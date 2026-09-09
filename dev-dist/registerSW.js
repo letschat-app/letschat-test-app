@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) navigator.serviceWorker.register('/LetsChat/dev-sw.js?dev-sw', { scope: '/LetsChat/', type: 'module' })
