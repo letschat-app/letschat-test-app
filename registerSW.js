@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/letschat-test-app/service-worker.js', { scope: '/letschat-test-app/' })})}
