@@ -1,7 +1,6 @@
 import messageStore from "../pages/MessageStore";
 import { updateMessageStatusInDB } from "./db";
 import * as SyncService from "./SyncService";
-
 let socket = null;
 let reconnectTimeout = null;
 let reconnectAttempts = 0;
@@ -50,7 +49,8 @@ export function initWebsocket() {
   // Connection URL
 
   //socket = new WebSocket(`ws://10.197.48.102:8080/chat?userid=${userid}`);
-  socket = new WebSocket(`wss://letschat-backend-69jf.onrender.com/chat?userid=${userid}`);
+  //socket = new WebSocket(`wss://letschat-backend-69jf.onrender.com/chat?userid=${userid}`);//prod server
+  socket = new WebSocket(`wss://letschat-5dxg.onrender.com/chat?userid=${userid}`);//test server
   localStorage.setItem('socket', socket);
 
   socket.onopen = () => {
