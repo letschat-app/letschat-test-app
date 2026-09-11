@@ -1,8 +1,8 @@
 {
   "name": "LetsChat",
   "short_name": "LetsChat",
-  "start_url": "/LetsChat/",
-  "scope": "/LetsChat/",
+  "start_url": "/letschat-test-app/",
+  "scope": "/letschat-test-app/",
   "display": "standalone",
   "background_color": "#0a0f18",
   "theme_color": "#0a0f18",
