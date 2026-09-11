@@ -395,6 +395,14 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
     }
   }, [selectedChatForSpaces]);
 
+  useEffect(() => {
+    const loader = document.getElementById('pwa-splash-loader');
+    if (loader && !loader.classList.contains('fade-out')) {
+      loader.classList.add('fade-out');
+      setTimeout(() => loader.remove(), 300);
+    }
+  }, []);
+
   // Helper to persist spacesCache
   useEffect(() => {
     localStorage.setItem('spacesCache', JSON.stringify(spacesCache));
