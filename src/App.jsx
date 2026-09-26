@@ -1,5 +1,19 @@
 import React, { Suspense, lazy , useEffect , useState} from "react";
-import { Routes, Route, Navigate,useLocation } from "react-router-dom";
+import { Routes, Route, Navigate,useLocation, useNavigate } from "react-router-dom";
+import Navbar from "./Navbar";
+import { purgeExpiredMessages } from "./service/db";
+import messageStore from "./pages/MessageStore";
+import EventPanel from "./service/EventPanel";
+import { EventStorage } from "./service/EventStorage";
+import { initWebsocket } from "./service/Websocket";
+import SwipeWrapper from "./Swipewrapper"; 
+import ChatLayout from "./layouts/ChatLayout";
+import { PWAProvider } from "./context/PWAContext";
+import UpdateToast from "./components/chat/UpdateToast";
+import InAppToast from "./components/chat/InAppToast";
+import { useNotifications } from "./hooks/useNotifications";
+import { WifiOff } from "lucide-react";
+
 // Custom lazy wrapper to remove splash screen ONLY when the first dynamic chunk resolves
 const lazyWithSplash = (importFunc) => {
   return lazy(() => 
@@ -15,20 +29,23 @@ const lazyWithSplash = (importFunc) => {
 };
 
 const Search = lazyWithSplash(() => import("./pages/Search"));
-import Navbar from "./Navbar";
-import { purgeExpiredMessages } from "./service/db";
-import messageStore from "./pages/MessageStore";
-import EventPanel from "./service/EventPanel";
-import { EventStorage } from "./service/EventStorage";
-import { initWebsocket } from "./service/Websocket";
-import SwipeWrapper from "./Swipewrapper"; 
-import ChatLayout from "./layouts/ChatLayout";
-import { PWAProvider } from "./context/PWAContext";
-import UpdateToast from "./components/chat/UpdateToast";
-import InAppToast from "./components/chat/InAppToast";
-import { useNotifications } from "./hooks/useNotifications";
-import { useNavigate } from "react-router-dom";
-import { WifiOff } from "lucide-react";
+const Rooms = lazyWithSplash(() => import("./pages/Rooms"));
+const ChatNames = lazyWithSplash(() => import("./pages/ChatNames"));
+const Profileupdate = lazyWithSplash(() => import("./pages/Profileupdate"));
+const ProfilePage = lazyWithSplash(() => import("./pages/ProfilePage"));
+const ChatBox = lazyWithSplash(() => import("./pages/ChatBox"));
+const Communities = lazyWithSplash(() => import("./pages/Communities"));
+const RecommendedCommunities = lazyWithSplash(() => import("./pages/RecommendedCommunities"));
+const MyCommunities = lazyWithSplash(() => import("./pages/MyCommunities"));
+const CommunityCreationPage = lazyWithSplash(() => import("./pages/CommunityCreationPage"));
+const UploadPost = lazyWithSplash(() => import("./pages/UploadPost"));
+const MediaFeed = lazyWithSplash(() => import("./pages/MediaFeed"));
+const SmoothCalendar = lazyWithSplash(() => import("./pages/SmoothCalendar"));
+const ShareTargetPage = lazyWithSplash(() => import("./pages/ShareTargetPage"));
+const StarredMessages = lazyWithSplash(() => import("./pages/StarredMessages"));
+const LandingPage = lazyWithSplash(() => import("./pages/LandingPage"));
+const Signin = lazyWithSplash(() => import("./pages/Signin"));
+const Login = lazyWithSplash(() => import("./pages/Login"));
 
 function App() {
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
