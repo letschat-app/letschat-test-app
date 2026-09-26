@@ -3695,10 +3695,10 @@ const ChatBox = () => {
             margin: '8px auto 14px',
             maxWidth: '92%',
             padding: '8px 14px',
-            backgroundColor: 'rgba(234, 179, 8, 0.1)',
-            border: '1px solid rgba(234, 179, 8, 0.22)',
+            backgroundColor: 'var(--bg-card)',
+            border: '1px solid var(--border-color)',
             borderRadius: '12px',
-            color: '#fef08a',
+            color: 'var(--text-secondary)',
             fontSize: '12px',
             lineHeight: '1.4',
             textAlign: 'center',
@@ -3706,8 +3706,8 @@ const ChatBox = () => {
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
             userSelect: 'none'
           }}>
-            <Lock size={14} color="#facc15" style={{ flexShrink: 0 }} />
-            <span>Messages are end-to-end encrypted. Not even LetsChat can read or listen to them.</span>
+            <Lock size={14} color="var(--accent-color)" style={{ flexShrink: 0 }} />
+            <span>Messages are encrypted. Not even LetsChat can read or listen to them.</span>
           </div>
 
           {/* Empty Space / Chat Suggestion Chips View */}
@@ -3788,20 +3788,20 @@ const ChatBox = () => {
                 {showDate && (
                   <div
                     style={{
-                      border: "1px solid #3a3a3a",
+                      border: "1px solid var(--border-color)",
                       textAlign: "center",
-                      color: "#b0b0b0",
+                      color: "var(--text-secondary)",
                       padding: isMobile ? '6px 12px' : '8px 16px',
                       borderRadius: '20px',
                       fontSize: isMobile ? '11px' : '12px',
-                      fontWeight: "500",
+                      fontWeight: "600",
                       margin: "12px auto",
-                      backgroundColor: "#252525",
+                      backgroundColor: "var(--bg-card)",
                       cursor: "pointer",
                       userSelect: "none",
-                      maxWidth: "180px",
+                      maxWidth: "200px",
                       transition: "all 0.2s ease",
-                      boxShadow: "0 2px 4px rgba(0, 0, 0, 0.2)",
+                      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15)",
                     }}
                     ref={(el) => (messageRefs.current[`date-${dateOnly}`] = el)}
                     onClick={(e) => {
@@ -3815,7 +3815,7 @@ const ChatBox = () => {
                           if (element) {
                             element.scrollIntoView({ behavior: "smooth", block: "start" });
                           }
-                        }, 100);
+                        }, 50);
                       } else {
                         // Collapse all messages, show only dates
                         setCollapsedView(true);
@@ -3843,12 +3843,12 @@ const ChatBox = () => {
                           position: 'absolute',
                           left: 0, right: 0, top: '50%',
                           height: '1px',
-                          backgroundColor: 'rgba(59, 130, 246, 0.4)',
+                          backgroundColor: 'var(--border-color)',
                           zIndex: 0
                         }} />
                         <span style={{
-                          backgroundColor: '#1e3a8a',
-                          color: '#ffffff',
+                          backgroundColor: 'var(--bg-card)',
+                          color: 'var(--accent-color)',
                           padding: '6px 16px',
                           borderRadius: '24px',
                           fontSize: '11px',
@@ -3856,8 +3856,8 @@ const ChatBox = () => {
                           textTransform: 'uppercase',
                           letterSpacing: '1.2px',
                           zIndex: 1,
-                          border: '2px solid #3b82f6',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                          border: '1px solid var(--border-color)',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                           display: 'flex',
                           alignItems: 'center',
                           gap: '8px'

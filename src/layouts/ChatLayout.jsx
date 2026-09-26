@@ -131,7 +131,7 @@ export default function ChatLayout() {
             </div>
 
             <div style={{ position: 'absolute', bottom: '24px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '14px' }}>
-              <span style={{ opacity: 0.6 }}>🔒 End-to-end encrypted</span>
+              <span style={{ opacity: 0.6 }}>🔒 encrypted</span>
             </div>
           </div>
         ) : (
