@@ -488,15 +488,15 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
         width: isMobile ? '100%' : '300px',
         maxWidth: '300px',
         padding: '12px 16px',
-        background: 'rgba(15, 23, 42, 0.4)',
+        background: isReceived ? 'var(--bg-card)' : 'rgba(0, 0, 0, 0.18)',
         backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(255, 255, 255, 0.05)',
+        border: isReceived ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.15)',
         borderRadius: '16px',
         display: 'flex',
         flexDirection: 'column',
         gap: '4px',
         position: 'relative',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
       }}>
         {/* Main row: Icon + Waveform */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -514,7 +514,7 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
                 <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
                   <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="3.5" />
                   <circle 
-                    cx="18" cy="18" r="15" fill="none" stroke="#60a5fa" strokeWidth="3.5" 
+                    cx="18" cy="18" r="15" fill="none" stroke={isReceived ? "var(--accent-color)" : "#ffffff"} strokeWidth="3.5" 
                     strokeDasharray="100" strokeDashoffset={100 - uploadProgress}
                     style={{ transition: 'stroke-dashoffset 0.2s ease' }}
                   />
@@ -530,9 +530,9 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
               }}
               style={{
                 width: '48px', height: '48px', borderRadius: '50%',
-                background: 'rgba(255,255,255,0.1)', border: 'none',
+                background: isReceived ? 'var(--bg-hover)' : 'rgba(255,255,255,0.15)', border: 'none',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#60a5fa', cursor: 'pointer', flexShrink: 0, outline: 'none'
+                color: isReceived ? 'var(--accent-color)' : '#ffffff', cursor: 'pointer', flexShrink: 0, outline: 'none'
               }}
             >
               <Download size={24} />
@@ -548,10 +548,10 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
                 width: '48px', height: '48px', borderRadius: '50%',
                 background: 'transparent', border: 'none',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#fff', cursor: 'pointer', flexShrink: 0, outline: 'none'
+                color: isReceived ? 'var(--accent-color)' : '#ffffff', cursor: 'pointer', flexShrink: 0, outline: 'none'
               }}
             >
-              {isPlaying ? <Pause size={30} fill="#fff" /> : <Play size={30} fill="#fff" />}
+              {isPlaying ? <Pause size={30} fill={isReceived ? 'var(--accent-color)' : '#fff'} /> : <Play size={30} fill={isReceived ? 'var(--accent-color)' : '#fff'} />}
             </button>
           )}
 
@@ -568,9 +568,9 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
                   key={i}
                   style={{
                     flex: 1, height: `${h}px`, borderRadius: '1.5px',
-                    background: isActive ? '#60a5fa' : 'rgba(148, 163, 184, 0.3)',
+                    background: isActive ? (isReceived ? 'var(--accent-color)' : '#ffffff') : (isReceived ? 'var(--border-color)' : 'rgba(255, 255, 255, 0.35)'),
                     transition: 'all 0.2s ease',
-                    boxShadow: isActive ? '0 0 8px rgba(96, 165, 250, 0.4)' : 'none'
+                    boxShadow: isActive ? `0 0 8px ${isReceived ? 'var(--accent-color)' : 'rgba(255, 255, 255, 0.5)'}` : 'none'
                   }}
                 />
               );
@@ -590,13 +590,12 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
 
           {/* Mic Icon (Standard Voice Note Indicator) */}
           <div style={{ 
-            color: '#60a5fa', 
+            color: isReceived ? 'var(--accent-color)' : '#ffffff', 
             display: 'flex', 
             alignItems: 'center', 
             opacity: isOptimistic ? 0.4 : 1,
-            filter: 'drop-shadow(0 0 8px rgba(96, 165, 250, 0.4))'
           }}>
-            <Mic size={20} fill="#60a5fa" />
+            <Mic size={20} fill={isReceived ? 'var(--accent-color)' : '#ffffff'} />
           </div>
         </div>
 
@@ -604,9 +603,9 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
         {!isOptimistic && (
           <div style={{
             display: 'flex', justifyContent: 'flex-start',
-            paddingLeft: '60px', opacity: 0.8
+            paddingLeft: '60px', opacity: 0.85
           }}>
-            <span style={{ fontSize: '10px', color: '#9ca3af', fontFamily: 'monospace' }}>
+            <span style={{ fontSize: '10px', color: isReceived ? 'var(--text-secondary)' : 'rgba(255, 255, 255, 0.85)', fontFamily: 'monospace' }}>
               {isPlaying || currentTime > 0 ? formatDuration(currentTime) : formatDuration(duration)} • {formatSize(fileSize)}
             </span>
           </div>
@@ -629,14 +628,14 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
         style={{
           width: isMobile ? '100%' : '300px',
           maxWidth: '300px',
-          background: '#232b36',
+          background: isReceived ? 'var(--bg-card)' : 'rgba(0, 0, 0, 0.18)',
           borderRadius: '12px',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
           position: 'relative',
           cursor: 'pointer',
-          border: '1px solid rgba(255,255,255,0.05)',
+          border: isReceived ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.15)',
           boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
         }}
         onClick={(e) => {
@@ -652,7 +651,7 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
         {hasThumb && (
           <div style={{
             width: '100%', height: '120px', 
-            background: '#1a1a1a', 
+            background: 'rgba(0, 0, 0, 0.2)', 
             position: 'relative',
             overflow: 'hidden'
           }}>
@@ -669,16 +668,16 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
             {/* Bottom Gradient Fade */}
             <div style={{
               position: 'absolute', bottom: 0, left: 0, right: 0, height: '40px',
-              background: 'linear-gradient(to top, #232b36, transparent)'
+              background: `linear-gradient(to top, ${isReceived ? 'var(--bg-card)' : 'rgba(0,0,0,0.3)'}, transparent)`
             }}/>
           </div>
         )}
 
-        {/* Bottom Details Block (Original Theme Color) */}
+        {/* Bottom Details Block */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: '14px',
           padding: '12px 14px',
-          background: '#232b36' 
+          background: isReceived ? 'var(--bg-card)' : 'transparent' 
         }}>
 
           {/* Folded Document Icon */}
@@ -701,7 +700,7 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
             <div style={{
               position: 'absolute', top: '-12px', right: '-12px',
               width: '24px', height: '24px',
-              background: '#232b36',
+              background: isReceived ? 'var(--bg-card)' : 'transparent',
               transform: 'rotate(45deg)'
             }} />
 
@@ -713,12 +712,12 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
           {/* Text Information */}
           <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <div style={{
-              fontSize: '14px', fontWeight: '600', color: '#ffffff',
+              fontSize: '14px', fontWeight: '600', color: isReceived ? 'var(--text-primary)' : '#ffffff',
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
             }}>
               {fileName}
             </div>
-            <div style={{ fontSize: '11px', color: '#a0aec0', fontWeight: '500' }}>
+            <div style={{ fontSize: '11px', color: isReceived ? 'var(--text-secondary)' : 'rgba(255, 255, 255, 0.85)', fontWeight: '500' }}>
               {mediaInfo.noOfPages ? `${mediaInfo.noOfPages} pages • ` : ''}
               {isPDF ? 'PDF' : (fileType || 'Doc').toUpperCase()} • {formatSize(fileSize)}
             </div>
@@ -760,7 +759,7 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
                   <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
                     <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="3.5" />
                     <circle 
-                      cx="18" cy="18" r="15" fill="none" stroke="#60a5fa" strokeWidth="3.5" 
+                      cx="18" cy="18" r="15" fill="none" stroke={isReceived ? "var(--accent-color)" : "#60a5fa"} strokeWidth="3.5" 
                       strokeDasharray="100" strokeDashoffset={100 - uploadProgress}
                       style={{ transition: 'stroke-dashoffset 0.2s ease' }}
                     />
@@ -776,15 +775,13 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
                   downloadFile(url, fileName);
                 }}
                 style={{
-                  padding: '8px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)',
-                  border: '1px solid rgba(255,255,255,0.15)',
+                  padding: '8px', borderRadius: '50%', background: isReceived ? 'var(--bg-hover)' : 'rgba(255,255,255,0.12)',
+                  border: isReceived ? '1px solid var(--border-color)' : '1px solid rgba(255,255,255,0.15)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
                   transition: 'background 0.2s'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
-                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
               >
-                <Download size={18} color="#ffffff" />
+                <Download size={18} color={isReceived ? 'var(--text-primary)' : '#ffffff'} />
               </div>
             )}
           </div>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, MessageSquare, ShieldCheck, Award, UserMinus, ChevronRight } from 'lucide-react';
+import { X, MessageSquare, ShieldCheck, Award, UserMinus, ChevronRight, User } from 'lucide-react';
 import { syncChatsMapToDB } from '../../service/db';
 import Avatar from '../chat/Avatar';
 
@@ -10,6 +10,13 @@ const MemberActionsPopup = ({ member, chat, currentUserId, myDisplayName, API, o
   const isSelectedMemberFaculty = member.role === 'faculty';
   const isCurrentUserAdmin = chat.role === 'admin';
   const isCurrentUserFaculty = chat.role === 'faculty';
+
+  const handleViewProfile = () => {
+    onClose();
+    if (navigate) {
+      navigate(`/profile/${member.userId}`);
+    }
+  };
 
   const handleChatPrivately = async () => {
     try {
@@ -133,6 +140,12 @@ const MemberActionsPopup = ({ member, chat, currentUserId, myDisplayName, API, o
 
         {/* Actions List */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <ActionItem 
+            icon={<User size={18} />} 
+            label="View Profile / Info" 
+            onClick={handleViewProfile} 
+            color="#60a5fa"
+          />
           <ActionItem 
             icon={<MessageSquare size={18} />} 
             label="Message Privately" 

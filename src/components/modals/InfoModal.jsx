@@ -30,6 +30,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
   const fileInputRef = useRef(null);
   const groupFileInputRef = useRef(null);
   const [muted, setMuted] = useState(false);
+  const [commonGroups, setCommonGroups] = useState([]);
   const [pinned, setPinned] = useState(() => {
     try {
       const list = JSON.parse(localStorage.getItem('quick_access_chats') || '[]');
@@ -63,9 +64,32 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
       fetchMembers();
     } else {
       setLoading(false);
+      fetchCommonGroups();
     }
     checkMuteStatus();
   }, [chat]);
+
+  const fetchCommonGroups = async () => {
+    const partnerId = String(chat.chatId || chat.userid || chat.id);
+    try {
+      const chatsMap = JSON.parse(localStorage.getItem('chatsMap') || '{}');
+      const groupList = Object.values(chatsMap).filter(c => c.type === 'group' || c.type === 'classroom');
+      
+      const checkPromises = groupList.map(async (g) => {
+        const cachedMembers = await getGroupMembersFromDB(g.chatId);
+        if (cachedMembers && cachedMembers.some(m => String(m.userId) === partnerId)) {
+          return g;
+        }
+        return null;
+      });
+
+      const results = await Promise.all(checkPromises);
+      const found = results.filter(Boolean);
+      setCommonGroups(found);
+    } catch (e) {
+      console.error("Error computing common groups:", e);
+    }
+  };
 
   const checkMuteStatus = async () => {
     const isMuted = await isChatMuted(chat.chatId);
@@ -756,6 +780,58 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
             }} />
           </div>
         </section>
+
+        {/* Common Groups Section (For Private 1-on-1 Chats) */}
+        {chat.type !== 'group' && chat.type !== 'classroom' && chat.type !== 'room' && (
+          <section style={{ marginBottom: '32px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+              <Users size={16} color="var(--accent-color)" />
+              <h3 style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>
+                Groups in Common ({commonGroups.length})
+              </h3>
+            </div>
+            {commonGroups.length === 0 ? (
+              <div style={{
+                padding: '16px', borderRadius: '16px',
+                backgroundColor: 'rgba(255, 255, 255, 0.03)', color: 'var(--text-secondary)',
+                fontSize: '13px', textAlign: 'center', border: '1px solid var(--border-color)'
+              }}>
+                No common groups found
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {commonGroups.map(g => (
+                  <div
+                    key={g.chatId}
+                    onClick={() => {
+                      onClose();
+                      navigate(`/chat/${g.chatId}`);
+                    }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '12px',
+                      padding: '12px', borderRadius: '16px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                      border: '1px solid var(--border-color)',
+                      cursor: 'pointer', transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)'}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.03)'}
+                  >
+                    <Avatar chat={g} size={40} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                        {g.chatName}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'capitalize' }}>
+                        {g.type} Chat
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Members Section */}
         {(chat.type === 'group' || chat.type === 'classroom' || chat.type === 'room') && (

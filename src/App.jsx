@@ -173,7 +173,7 @@ function App() {
             <Route path="/search" element={<Search />}/>
             <Route path="/rooms" element={<Rooms />} />
             <Route path="/calendar" element={<SmoothCalendar/>}/>
-            <Route path="/profile" element={<ProfilePage/>}/>
+            <Route path="/profile/:targetUserId?" element={<ProfilePage/>}/>
             <Route path="/profileupdate" element={<Profileupdate/>}/>
             <Route path="/starred" element={<StarredMessages />} />
           </Route>
