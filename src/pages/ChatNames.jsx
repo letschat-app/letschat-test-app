@@ -1271,7 +1271,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
             position: 'relative',
             display: 'flex',
             alignItems: 'center',
-            backgroundColor: isDesktop ? 'var(--bg-secondary)' : '#1a1a1a',
+            backgroundColor: 'var(--bg-secondary)',
             borderRadius: '8px',
             padding: '0 12px'
           }}>
@@ -1280,7 +1280,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                 width: "20px",
                 height: "20px",
                 pointerEvents: "none",
-                color: '#808080'
+                color: 'var(--text-secondary)'
               }}
               fill="none"
               stroke="currentColor"
