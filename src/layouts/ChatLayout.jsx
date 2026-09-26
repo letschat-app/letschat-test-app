@@ -33,7 +33,7 @@ export default function ChatLayout() {
 
   // Desktop 3-Layer Layout
   return (
-    <div style={{ display: 'flex', width: '100vw', height: '100%', flex: 1, overflow: 'hidden', backgroundColor: 'var(--bg-primary)' }}>
+    <div style={{ display: 'flex', width: '100%', height: '100%', flex: 1, overflow: 'hidden', backgroundColor: 'var(--bg-primary)' }}>
       {/* Layer 1: Desktop Sidebar */}
       <DesktopSidebar />
 

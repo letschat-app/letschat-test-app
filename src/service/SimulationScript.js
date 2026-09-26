@@ -20,7 +20,8 @@ export const SIMULATION_SCRIPT = [
     type: "message",
     content: "I've dropped something in another space... can you find it? 👀",
     delay: 2000,
-    spaceid: 0
+    spaceid: 0,
+    createSpace: { id: 1, name: "Space 1" }
   },
   {
     step: 4,
@@ -28,12 +29,13 @@ export const SIMULATION_SCRIPT = [
     content: "Just click the **< Back** button on the top left to return to the space list. See if you can find the new space I created! 👀",
     delay: 2500,
     spaceid: 0,
+    createSpace: { id: 1, name: "Space 1" },
     waitFor: { type: "space_change", value: 1 }
   },
   {
     step: 5,
     type: "message",
-    content: "Nice 😄 You found Space 1. Every space is a distinct topic, with its own history and **Space names are customizable!** ✏️",
+    content: "Nice 😄 You found Space 1. Every space is a distinct topic, with its own history and **Space names are customizable!** ✏️ (Tap the space name to rename it)",
     delay: 1000,
     spaceid: 1
   },

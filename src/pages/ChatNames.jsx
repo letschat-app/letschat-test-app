@@ -9,7 +9,7 @@ import { getChatIcon, getChatColor } from "../service/ChatUtils";
 import MediaViewer from "../components/chat/MediaViewer";
 import Avatar from "../components/chat/Avatar";
 import userDiscoveryStore from "../service/UserDiscoveryStore";
-import { MoreVertical, Pin, Plus, Users, RefreshCcw, Check, X } from "lucide-react";
+import { MoreVertical, Pin, Plus, Users, RefreshCcw, Check, X, Pencil } from "lucide-react";
 import { SIMULATION_ID } from "../service/SimulationScript";
 import { usePWA } from "../context/PWAContext";
 import { useEventMediator } from "../service/EventStorage";
@@ -342,6 +342,14 @@ const ChatRow = React.memo(function ChatRow({
 function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false }) {
   const { deferredPrompt, isInstalled, installApp } = usePWA();
   const [chatNames, setChatNames] = useState([]);
+  const [isLoading, setIsLoading] = useState(() => {
+    try {
+      const cached = JSON.parse(localStorage.getItem("chatsMap") || '{}');
+      return Object.keys(cached).length === 0;
+    } catch {
+      return true;
+    }
+  });
   const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [lastMessages, setLastMessages] = useState({});
@@ -407,6 +415,23 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
   useEffect(() => {
     localStorage.setItem('spacesCache', JSON.stringify(spacesCache));
   }, [spacesCache]);
+
+  useEffect(() => {
+    const handleSpacesUpdate = (e) => {
+      const { chatId, spaces } = e.detail || {};
+      if (chatId && spaces) {
+        setSpacesCache(prev => ({ ...prev, [chatId]: spaces }));
+        setSelectedChatForSpaces(prev => {
+          if (prev && String(prev.chatId) === String(chatId)) {
+            return { ...prev, spaces };
+          }
+          return prev;
+        });
+      }
+    };
+    window.addEventListener('spaces_cache_updated', handleSpacesUpdate);
+    return () => window.removeEventListener('spaces_cache_updated', handleSpacesUpdate);
+  }, []);
 
   // ── Stable Refs ──────────────────────────────────────────────────────────
   const isMounted = useRef(true);
@@ -1280,6 +1305,24 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                 outline: "none",
               }}
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '50%',
+                }}
+              >
+                <X size={16} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -1418,22 +1461,54 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
               };
 
               return (
-                <ChatRow
-                  key={space.id}
-                  chat={spaceChat}
-                  msg={spaceLastMsg}
-                  chatCount={spaceCount}
-                  isPinned={false}
-                  isActive={activeChatRoute?.includes(`/chat/${selectedChatForSpaces.chatId}`) && activeChatRoute?.includes(`space=${space.id}`)}
-                  isDesktop={isDesktop}
-                  isOnline={false}
-                  userId={userIdRef.current}
-                  onChatClick={() => handleSpaceClick(selectedChatForSpaces, space)}
-                  onTogglePin={() => { }}
-                  onAvatarClick={() => { }}
-                  formatTime={formatChatTime}
-                  hideAvatar={true}
-                />
+                <div key={space.id} style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <ChatRow
+                      chat={spaceChat}
+                      msg={spaceLastMsg}
+                      chatCount={spaceCount}
+                      isPinned={false}
+                      isActive={activeChatRoute?.includes(`/chat/${selectedChatForSpaces.chatId}`) && activeChatRoute?.includes(`space=${space.id}`)}
+                      isDesktop={isDesktop}
+                      isOnline={false}
+                      userId={userIdRef.current}
+                      onChatClick={() => handleSpaceClick(selectedChatForSpaces, space)}
+                      onTogglePin={() => { }}
+                      onAvatarClick={() => { }}
+                      formatTime={formatChatTime}
+                      hideAvatar={true}
+                    />
+                  </div>
+                  {space.id !== 0 && selectedChatForSpaces.type !== 'classroom' && (
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const currentName = space.name;
+                        const newName = prompt("Enter new name for this space:", currentName);
+                        if (newName && newName.trim() && newName !== currentName) {
+                          await spaceStore.setSpaceName(selectedChatForSpaces.chatId, space.id, newName.trim());
+                        }
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        padding: '10px 14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '8px',
+                        transition: 'color 0.2s ease'
+                      }}
+                      title="Rename Space"
+                      onMouseEnter={e => e.currentTarget.style.color = 'var(--accent-color)'}
+                      onMouseLeave={e => e.currentTarget.style.color = 'var(--text-secondary)'}
+                    >
+                      <Pencil size={15} />
+                    </button>
+                  )}
+                </div>
               );
             })}
 
@@ -1620,6 +1695,25 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                 </div>
               );
             })()}
+          </div>
+        ) : isLoading && sortedAndFilteredChats.length === 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '4px' }}>
+            <style>{`
+              @keyframes chatSkeletonPulse {
+                0% { opacity: 0.3; }
+                50% { opacity: 0.8; }
+                100% { opacity: 0.3; }
+              }
+            `}</style>
+            {[1, 2, 3, 4, 5, 6].map(i => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '12px 16px', width: '100%', boxSizing: 'border-box' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '14px', backgroundColor: 'rgba(255, 255, 255, 0.08)', flexShrink: 0, animation: 'chatSkeletonPulse 1.5s ease-in-out infinite' }} />
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ width: '45%', height: '14px', borderRadius: '6px', backgroundColor: 'rgba(255, 255, 255, 0.1)', animation: 'chatSkeletonPulse 1.5s ease-in-out infinite' }} />
+                  <div style={{ width: '75%', height: '11px', borderRadius: '4px', backgroundColor: 'rgba(255, 255, 255, 0.05)', animation: 'chatSkeletonPulse 1.5s ease-in-out infinite' }} />
+                </div>
+              </div>
+            ))}
           </div>
         ) : sortedAndFilteredChats.length === 0 ? (
           <div style={{

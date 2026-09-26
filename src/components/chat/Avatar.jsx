@@ -66,7 +66,7 @@ const Avatar = ({ chat, size = 48, style = {}, onClick = null, isHovered = false
   const circleStyle = {
     position: 'absolute',
     inset: 0,
-    borderRadius: '50%',
+    borderRadius: `calc(${size}px * 0.28)`,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',

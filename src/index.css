@@ -1,108 +1,80 @@
+@import "tailwindcss";
+
 :root {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.5;
   font-weight: 400;
+  color-scheme: dark;
 
-  /* Premium Dark Theme (Deep Midnight) */
-  --bg-primary: #0a0f18;
-  --bg-secondary: #121826;
-  --bg-gradient: linear-gradient(165deg, #121826 0%, #0a0f18 100%);
-  --bg-card: #111827;
-  --bg-card-hover: rgba(51, 65, 85, 0.8);
-  --bg-hover: rgba(255, 255, 255, 0.05);
-  --border-color: #374151;
-  --accent-color: #3b82f6;
-  --accent-color-hover: #2563eb;
-  --text-primary: #f3f4f6;
+  /* Premium Midnight Glass Theme */
+  --bg-primary: #0b0f19;
+  --bg-secondary: #111827;
+  --bg-gradient: linear-gradient(165deg, #111827 0%, #0b0f19 100%);
+  --bg-card: #1f2937;
+  --bg-card-hover: rgba(55, 65, 81, 0.8);
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --border-color: rgba(255, 255, 255, 0.1);
+  --border-focus: rgba(99, 102, 241, 0.5);
+  
+  --accent-color: #6366f1;
+  --accent-color-hover: #4f46e5;
+  --accent-gradient: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+  
+  --text-primary: #f9fafb;
   --text-secondary: #9ca3af;
-  --nav-active-bg: rgba(59, 130, 246, 0.1);
+  --text-muted: #6b7280;
+  
+  --nav-active-bg: rgba(99, 102, 241, 0.15);
   --danger-color: #f43f5e;
-  --message-bg-outgoing: #3b82f6;
+  --success-color: #10b981;
+  --warning-color: #f59e0b;
+  
+  --message-bg-outgoing: linear-gradient(135deg, #4f46e5 0%, #2563eb 100%);
   --message-bg-incoming: #1f2937;
-  --glass-effect: blur(12px) saturate(180%);
+  --glass-effect: blur(16px) saturate(180%);
   
   color: var(--text-primary);
   background-color: var(--bg-primary);
 }
 
 [data-theme="light"] {
-  /* Clean Studio Palette */
-  --bg-primary: #fcfcfd;
+  color-scheme: light;
+  --bg-primary: #f8fafc;
   --bg-secondary: #ffffff;
   --bg-gradient: linear-gradient(165deg, #ffffff 0%, #f1f5f9 100%);
-  --bg-card: rgba(241, 245, 249, 0.8);
-  --bg-card-hover: rgba(226, 232, 240, 0.9);
-  --border-color: rgba(203, 213, 225, 0.4);
-  --accent-color: #2563eb;
-  --accent-color-hover: #1d4ed8;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f1f5f9;
+  --border-color: rgba(226, 232, 240, 0.8);
+  --accent-color: #4f46e5;
+  --accent-color-hover: #4338ca;
   --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --nav-active-bg: rgba(37, 99, 231, 0.1);
+  --text-secondary: #64748b;
+  --nav-active-bg: rgba(79, 70, 229, 0.1);
   --danger-color: #e11d48;
-  --message-bg-outgoing: #2563eb;
+  --message-bg-outgoing: #4f46e5;
   --message-bg-incoming: #f1f5f9;
   
   color: var(--text-primary);
   background-color: var(--bg-primary);
 }
 
-[data-theme="pink"] {
-  /* Rose Quartz Palette */
-  --bg-primary: #fff1f2;
-  --bg-secondary: #fffafb;
-  --bg-gradient: linear-gradient(165deg, #fffafb 0%, #ffe4e6 100%);
-  --bg-card: rgba(251, 207, 232, 0.3);
-  --bg-card-hover: rgba(24bc, 172, 214, 0.4);
-  --border-color: rgba(225, 29, 72, 0.15);
-  --accent-color: #e11d48;
-  --accent-color-hover: #be123c;
-  --text-primary: #4c0519;
-  --text-secondary: #9f1239;
-  --nav-active-bg: rgba(225, 29, 72, 0.1);
-  --danger-color: #be123c;
-  --message-bg-outgoing: #e11d48;
-  --message-bg-incoming: #fff1f2;
-  
-  color: var(--text-primary);
-  background-color: var(--bg-primary);
-}
-
-[data-theme="blue"] {
-  /* Ocean & Space Palette */
-  --bg-primary: #0f172a;
-  --bg-secondary: #1e293b;
-  --bg-gradient: linear-gradient(165deg, #1e293b 0%, #0f172a 100%);
-  --bg-card: rgba(30, 41, 59, 0.8);
-  --bg-card-hover: rgba(51, 65, 85, 0.9);
-  --border-color: rgba(56, 189, 248, 0.2);
-  --accent-color: #0ea5e9;
-  --accent-color-hover: #38bdf8;
-  --text-primary: #f0f9ff;
-  --text-secondary: #7dd3fc;
-  --nav-active-bg: rgba(14, 165, 233, 0.15);
-  --danger-color: #ef4444;
-  --message-bg-outgoing: #0ea5e9;
-  --message-bg-incoming: #1e293b;
-
-  color: var(--text-primary);
-  background-color: var(--bg-primary);
-}
-
-a {
-  font-weight: 500;
-  color: var(--accent-color);
-  text-decoration: inherit;
-}
-a:hover {
-  color: var(--accent-color-hover);
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
   margin: 0;
   padding: 0;
-  width: 100%;
+  width: 100vw;
   height: 100dvh;
   overflow: hidden;
+  background-color: var(--bg-primary);
+  font-family: inherit;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #root {
@@ -110,33 +82,45 @@ body {
   height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
-h1 {
-  font-size: 1.8em;
-  line-height: 1.2;
+a {
+  font-weight: 500;
+  color: var(--accent-color);
+  text-decoration: none;
+  transition: color 0.2s ease;
 }
-
+a:hover {
+  color: var(--accent-color-hover);
+}
 
 button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
   font-family: inherit;
-  background-color: var(--bg-card);
   cursor: pointer;
-  transition: border-color 0.25s, background-color 0.25s;
-  color: var(--text-primary);
+  border-radius: 10px;
+  outline: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
-button:hover {
-  border-color: var(--accent-color);
-  background-color: var(--bg-card-hover);
-}
-button:focus,
+
 button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  box-shadow: 0 0 0 2px var(--accent-color);
+}
+
+/* Custom Sleek Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .hide-scrollbar::-webkit-scrollbar {
@@ -147,3 +131,18 @@ button:focus-visible {
   scrollbar-width: none;
 }
 
+/* Micro Animations */
+@keyframes muFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.04); }
+}

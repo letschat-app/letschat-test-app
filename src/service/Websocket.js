@@ -117,11 +117,23 @@ export function initWebsocket() {
 
       if (senderId && senderId !== myId && !msg.isold) {
         if (actualMsgType !== 'reaction' && actualMsgType !== 'indicator' && !msg.isIndicator) {
-          const now = Date.now();
-          if (now - lastSoundTime > 10000) {
-            lastSoundTime = now;
-            const audio = new Audio(`${import.meta.env.BASE_URL}Incoming.mpeg`);
-            audio.play().catch(e => console.warn("Audio play blocked by browser:", e));
+          const activeChat = messageStore.getActivechatbox();
+          const activeSpace = messageStore.getActiveSpace();
+
+          const msgChatId = msg.chatid || msg.userchatId || msg.chatId;
+          const msgSpaceId = msg.spaceid !== undefined ? parseInt(msg.spaceid) : (msg.spaceId !== undefined ? parseInt(msg.spaceId) : (msg.usermsgId !== undefined ? parseInt(msg.usermsgId) : 0));
+
+          const isSameChat = activeChat != null && String(activeChat) === String(msgChatId);
+          const isSameSpace = activeSpace != null && Number(activeSpace) === Number(msgSpaceId);
+
+          if (isSameChat && isSameSpace) {
+            const now = Date.now();
+            if (now - lastSoundTime > 10000) {
+              lastSoundTime = now;
+              const audio = new Audio(`${import.meta.env.BASE_URL}Incoming.mpeg`);
+              audio.volume = 0.7;
+              audio.play().catch(e => console.warn("Audio play blocked by browser:", e));
+            }
           }
         }
       }
