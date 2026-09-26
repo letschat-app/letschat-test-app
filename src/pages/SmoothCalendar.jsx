@@ -225,7 +225,7 @@ const SmoothCalendar = () => {
       minHeight: '100vh',
       overflowY: 'auto',
       overflowX: 'hidden',
-      background: 'linear-gradient(135deg, #020617 0%, #0f172a 50%, #000000 100%)',
+      background: 'var(--bg-primary)',
       padding: isMobile ? '8px 0' : '12px 16px',
       marginTop: '10px',
       fontFamily: "'Inter', sans-serif",
@@ -239,13 +239,13 @@ const SmoothCalendar = () => {
           --radius-curvy: 32px;
           --radius-pill: 500px;
           --accent-glow: 0 0 20px rgba(59, 130, 246, 0.4);
-          --glass-bg: rgba(15, 23, 42, 0.85);
+          --glass-bg: var(--bg-card);
           --glass-blur: blur(24px) saturate(160%);
         }
 
         .calendar-title {
           font-family: 'Outfit', sans-serif;
-          background: linear-gradient(to right, #60a5fa, #a855f7);
+          background: var(--accent-gradient);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           font-weight: 700;
@@ -254,10 +254,10 @@ const SmoothCalendar = () => {
         }
 
         .glass-panel {
-          background: var(--glass-bg) !important;
+          background: var(--bg-card) !important;
           backdrop-filter: var(--glass-blur) !important;
-          border: 1px solid rgba(255, 255, 255, 0.1) !important;
-          box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.4) !important;
+          border: 1px solid var(--border-color) !important;
+          box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.2) !important;
           border-radius: var(--radius-curvy) !important;
         }
 
@@ -268,8 +268,8 @@ const SmoothCalendar = () => {
 
         .day-circle:hover {
           transform: translateY(-4px) scale(1.1) !important;
-          background-color: rgba(59, 130, 246, 0.3) !important;
-          border-color: #60a5fa !important;
+          background-color: var(--nav-active-bg) !important;
+          border-color: var(--accent-color) !important;
           border-radius: var(--radius-curvy) !important;
         }
 
@@ -279,8 +279,8 @@ const SmoothCalendar = () => {
         }
 
         .calendar-nav-btn:hover {
-          background-color: rgba(255, 255, 255, 0.1) !important;
-          color: #fff !important;
+          background-color: var(--nav-active-bg) !important;
+          color: var(--text-primary) !important;
           transform: scale(1.05);
         }
 
@@ -395,10 +395,10 @@ const SmoothCalendar = () => {
             display: 'flex',
             alignItems: 'center',
             gap: '4px',
-            backgroundColor: 'rgba(31, 41, 55, 0.5)',
+            backgroundColor: 'var(--bg-card)',
             borderRadius: '12px',
             padding: '6px',
-            border: '1px solid rgba(75, 85, 99, 0.4)',
+            border: '1px solid var(--border-color)',
             backdropFilter: 'blur(8px)'
           }}>
             <button
@@ -414,7 +414,7 @@ const SmoothCalendar = () => {
               style={{
                 background: 'none',
                 border: 'none',
-                color: '#9ca3af',
+                color: 'var(--text-secondary)',
                 cursor: 'pointer',
                 padding: isMobile ? '6px' : '8px',
                 display: 'flex',
@@ -428,7 +428,7 @@ const SmoothCalendar = () => {
             </button>
 
             <span style={{
-              color: '#fff',
+              color: 'var(--text-primary)',
               fontFamily: "'Outfit', sans-serif",
               fontSize: isMobile ? '15px' : '18px',
               fontWeight: '600',
@@ -451,7 +451,7 @@ const SmoothCalendar = () => {
               style={{
                 background: 'none',
                 border: 'none',
-                color: '#9ca3af',
+                color: 'var(--text-secondary)',
                 cursor: 'pointer',
                 padding: isMobile ? '6px' : '8px',
                 display: 'flex',
@@ -470,10 +470,10 @@ const SmoothCalendar = () => {
             display: 'flex',
             alignItems: 'center',
             gap: '4px',
-            backgroundColor: 'rgba(31, 41, 55, 0.5)',
+            backgroundColor: 'var(--bg-card)',
             borderRadius: '12px',
             padding: '6px',
-            border: '1px solid rgba(75, 85, 99, 0.4)',
+            border: '1px solid var(--border-color)',
             backdropFilter: 'blur(8px)'
           }}>
             <button
@@ -482,7 +482,7 @@ const SmoothCalendar = () => {
               style={{
                 background: 'none',
                 border: 'none',
-                color: '#9ca3af',
+                color: 'var(--text-secondary)',
                 cursor: 'pointer',
                 padding: isMobile ? '6px' : '8px',
                 display: 'flex',
@@ -496,7 +496,7 @@ const SmoothCalendar = () => {
             </button>
 
             <span style={{
-              color: '#fff',
+              color: 'var(--text-primary)',
               fontFamily: "'Outfit', sans-serif",
               fontSize: isMobile ? '15px' : '18px',
               fontWeight: '600',
@@ -512,7 +512,7 @@ const SmoothCalendar = () => {
               style={{
                 background: 'none',
                 border: 'none',
-                color: '#9ca3af',
+                color: 'var(--text-secondary)',
                 cursor: 'pointer',
                 padding: isMobile ? '6px' : '8px',
                 display: 'flex',
@@ -555,7 +555,7 @@ const SmoothCalendar = () => {
                         gridTemplateColumns: isMobile ? 'repeat(7, minmax(0, 1fr))' : 'repeat(7, 1fr)',
                         marginBottom: isMobile ? '8px' : '20px',
                         gap: isMobile ? '2px' : '4px',
-                        borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                        borderBottom: '1px solid var(--border-color)',
                         paddingBottom: '12px',
                         width: '100%'
                       }}
@@ -566,7 +566,7 @@ const SmoothCalendar = () => {
                           style={{
                             textAlign: 'center',
                             fontWeight: 700,
-                            color: '#9ca3af',
+                            color: 'var(--text-secondary)',
                             fontSize: '12px',
                             textTransform: 'uppercase',
                             letterSpacing: '0.05em',
@@ -602,9 +602,9 @@ const SmoothCalendar = () => {
                           fontWeight: 600,
                           cursor: 'pointer',
                           position: 'relative',
-                          border: isToday(day) ? 'none' : '1px solid rgba(255, 255, 255, 0.05)',
-                          backgroundColor: isToday(day) ? '#3b82f6' : 'rgba(55, 65, 81, 0.3)',
-                          color: isToday(day) ? '#fff' : isPast ? '#4b5563' : '#e5e7eb',
+                          border: isToday(day) ? 'none' : '1px solid var(--border-color)',
+                          backgroundColor: isToday(day) ? 'var(--accent-color)' : 'var(--bg-card)',
+                          color: isToday(day) ? '#fff' : isPast ? 'var(--text-muted)' : 'var(--text-primary)',
                           boxShadow: isToday(day) ? '0 0 20px rgba(59, 130, 246, 0.5)' : 'none',
                           boxSizing: 'border-box'
                         };

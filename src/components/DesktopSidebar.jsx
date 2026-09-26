@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getsocket } from '../service/Websocket';
-import { MessageSquare, Users, Search, Calendar, LogOut, Settings, User, Star } from 'lucide-react';
+import { MessageSquare, Users, Search, Calendar, LogOut, User, Star } from 'lucide-react';
 import { removeFCMToken } from '../service/UserAuth';
 
 const topMenuItems = [
@@ -14,7 +14,6 @@ const topMenuItems = [
 
 const bottomMenuItems = [
     { id: 'profile', path: '/profile', icon: User, label: 'Profile' },
-    { id: 'settings', path: '/settings', icon: Settings, label: 'Settings' },
 ];
 
 const DesktopSidebar = () => {
