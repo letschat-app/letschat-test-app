@@ -16,6 +16,7 @@ const SearchComponent = () => {
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isDiscoveryLoading, setIsDiscoveryLoading] = useState(!userDiscoveryStore.isLoaded && userDiscoveryStore.users.length === 0);
   const userId = localStorage.getItem("userid");
 
   const [recentSearches, setRecentSearches] = useState(() => {
@@ -126,11 +127,19 @@ const SearchComponent = () => {
   };
 
   useEffect(() => {
-    const unsubscribe = userDiscoveryStore.subscribe(setuserlist);
+    const unsubscribe = userDiscoveryStore.subscribe((users) => {
+      setuserlist(users);
+      setIsDiscoveryLoading(false);
+    });
     
     // Initial fetch if not loaded
     if (!userDiscoveryStore.isLoaded) {
-      userDiscoveryStore.fetchUsers();
+      setIsDiscoveryLoading(true);
+      userDiscoveryStore.fetchUsers().finally(() => {
+        setIsDiscoveryLoading(false);
+      });
+    } else {
+      setIsDiscoveryLoading(false);
     }
     
     return unsubscribe;
@@ -486,7 +495,10 @@ const SearchComponent = () => {
               <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#f8fafc', margin: 0 }}>Explore Community</h2>
             </div>
             <button 
-              onClick={() => userDiscoveryStore.fetchUsers(true)}
+              onClick={() => {
+                setIsDiscoveryLoading(true);
+                userDiscoveryStore.fetchUsers(true).finally(() => setIsDiscoveryLoading(false));
+              }}
               style={{
                 display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px',
                 backgroundColor: 'rgba(51, 65, 85, 0.5)', color: '#f1f5f9', border: '1px solid rgba(255,255,255,0.1)',
@@ -500,7 +512,7 @@ const SearchComponent = () => {
             </button>
           </div>
 
-          {userlist.length === 0 && isLoading ? (
+          {isDiscoveryLoading ? (
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
@@ -513,7 +525,7 @@ const SearchComponent = () => {
                   100% { opacity: 0.3; }
                 }
               `}</style>
-              {[1, 2, 3, 4].map(i => (
+              {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
                 <div
                   key={i}
                   style={{

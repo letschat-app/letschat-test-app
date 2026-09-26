@@ -1695,6 +1695,18 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                 </div>
               );
             })()}
+
+            <div style={{
+              textAlign: 'center',
+              padding: '20px 0 24px 0',
+              color: 'var(--text-secondary)',
+              fontSize: '12px',
+              fontWeight: '600',
+              letterSpacing: '0.05em',
+              opacity: 0.7
+            }}>
+              — End of spaces —
+            </div>
           </div>
         ) : isLoading && sortedAndFilteredChats.length === 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '4px' }}>
@@ -1766,6 +1778,18 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                 />
               );
             })}
+            
+            <div style={{
+              textAlign: 'center',
+              padding: '24px 0 36px 0',
+              color: 'var(--text-secondary)',
+              fontSize: '12px',
+              fontWeight: '600',
+              letterSpacing: '0.05em',
+              opacity: 0.7
+            }}>
+              — End of chats —
+            </div>
           </div>
         )}
 
