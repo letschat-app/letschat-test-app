@@ -5,12 +5,13 @@ import { API } from '../service/UserAuth';
 import { Search, MessageCircle, Users, RefreshCcw, Share2, Sparkles, X, History } from 'lucide-react';
 import userDiscoveryStore from '../service/UserDiscoveryStore';
 import Avatar from '../components/chat/Avatar';
-import { syncChatsMapToDB } from '../service/db';
+import { syncChatsMapToDB, getGroupMembersFromDB } from '../service/db';
 
 const SearchComponent = () => {
   const navigate = useNavigate();
   const [userid, setUserid] = useState('');
   const [userData, setUserData] = useState(null);
+  const [userDataCommonGroups, setUserDataCommonGroups] = useState([]);
   const [message, setMessage] = useState('');
   const [userlist, setuserlist] = useState(userDiscoveryStore.users);
   const [filteredUsers, setFilteredUsers] = useState([]);
@@ -85,6 +86,34 @@ const SearchComponent = () => {
     }
     setIsLoading(false);
   };
+
+  useEffect(() => {
+    if (!userData || !userData.userId) {
+      setUserDataCommonGroups([]);
+      return;
+    }
+    const computeCommon = async () => {
+      try {
+        const rawMap = localStorage.getItem("chatsMap");
+        if (!rawMap) return;
+        const chatsMap = JSON.parse(rawMap);
+        const groupChats = Object.values(chatsMap).filter(c => c.isGroupChat || c.isSpace || c.isClassroom);
+        const shared = [];
+        for (const grp of groupChats) {
+          const members = await getGroupMembersFromDB(grp.chatId);
+          if (members && members.length > 0) {
+            if (members.some(m => String(m.userId) === String(userData.userId))) {
+              shared.push(grp);
+            }
+          }
+        }
+        setUserDataCommonGroups(shared);
+      } catch (err) {
+        console.error("Failed to compute common groups in Search:", err);
+      }
+    };
+    computeCommon();
+  }, [userData]);
 
   const handleChat = async (targetUserId) => {
     try {
@@ -457,31 +486,68 @@ const SearchComponent = () => {
             {userData && (
               <div style={{
                 marginTop: '24px', padding: '24px', backgroundColor: 'var(--bg-card)',
-                borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                flexWrap: 'wrap', gap: '16px', border: '1px solid var(--border-color)', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.3)',
+                borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '16px',
+                border: '1px solid var(--border-color)', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.3)',
                 textAlign: 'left'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  <Avatar chat={userData} size={64} />
-                  <div>
-                    <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>{userData.userName}</div>
-                    <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>User ID: {userData.userId}</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <Avatar chat={userData} size={64} />
+                    <div>
+                      <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>{userData.userName}</div>
+                      <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>User ID: {userData.userId}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button 
+                      onClick={() => navigate(`/profile/${userData.userId}`)}
+                      style={{
+                        padding: '12px 18px', backgroundColor: 'var(--nav-active-bg)',
+                        color: 'var(--accent-color)', border: '1px solid var(--border-color)', borderRadius: '12px', fontSize: '14px', fontWeight: '700',
+                        cursor: 'pointer', transition: 'all 0.2s'
+                      }}
+                    >
+                      View Profile
+                    </button>
+                    <button 
+                      onClick={() => handleChat(userData.userId || userid)}
+                      style={{
+                        padding: '12px 24px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: '#fff', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '700',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s',
+                        boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                      onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                    >
+                      <MessageCircle size={18} />
+                      Start Chat
+                    </button>
                   </div>
                 </div>
-                <button 
-                  onClick={() => handleChat(userData.userId || userid)}
-                  style={{
-                    padding: '12px 24px', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    color: '#fff', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '700',
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s',
-                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                  onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-                >
-                  <MessageCircle size={18} />
-                  Start Chat
-                </button>
+
+                {userDataCommonGroups.length > 0 && (
+                  <div style={{
+                    padding: '12px 16px',
+                    backgroundColor: 'var(--bg-secondary)',
+                    borderRadius: '12px',
+                    border: '1px solid var(--border-color)'
+                  }}>
+                    <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Groups in Common ({userDataCommonGroups.length})
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {userDataCommonGroups.map(grp => (
+                        <span key={grp.chatId} style={{
+                          fontSize: '12px', padding: '4px 10px', borderRadius: '8px',
+                          backgroundColor: 'var(--nav-active-bg)', color: 'var(--accent-color)', fontWeight: '600'
+                        }}>
+                          {grp.chatName || grp.chatId}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -41,7 +41,9 @@ import {
   XCircle,
   Zap,
   Pencil,
-  Lock
+  Lock,
+  Filter,
+  User
 } from "lucide-react";
 import { useEventMediator } from "../service/EventStorage";
 import AssignmentMessage from "./AssignmentMessage";
@@ -261,9 +263,43 @@ const ChatBox = () => {
     });
   }, [messages, chatid]);
 
+  const [filterMember, setFilterMember] = useState(null);
+  const [showFilterModal, setShowFilterModal] = useState(false);
+
   const filteredMessages = useMemo(() => {
-    return allVisibleMessages.filter(msg => msg.spaceid === activeSpace);
-  }, [allVisibleMessages, activeSpace]);
+    let list = allVisibleMessages.filter(msg => msg.spaceid === activeSpace);
+    if (filterMember) {
+      list = list.filter(msg => {
+        if (filterMember.userId && msg.userid) {
+          if (String(msg.userid) === String(filterMember.userId)) return true;
+        }
+        if (filterMember.userName && msg.sendername) {
+          if (msg.sendername.toLowerCase() === filterMember.userName.toLowerCase()) return true;
+        }
+        return false;
+      });
+    }
+    return list;
+  }, [allVisibleMessages, activeSpace, filterMember]);
+
+  const filterCandidates = useMemo(() => {
+    const map = new Map();
+    if (members && members.length > 0) {
+      members.forEach(m => map.set(String(m.userId), { userId: m.userId, userName: m.userName, profile: m.profile, role: m.role }));
+    }
+    allVisibleMessages.forEach(msg => {
+      const uId = msg.userid ? String(msg.userid) : null;
+      const name = msg.sendername;
+      if (uId && !map.has(uId)) {
+        map.set(uId, { userId: uId, userName: name || "User", profile: null });
+      } else if (name && name !== "server" && !uId) {
+        if (!map.has(name)) {
+          map.set(name, { userId: null, userName: name, profile: null });
+        }
+      }
+    });
+    return Array.from(map.values());
+  }, [members, allVisibleMessages]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -3065,8 +3101,8 @@ const ChatBox = () => {
                 position: 'absolute',
                 top: Math.min(activeLinkMenu.y, window.innerHeight - 100),
                 left: Math.min(activeLinkMenu.x, window.innerWidth - 150),
-                backgroundColor: '#1f2937',
-                border: '1px solid #374151',
+                backgroundColor: 'var(--bg-card)',
+                border: '1px solid var(--border-color)',
                 borderRadius: '8px',
                 padding: '4px',
                 boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)',
@@ -3498,6 +3534,32 @@ const ChatBox = () => {
 
                   <button
                     onClick={() => {
+                      setShowHeaderMenu(false);
+                      setShowFilterModal(true);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      textAlign: 'left',
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <Filter size={16} color="var(--accent-color)" /> Filter by Person
+                  </button>
+
+                  <button
+                    onClick={() => {
                       setShowClearModal(true);
                       setShowHeaderMenu(false);
                     }}
@@ -3870,12 +3932,12 @@ const ChatBox = () => {
                     {msg.sendername === "server" || msg.type === "banner" ? (
                       <div style={{
                         alignSelf: "center",
-                        backgroundColor: "#2a2a2a",
-                        color: "#9ca3af",
+                        backgroundColor: "var(--bg-card)",
+                        color: "var(--text-secondary)",
                         padding: isMobile ? '6px 12px' : '8px 16px',
                         borderRadius: '16px',
                         fontSize: isMobile ? '12px' : '13px',
-                        border: "1px solid #3a3a3a",
+                        border: "1px solid var(--border-color)",
                       }}>
                         {/* {msg.content} */}
                         {
@@ -3901,14 +3963,14 @@ const ChatBox = () => {
                             ref={(el) => (messageRefs.current[msg.msgid] = el)}
                             style={{
                               alignSelf: isReceived ? "flex-start" : "flex-end",
-                              backgroundColor: isReceived ? "#1f2937" : "#2d3748",
-                              color: "#9ca3af",
+                              backgroundColor: isReceived ? "var(--message-bg-incoming)" : "var(--bg-card)",
+                              color: "var(--text-secondary)",
                               padding: isMobile ? '8px 12px' : '10px 14px',
                               borderRadius: isReceived ? "16px 16px 16px 4px" : "16px 16px 4px 16px",
                               maxWidth: isMobile ? "80%" : "70%",
                               wordWrap: "break-word",
                               cursor: "pointer",
-                              border: "1px solid #374151",
+                              border: "1px solid var(--border-color)",
                               transition: "all 0.2s ease",
                               fontSize: isMobile ? '13px' : '14px',
                             }}
@@ -3918,7 +3980,7 @@ const ChatBox = () => {
                               <div style={{
                                 fontSize: isMobile ? '11px' : '12px',
                                 fontWeight: "600",
-                                color: "#60a5fa",
+                                color: "var(--accent-color)",
                                 marginBottom: "4px",
                               }}>
                                 {msg.sendername}
@@ -3936,16 +3998,16 @@ const ChatBox = () => {
                             ref={(el) => (messageRefs.current[msg.msgid] = el)}
                             style={{
                               alignSelf: isReceived ? "flex-start" : "flex-end",
-                              backgroundColor: selectedMessages.has(msg)
-                                ? (isReceived ? "#374151" : "#3b82f6")
-                                : (isReceived ? "#1f2937" : "#1e40af"),
-                              color: "#ffffff",
+                              background: selectedMessages.has(msg)
+                                ? (isReceived ? "var(--nav-active-bg)" : "var(--accent-color)")
+                                : (isReceived ? "var(--message-bg-incoming)" : "var(--message-bg-outgoing)"),
+                              color: isReceived ? "var(--text-primary)" : "#ffffff",
                               padding: isMobile ? '8px 12px' : '10px 14px',
                               borderRadius: isReceived ? "16px 16px 16px 4px" : "16px 16px 4px 16px",
                               maxWidth: isMobile ? "80%" : "70%",
                               wordWrap: "break-word",
                               cursor: "pointer",
-                              boxShadow: "0 2px 4px rgba(0, 0, 0, 0.2)",
+                              boxShadow: "0 2px 4px rgba(0, 0, 0, 0.15)",
                               transition: (swipeOffset[msg.msgid] || 0) === 0 ? "all 0.2s ease" : "none",
                               fontSize: isMobile ? '13px' : '14px',
                               position: "relative",
@@ -3979,7 +4041,7 @@ const ChatBox = () => {
                               <div style={{
                                 fontSize: '10px',
                                 marginBottom: "6px",
-                                color: "#9ca3af",
+                                color: isReceived ? "var(--text-secondary)" : "rgba(255, 255, 255, 0.75)",
                                 fontStyle: "italic",
                                 display: "flex",
                                 alignItems: "center",
@@ -4012,7 +4074,7 @@ const ChatBox = () => {
                                 fontSize: isMobile ? '11px' : '12px',
                                 fontWeight: "600",
                                 marginBottom: "6px",
-                                color: "#60a5fa",
+                                color: "var(--accent-color)",
                               }}>
                                 {msg.sendername}
                               </div>
@@ -4023,8 +4085,8 @@ const ChatBox = () => {
                               return repliedMsg ? (
                                 <div
                                   style={{
-                                    backgroundColor: repliedMsg.status === null ? "#374151" : "#1e3a8a",
-                                    borderLeft: "3px solid #60a5fa",
+                                    backgroundColor: isReceived ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.18)",
+                                    borderLeft: "3px solid var(--accent-color)",
                                     padding: '6px 10px',
                                     borderRadius: "6px",
                                     marginBottom: "8px",
@@ -4046,10 +4108,10 @@ const ChatBox = () => {
                                     }
                                   }}
                                 >
-                                  <div style={{ fontWeight: "600", color: '#60a5fa', marginBottom: "2px" }}>
+                                  <div style={{ fontWeight: "600", color: 'var(--accent-color)', marginBottom: "2px" }}>
                                     {repliedMsg.status === null ? repliedMsg.sendername : "You"}
                                   </div>
-                                  <div style={{ color: "#d1d5db" }}>
+                                  <div style={{ opacity: 0.9 }}>
                                     {repliedMsg.type === 'text' && (stripMentionEncoding(repliedMsg.content).length > 50
                                       ? stripMentionEncoding(repliedMsg.content).substring(0, 50) + '...'
                                       : stripMentionEncoding(repliedMsg.content))}
@@ -4125,7 +4187,7 @@ const ChatBox = () => {
                                         cursor: 'pointer',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        color: msg.isStarred ? '#fbbf24' : (isReceived ? "#9ca3af" : "#bfdbfe"),
+                                        color: msg.isStarred ? '#fbbf24' : (isReceived ? "var(--text-secondary)" : "rgba(255, 255, 255, 0.75)"),
                                         transition: 'transform 0.2s ease',
                                       }}
                                       onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.2)'}
@@ -4137,7 +4199,7 @@ const ChatBox = () => {
                                 )}
 
                                 <span style={{
-                                  color: isReceived ? "#9ca3af" : "#bfdbfe",
+                                  color: isReceived ? "var(--text-secondary)" : "rgba(255, 255, 255, 0.75)",
                                   fontWeight: "500",
                                   fontSize: "11px"
                                 }}>
@@ -4459,10 +4521,17 @@ const ChatBox = () => {
                   style={{
                     display: "flex",
                     flexDirection: "column",
-                    background: "var(--bg-secondary, #1a1a2e)",
-                    borderTop: "2px solid #60a5fa",
-                    width: "100%",
+                    background: "var(--bg-card)",
+                    border: isMobile ? "none" : "1px solid var(--border-color)",
+                    borderTop: "2px solid var(--accent-color)",
+                    width: isMobile ? "100%" : "calc(100% - 32px)",
+                    maxWidth: isMobile ? "100%" : "600px",
+                    margin: isMobile ? "0" : "0 auto 12px auto",
+                    borderRadius: isMobile ? "0" : "16px",
+                    boxShadow: isMobile ? "none" : "0 12px 32px rgba(0, 0, 0, 0.35)",
                     boxSizing: "border-box",
+                    backdropFilter: "var(--glass-effect)",
+                    zIndex: 20
                   }}
                 >
                   {/* Row 1: Count + Cancel */}
@@ -4471,22 +4540,23 @@ const ChatBox = () => {
                     alignItems: "center",
                     justifyContent: "space-between",
                     padding: isMobile ? "8px 16px" : "10px 16px",
-                    borderBottom: "1px solid rgba(96,165,250,0.15)",
+                    borderBottom: "1px solid var(--border-color)",
                   }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                       <div style={{
-                        color: "#60a5fa",
+                        color: "var(--accent-color)",
                         fontSize: "14px",
                         fontWeight: "700",
-                        background: "#1e3a8a",
+                        background: "var(--nav-active-bg)",
                         padding: "4px 12px",
                         borderRadius: "12px",
                         minWidth: "28px",
                         textAlign: "center",
+                        border: "1px solid var(--border-color)"
                       }}>
                         {selectedMessages.size}
                       </div>
-                      <span style={{ color: "#9ca3af", fontSize: "13px" }}>
+                      <span style={{ color: "var(--text-secondary)", fontSize: "13px", fontWeight: "500" }}>
                         selected
                       </span>
                     </div>
@@ -4494,7 +4564,7 @@ const ChatBox = () => {
                       onClick={clearSelection}
                       style={{
                         background: "rgba(239,68,68,0.12)",
-                        color: "#ef4444",
+                        color: "var(--danger-color)",
                         border: "1px solid rgba(239,68,68,0.3)",
                         borderRadius: "20px",
                         padding: "5px 14px",
@@ -4504,9 +4574,10 @@ const ChatBox = () => {
                         display: "flex",
                         alignItems: "center",
                         gap: "5px",
+                        transition: "all 0.2s ease"
                       }}
                     >
-                      <span style={{ fontSize: '14px', fontWeight: '700' }}>X</span> Cancel
+                      <span style={{ fontSize: '14px', fontWeight: '700' }}>✕</span> Cancel
                     </button>
                   </div>
 
@@ -4514,9 +4585,10 @@ const ChatBox = () => {
                   <div style={{
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "space-around",
-                    padding: isMobile ? "6px 4px" : "8px 16px",
-                    gap: "4px",
+                    justifyContent: isMobile ? "space-around" : "center",
+                    flexWrap: "wrap",
+                    padding: isMobile ? "6px 4px" : "10px 16px",
+                    gap: isMobile ? "4px" : "8px",
                   }}>
                     {(() => {
                       const items = Array.from(selectedMessages);
@@ -4528,7 +4600,7 @@ const ChatBox = () => {
                             onClick={handleCancelUploads}
                             style={{
                               background: "rgba(239, 68, 68, 0.1)",
-                              color: "#ef4444",
+                              color: "var(--danger-color)",
                               border: "1px solid rgba(239, 68, 68, 0.3)",
                               padding: "8px 16px",
                               borderRadius: "20px",
@@ -4540,33 +4612,33 @@ const ChatBox = () => {
                               gap: "8px",
                             }}
                           >
-                            <span style={{ fontSize: '18px', fontWeight: '700', marginRight: '8px' }}>X</span>
+                            <span style={{ fontSize: '18px', fontWeight: '700', marginRight: '8px' }}>✕</span>
                             Cancel Upload
                           </button>
                         );
                       }
 
-                      const actionBtnStyle = (color = "#60a5fa") => ({
-                        background: "transparent",
-                        color,
-                        border: "none",
-                        padding: isMobile ? "8px 10px" : "8px 12px",
+                      const actionBtnStyle = (color = "var(--accent-color)") => ({
+                        background: "var(--bg-hover)",
+                        color: color || "var(--text-primary)",
+                        border: "1px solid var(--border-color)",
+                        padding: isMobile ? "8px 10px" : "8px 14px",
                         cursor: "pointer",
                         display: "flex",
-                        flexDirection: "column",
+                        flexDirection: isMobile ? "column" : "row",
                         alignItems: "center",
                         justifyContent: "center",
-                        gap: "3px",
+                        gap: isMobile ? "3px" : "6px",
                         borderRadius: "10px",
-                        flex: 1,
-                        minWidth: 0,
-                        transition: "background 0.15s",
+                        flex: isMobile ? 1 : "none",
+                        minWidth: isMobile ? 0 : "auto",
+                        transition: "all 0.15s ease",
                       });
 
                       const labelStyle = {
-                        fontSize: "10px",
+                        fontSize: isMobile ? "10px" : "12px",
                         fontWeight: "500",
-                        color: "#9ca3af",
+                        color: "inherit",
                         whiteSpace: "nowrap",
                       };
 
@@ -4574,19 +4646,19 @@ const ChatBox = () => {
                         <>
                           {selectedMessages.size === 1 && (
                             <button onClick={reply} style={actionBtnStyle()}>
-                              <Reply size={isMobile ? 19 : 20} />
-                              {isMobile && <span style={labelStyle}>Reply</span>}
+                              <Reply size={isMobile ? 19 : 16} />
+                              <span style={labelStyle}>Reply</span>
                             </button>
                           )}
 
-                          <button onClick={delet} style={actionBtnStyle("#ef4444")}>
-                            <Trash2 size={isMobile ? 19 : 20} />
-                            {isMobile && <span style={labelStyle}>Delete</span>}
+                          <button onClick={delet} style={actionBtnStyle("var(--danger-color)")}>
+                            <Trash2 size={isMobile ? 19 : 16} />
+                            <span style={labelStyle}>Delete</span>
                           </button>
 
                           <button onClick={forward} style={actionBtnStyle()}>
-                            <Forward size={isMobile ? 19 : 20} />
-                            {isMobile && <span style={labelStyle}>Forward</span>}
+                            <Forward size={isMobile ? 19 : 16} />
+                            <span style={labelStyle}>Forward</span>
                           </button>
 
                           {selectedMessages.size === 1 && (
@@ -4596,42 +4668,42 @@ const ChatBox = () => {
                                 toggleStar(e, msg);
                                 clearSelection();
                               }}
-                              style={actionBtnStyle(items[0]?.isStarred ? "#fbbf24" : "#60a5fa")}
+                              style={actionBtnStyle(items[0]?.isStarred ? "#fbbf24" : "var(--accent-color)")}
                             >
-                              <Star size={isMobile ? 19 : 20} fill={items[0]?.isStarred ? "#fbbf24" : "none"} />
-                              {isMobile && <span style={labelStyle}>{items[0]?.isStarred ? "Unstar" : "Star"}</span>}
+                              <Star size={isMobile ? 19 : 16} fill={items[0]?.isStarred ? "#fbbf24" : "none"} />
+                              <span style={labelStyle}>{items[0]?.isStarred ? "Unstar" : "Star"}</span>
                             </button>
                           )}
 
                           {selectedMessages.size === 1 && items[0]?.type === 'text' && (
                             <button onClick={handleCopySelected} style={actionBtnStyle()} title="Copy Text">
-                              <Copy size={isMobile ? 19 : 20} />
-                              {isMobile && <span style={labelStyle}>Copy</span>}
+                              <Copy size={isMobile ? 19 : 16} />
+                              <span style={labelStyle}>Copy</span>
                             </button>
                           )}
 
                           <button
                             onClick={handleShareSelected}
                             disabled={isSharingMedia}
-                            style={actionBtnStyle(isSharingMedia ? "#4b5563" : "#60a5fa")}
+                            style={actionBtnStyle(isSharingMedia ? "var(--text-muted)" : "var(--accent-color)")}
                             title="Share Media"
                           >
-                            {isSharingMedia ? <Loader2 size={isMobile ? 19 : 20} className="animate-spin" /> : <Share2 size={isMobile ? 19 : 20} />}
-                            {isMobile && <span style={labelStyle}>Share</span>}
+                            {isSharingMedia ? <Loader2 size={isMobile ? 19 : 16} className="animate-spin" /> : <Share2 size={isMobile ? 19 : 16} />}
+                            <span style={labelStyle}>Share</span>
                           </button>
 
                           <button
                             onClick={toggleInputBox}
                             style={{
                               ...actionBtnStyle(),
-                              background: showInputBox ? "rgba(37,99,235,0.15)" : "transparent",
+                              background: showInputBox ? "var(--nav-active-bg)" : "var(--bg-hover)",
                             }}
                           >
                             <ChevronDown
-                              size={isMobile ? 19 : 20}
+                              size={isMobile ? 19 : 16}
                               style={{ transform: showInputBox ? "rotate(0deg)" : "rotate(180deg)", transition: "transform 0.3s" }}
                             />
-                            {isMobile && <span style={labelStyle}>{showInputBox ? "Hide" : "Show"}</span>}
+                            <span style={labelStyle}>{showInputBox ? "Hide" : "Show"}</span>
                           </button>
                         </>
                       );
@@ -4643,13 +4715,13 @@ const ChatBox = () => {
                     <div style={{
                       display: "flex",
                       alignItems: "center",
-                      justifyContent: isMobile ? "flex-start" : "space-between",
+                      justifyContent: "center",
                       padding: "8px 16px",
-                      background: "rgba(30, 41, 59, 0.95)",
+                      background: "var(--bg-secondary)",
                       borderTop: "1px solid var(--border-color)",
-                      borderBottomLeftRadius: "24px",
-                      borderBottomRightRadius: "24px",
-                      gap: isMobile ? "12px" : "8px",
+                      borderBottomLeftRadius: isMobile ? "0" : "16px",
+                      borderBottomRightRadius: isMobile ? "0" : "16px",
+                      gap: isMobile ? "12px" : "16px",
                       overflowX: "auto",
                       WebkitOverflowScrolling: "touch"
                     }}>
@@ -4663,9 +4735,11 @@ const ChatBox = () => {
                           }}
                           style={{
                             background: 'none', border: 'none', fontSize: '24px',
-                            cursor: 'pointer', transition: 'transform 0.1s', padding: '4px',
+                            cursor: 'pointer', transition: 'transform 0.15s ease', padding: '4px',
                             flexShrink: 0
                           }}
+                          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.25)'}
+                          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                         >
                           {emoji}
                         </button>
@@ -4677,10 +4751,10 @@ const ChatBox = () => {
                           width: '40px',
                           minWidth: '40px',
                           flexShrink: 0,
-                          background: 'rgba(255,255,255,0.1)',
-                          border: '1px solid rgba(255,255,255,0.2)',
+                          background: 'var(--bg-card)',
+                          border: '1px solid var(--border-color)',
                           borderRadius: '12px',
-                          color: 'white',
+                          color: 'var(--text-primary)',
                           textAlign: 'center',
                           padding: '6px',
                           fontSize: '18px'
@@ -4699,6 +4773,45 @@ const ChatBox = () => {
               )}
 
 
+              {filterMember && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '8px 16px',
+                  backgroundColor: 'var(--bg-card)',
+                  borderTop: '1px solid var(--border-color)',
+                  borderBottom: '1px solid var(--border-color)',
+                  color: 'var(--text-primary)',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  zIndex: 10
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Filter size={15} color="var(--accent-color)" />
+                    <span>Filtering messages by <strong style={{ color: 'var(--accent-color)' }}>{filterMember.userName || filterMember.name}</strong></span>
+                  </div>
+                  <button
+                    onClick={() => setFilterMember(null)}
+                    style={{
+                      background: 'rgba(239, 68, 68, 0.12)',
+                      color: 'var(--danger-color)',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      borderRadius: '16px',
+                      padding: '3px 12px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <span>✕</span> Exit Filter
+                  </button>
+                </div>
+              )}
+
               {/* Input Box Section - Animated wrapper */}
               <div
                 style={{
@@ -4711,11 +4824,11 @@ const ChatBox = () => {
                   {showreplytomsg && (
                     <div
                       style={{
-                        backgroundColor: repliedto.status == null ? "#1f2937" : "#1e40af",
-                        borderLeft: "4px solid #007bff",
+                        backgroundColor: "var(--bg-card)",
+                        borderLeft: "4px solid var(--accent-color)",
+                        border: "1px solid var(--border-color)",
                         padding: "6px 10px",
                         borderRadius: "6px",
-                        //marginBottom: "15%",
                         display: "flex",
                         justifyContent: "space-between",
                         alignItems: "center",
@@ -4726,7 +4839,7 @@ const ChatBox = () => {
                           style={{
                             fontWeight: "bold",
                             fontSize: "13px",
-                            color: repliedto.status == null ? "#60a5fa" : "#e5e7eb",
+                            color: "var(--accent-color)",
                           }}
                         >
                           {repliedto.status === null ? repliedto.sendername : "You"}
@@ -4879,9 +4992,10 @@ const ChatBox = () => {
                     top: '50%',
                     left: '50%',
                     transform: 'translate(-50%, -50%)',
-                    backgroundColor: 'var(--text-primary)',
+                    backgroundColor: 'var(--bg-card)',
+                    border: '1px solid var(--border-color)',
                     borderRadius: '12px',
-                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
                     zIndex: '50',
                     width: '80%',
                     maxHeight: '384px',
@@ -4894,13 +5008,13 @@ const ChatBox = () => {
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       padding: '16px',
-                      borderBottom: '1px solid #e5e7eb'
+                      borderBottom: '1px solid var(--border-color)'
                     }}>
-                      <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--message-bg-incoming)' }}>Forward to Chat</h2>
+                      <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-primary)' }}>Forward to Chat</h2>
                       <button
                         onClick={() => cancelforward()}
                         style={{
-                          color: '#6b7280',
+                          color: 'var(--text-secondary)',
                           background: 'none',
                           border: 'none',
                           cursor: 'pointer',
@@ -4910,10 +5024,10 @@ const ChatBox = () => {
                           fontSize: '20px',
                           fontWeight: 'bold'
                         }}
-                        onMouseEnter={(e) => e.target.style.color = '#374151'}
-                        onMouseLeave={(e) => e.target.style.color = '#6b7280'}
+                        onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
+                        onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
                       >
-                        X
+                        ✕
                       </button>
                     </div>
 
@@ -4932,10 +5046,10 @@ const ChatBox = () => {
                             background: 'none',
                             cursor: 'pointer'
                           }}
-                          onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
-                          onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                         >
-                          <span style={{ color: 'var(--message-bg-incoming)', fontWeight: '500' }}>
+                          <span style={{ color: 'var(--text-primary)', fontWeight: '500' }}>
                             {chat.chatName}
                           </span>
                         </button>
@@ -4967,9 +5081,10 @@ const ChatBox = () => {
                     top: '50%',
                     left: '50%',
                     transform: 'translate(-50%, -50%)',
-                    backgroundColor: 'var(--text-primary)',
+                    backgroundColor: 'var(--bg-card)',
+                    border: '1px solid var(--border-color)',
                     borderRadius: '12px',
-                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
                     zIndex: '50',
                     width: '80%',
                     maxHeight: '384px',
@@ -4982,13 +5097,13 @@ const ChatBox = () => {
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       padding: '16px',
-                      borderBottom: '1px solid #e5e7eb'
+                      borderBottom: '1px solid var(--border-color)'
                     }}>
-                      <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--message-bg-incoming)' }}>Invite to {chat.chatName}</h2>
+                      <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-primary)' }}>Invite to {chat.chatName}</h2>
                       <button
                         onClick={() => setShowInviteModal(false)}
                         style={{
-                          color: '#6b7280',
+                          color: 'var(--text-secondary)',
                           background: 'none',
                           border: 'none',
                           cursor: 'pointer',
@@ -4998,10 +5113,10 @@ const ChatBox = () => {
                           fontSize: '20px',
                           fontWeight: 'bold'
                         }}
-                        onMouseEnter={(e) => e.target.style.color = '#374151'}
-                        onMouseLeave={(e) => e.target.style.color = '#6b7280'}
+                        onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
+                        onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
                       >
-                        X
+                        ✕
                       </button>
                     </div>
 
@@ -5020,12 +5135,108 @@ const ChatBox = () => {
                             background: 'none',
                             cursor: 'pointer'
                           }}
-                          onMouseEnter={(e) => e.target.style.backgroundColor = '#f3f4f6'}
-                          onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                         >
-                          <span style={{ color: 'var(--message-bg-incoming)', fontWeight: '500' }}>
+                          <span style={{ color: 'var(--text-primary)', fontWeight: '500' }}>
                             {c.chatName}
                           </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )
+            }
+
+            {
+              showFilterModal && (
+                <>
+                  <div
+                    style={{
+                      position: 'fixed',
+                      inset: '0',
+                      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                      zIndex: '50'
+                    }}
+                    onClick={() => setShowFilterModal(false)}
+                  />
+                  <div style={{
+                    position: 'fixed',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    backgroundColor: 'var(--bg-card)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '16px',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
+                    zIndex: '60',
+                    width: '85%',
+                    maxWidth: '380px',
+                    maxHeight: '420px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '16px',
+                      borderBottom: '1px solid var(--border-color)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Filter size={18} color="var(--accent-color)" />
+                        <h2 style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-primary)', margin: 0 }}>Filter Messages by Person</h2>
+                      </div>
+                      <button
+                        onClick={() => setShowFilterModal(false)}
+                        style={{
+                          color: 'var(--text-secondary)',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          fontSize: '18px',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div style={{ flex: '1', overflowY: 'auto', padding: '8px' }}>
+                      {filterCandidates.map((m) => (
+                        <button
+                          key={m.userId || m.userName}
+                          onClick={() => {
+                            setFilterMember(m);
+                            setShowFilterModal(false);
+                          }}
+                          style={{
+                            width: '100%',
+                            textAlign: 'left',
+                            padding: '10px 14px',
+                            borderRadius: '10px',
+                            border: 'none',
+                            background: filterMember?.userId === m.userId || filterMember?.userName === m.userName ? 'var(--nav-active-bg)' : 'none',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            transition: 'background-color 0.2s'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = filterMember?.userId === m.userId || filterMember?.userName === m.userName ? 'var(--nav-active-bg)' : 'transparent'}
+                        >
+                          <Avatar chat={{ profile: m.profile, userName: m.userName }} size={36} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ color: 'var(--text-primary)', fontWeight: '600', fontSize: '14px' }}>
+                              {m.userId === localStorage.getItem("userid") ? "You" : (m.userName || "User")}
+                            </div>
+                            <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+                              {m.role ? m.role.toUpperCase() : "Participant"}
+                            </div>
+                          </div>
                         </button>
                       ))}
                     </div>
@@ -5052,9 +5263,10 @@ const ChatBox = () => {
                     top: '50%',
                     left: '50%',
                     transform: 'translate(-50%, -50%)',
-                    backgroundColor: 'var(--text-primary)',
+                    backgroundColor: 'var(--bg-card)',
+                    border: '1px solid var(--border-color)',
                     borderRadius: '12px',
-                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
                     zIndex: '70',
                     width: '80%',
                     maxWidth: '350px',
@@ -5065,7 +5277,7 @@ const ChatBox = () => {
                     <div style={{
                       padding: '20px',
                       textAlign: 'center',
-                      color: 'var(--message-bg-incoming)'
+                      color: 'var(--text-primary)'
                     }}>
                       <div style={{ marginBottom: '12px' }}>
                         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ margin: '0 auto' }}>
@@ -5076,7 +5288,7 @@ const ChatBox = () => {
                         </svg>
                       </div>
                       <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>No Connection</h3>
-                      <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>
+                      <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>
                         You seem to be offline or have a slow connection. Please check your internet and try again.
                       </p>
                     </div>
@@ -5084,10 +5296,10 @@ const ChatBox = () => {
                       onClick={() => setNetworkError(false)}
                       style={{
                         padding: '14px',
-                        backgroundColor: '#f3f4f6',
-                        color: 'var(--message-bg-incoming)',
+                        backgroundColor: 'var(--bg-hover)',
+                        color: 'var(--text-primary)',
                         border: 'none',
-                        borderTop: '1px solid #e5e7eb',
+                        borderTop: '1px solid var(--border-color)',
                         fontWeight: '600',
                         fontSize: '15px',
                         cursor: 'pointer',
@@ -5120,9 +5332,10 @@ const ChatBox = () => {
                     top: '50%',
                     left: '50%',
                     transform: 'translate(-50%, -50%)',
-                    backgroundColor: 'var(--text-primary)',
+                    backgroundColor: 'var(--bg-card)',
+                    border: '1px solid var(--border-color)',
                     borderRadius: '12px',
-                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
                     zIndex: '50',
                     width: '80%',
                     display: 'flex',
@@ -5134,9 +5347,9 @@ const ChatBox = () => {
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       padding: '16px',
-                      borderBottom: '1px solid #e5e7eb'
+                      borderBottom: '1px solid var(--border-color)'
                     }}>
-                      <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--message-bg-incoming)' }}>Delete Message</h2>
+                      <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-primary)' }}>Delete Message</h2>
                       <button
                         onClick={() => { setshowdelet(false); setdeleted([]); }}
                         style={{
@@ -5150,10 +5363,10 @@ const ChatBox = () => {
                           fontSize: '20px',
                           fontWeight: 'bold'
                         }}
-                        onMouseEnter={(e) => e.target.style.color = '#dc2626'}
-                        onMouseLeave={(e) => e.target.style.color = 'var(--danger-color)'}
+                        onMouseEnter={(e) => e.currentTarget.style.color = '#dc2626'}
+                        onMouseLeave={(e) => e.currentTarget.style.color = 'var(--danger-color)'}
                       >
-                        X
+                        ✕
                       </button>
                     </div>
 
@@ -5166,16 +5379,14 @@ const ChatBox = () => {
                           style={{
                             width: '100%',
                             padding: '12px 16px',
-                            backgroundColor: '#e5e7eb',
-                            color: 'var(--message-bg-incoming)',
-                            border: 'none',
+                            backgroundColor: 'var(--bg-hover)',
+                            color: 'var(--text-primary)',
+                            border: '1px solid var(--border-color)',
                             borderRadius: '8px',
                             cursor: 'pointer',
                             fontWeight: '500',
-                            transition: 'background-color 0.2s'
+                            transition: 'all 0.2s ease'
                           }}
-                          onMouseEnter={(e) => e.target.style.backgroundColor = '#d1d5db'}
-                          onMouseLeave={(e) => e.target.style.backgroundColor = '#e5e7eb'}
                         >
                           Delete for Me
                         </button>
@@ -5188,15 +5399,15 @@ const ChatBox = () => {
                             width: '100%',
                             padding: '12px 16px',
                             backgroundColor: 'var(--danger-color)',
-                            color: 'var(--text-primary)',
+                            color: '#ffffff',
                             border: 'none',
                             borderRadius: '8px',
                             cursor: 'pointer',
                             fontWeight: '500',
                             transition: 'background-color 0.2s'
                           }}
-                          onMouseEnter={(e) => e.target.style.backgroundColor = '#dc2626'}
-                          onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--danger-color)'}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--danger-color)'}
                         >
                           Delete for Everyone
                         </button>
@@ -5209,15 +5420,15 @@ const ChatBox = () => {
                             width: '100%',
                             padding: '12px 16px',
                             backgroundColor: 'var(--danger-color)',
-                            color: 'var(--text-primary)',
+                            color: '#ffffff',
                             border: 'none',
                             borderRadius: '8px',
                             cursor: 'pointer',
                             fontWeight: '500',
                             transition: 'background-color 0.2s'
                           }}
-                          onMouseEnter={(e) => e.target.style.backgroundColor = '#dc2626'}
-                          onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--danger-color)'}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--danger-color)'}
                         >
                           Delete
                         </button>
@@ -5248,9 +5459,10 @@ const ChatBox = () => {
                     top: '50%',
                     left: '50%',
                     transform: 'translate(-50%, -50%)',
-                    backgroundColor: 'var(--text-primary)',
+                    backgroundColor: 'var(--bg-card)',
+                    border: '1px solid var(--border-color)',
                     borderRadius: '12px',
-                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
                     zIndex: '50',
                     width: '80%',
                     display: 'flex',
@@ -5262,9 +5474,9 @@ const ChatBox = () => {
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       padding: '16px',
-                      borderBottom: '1px solid #e5e7eb'
+                      borderBottom: '1px solid var(--border-color)'
                     }}>
-                      <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--message-bg-incoming)' }}>Revive Message</h2>
+                      <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-primary)' }}>Revive Message</h2>
                       <button
                         onClick={() => { setrevpanel(false); setrevev(null) }}
                         style={{
@@ -5278,10 +5490,10 @@ const ChatBox = () => {
                           fontSize: '20px',
                           fontWeight: 'bold'
                         }}
-                        onMouseEnter={(e) => e.target.style.color = '#dc2626'}
-                        onMouseLeave={(e) => e.target.style.color = 'var(--danger-color)'}
+                        onMouseEnter={(e) => e.currentTarget.style.color = '#dc2626'}
+                        onMouseLeave={(e) => e.currentTarget.style.color = 'var(--danger-color)'}
                       >
-                        X
+                        ✕
                       </button>
                     </div>
 
@@ -5294,16 +5506,14 @@ const ChatBox = () => {
                         style={{
                           width: '100%',
                           padding: '12px 16px',
-                          backgroundColor: '#e5e7eb',
-                          color: 'var(--message-bg-incoming)',
-                          border: 'none',
+                          backgroundColor: 'var(--bg-hover)',
+                          color: 'var(--text-primary)',
+                          border: '1px solid var(--border-color)',
                           borderRadius: '8px',
                           cursor: 'pointer',
                           fontWeight: '500',
-                          transition: 'background-color 0.2s'
+                          transition: 'all 0.2s ease'
                         }}
-                        onMouseEnter={(e) => e.target.style.backgroundColor = '#d1d5db'}
-                        onMouseLeave={(e) => e.target.style.backgroundColor = '#e5e7eb'}
                       >
                         Revive for Me
                       </button>
@@ -5316,7 +5526,7 @@ const ChatBox = () => {
                             width: '100%',
                             padding: '12px 16px',
                             backgroundColor: '#10b981',
-                            color: 'var(--text-primary)',
+                            color: '#ffffff',
                             border: 'none',
                             borderRadius: '8px',
                             cursor: 'pointer',
@@ -5337,7 +5547,7 @@ const ChatBox = () => {
                             width: '100%',
                             padding: '12px 16px',
                             backgroundColor: '#10b981',
-                            color: 'var(--text-primary)',
+                            color: '#ffffff',
                             border: 'none',
                             borderRadius: '8px',
                             cursor: 'pointer',

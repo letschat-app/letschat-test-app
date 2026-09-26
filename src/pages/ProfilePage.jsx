@@ -1,60 +1,158 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { getsocket, toggleSleepMode } from '../service/Websocket';
 import { API } from '../service/UserAuth';
 import { uploadMedia, STAGE_LABELS } from '../service/MediaUploader';
 import { getMediaInfo, getMediaBlob } from '../service/MediaCache';
 import MediaViewer from '../components/chat/MediaViewer';
-import { Camera, Loader2, LogOut, CheckCircle2, Bell, Moon } from 'lucide-react';
+import { Camera, Loader2, LogOut, CheckCircle2, Bell, Moon, MessageCircle, ArrowLeft } from 'lucide-react';
 import Avatar from '../components/chat/Avatar';
 import { useNotifications } from '../hooks/useNotifications';
+import { getGroupMembersFromDB, syncChatsMapToDB } from '../service/db';
+import { getchat } from './ChatNames';
 
 const ProfilePage = () => {
     const navigate = useNavigate();
+    const { targetUserId } = useParams();
     const userId = localStorage.getItem('userid');
+    
+    const isTargetUser = Boolean(targetUserId && String(targetUserId) !== String(userId));
+    const [targetUserData, setTargetUserData] = useState(null);
+    const [targetUserCommonGroups, setTargetUserCommonGroups] = useState([]);
+    const [existingChatId, setExistingChatId] = useState(null);
+    const [isStartingChat, setIsStartingChat] = useState(false);
+
     const { fcmToken, permissionStatus, requestPermissionAndGetToken, disableNotifications } = useNotifications();
     const [username, setUsername] = useState(localStorage.getItem('username') || userId);
     const [profile, setProfile] = useState(localStorage.getItem('profile'));
     const [uploading, setUploading] = useState(false);
     const [progress, setProgress] = useState(0);
     const [stage, setStage] = useState('');
-    const [resolvedThumb, setResolvedThumb] = useState(null);
     const [viewingMedia, setViewingMedia] = useState(null);
     const [isHoveringAvatar, setIsHoveringAvatar] = useState(false);
     const [isSleepMode, setIsSleepMode] = useState(localStorage.getItem('sleepMode') === 'true');
-    const email = localStorage.getItem('email') || 'No email provided';
 
     useEffect(() => {
-        const fetchUserData = async () => {
-            try {
-                const response = await fetch(`${API}/user/me`, {
-                    method: 'GET',
-                    headers: {
-                        'User-id': userId,
-                        'Content-Type': 'application/json'
+        if (isTargetUser) {
+            const fetchTargetInfo = async () => {
+                try {
+                    const res = await fetch(`${API}/user/search/${targetUserId}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        setTargetUserData(data);
+                    } else {
+                        setTargetUserData({ userId: targetUserId, userName: targetUserId });
                     }
-                });
+                } catch (e) {
+                    setTargetUserData({ userId: targetUserId, userName: targetUserId });
+                }
+            };
+            fetchTargetInfo();
 
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.userName) {
-                        localStorage.setItem('username', data.userName);
-                        setUsername(data.userName);
-                    }
-                    if (data.profile) {
-                        localStorage.setItem('profile', data.profile);
-                        setProfile(data.profile);
+            // Check existing chat in chatsMap
+            try {
+                const rawMap = localStorage.getItem("chatsMap");
+                if (rawMap) {
+                    const chatsMap = JSON.parse(rawMap);
+                    const found = Object.values(chatsMap).find(c => {
+                        return c.type === 'private' && (String(c.otherUserId) === String(targetUserId) || String(c.id) === String(targetUserId) || String(c.chatId).includes(targetUserId));
+                    });
+                    if (found) {
+                        setExistingChatId(found.chatId);
                     }
                 }
             } catch (err) {
-                console.error('[ProfilePage] Fetch user data fail:', err);
+                console.error("Error parsing chatsMap:", err);
             }
-        };
 
-        if (userId) {
+            // Compute shared groups
+            const computeCommon = async () => {
+                try {
+                    const rawMap = localStorage.getItem("chatsMap");
+                    if (!rawMap) return;
+                    const chatsMap = JSON.parse(rawMap);
+                    const groupChats = Object.values(chatsMap).filter(c => c.isGroupChat || c.isSpace || c.isClassroom);
+                    const shared = [];
+                    for (const grp of groupChats) {
+                        const members = await getGroupMembersFromDB(grp.chatId);
+                        if (members && members.length > 0) {
+                            if (members.some(m => String(m.userId) === String(targetUserId))) {
+                                shared.push(grp);
+                            }
+                        }
+                    }
+                    setTargetUserCommonGroups(shared);
+                } catch (err) {
+                    console.error("Failed to compute common groups in ProfilePage:", err);
+                }
+            };
+            computeCommon();
+        } else if (userId) {
+            const fetchUserData = async () => {
+                try {
+                    const response = await fetch(`${API}/user/me`, {
+                        method: 'GET',
+                        headers: {
+                            'User-id': userId,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.userName) {
+                            localStorage.setItem('username', data.userName);
+                            setUsername(data.userName);
+                        }
+                        if (data.profile) {
+                            localStorage.setItem('profile', data.profile);
+                            setProfile(data.profile);
+                        }
+                    }
+                } catch (err) {
+                    console.error('[ProfilePage] Fetch user data fail:', err);
+                }
+            };
             fetchUserData();
         }
-    }, [userId]);
+    }, [targetUserId, userId, isTargetUser]);
+
+    const handleStartOrGoToChat = async () => {
+        if (existingChatId) {
+            navigate(`/chat/${existingChatId}`);
+            return;
+        }
+        setIsStartingChat(true);
+        try {
+            const response = await fetch(`${API}/user/addtochat/${targetUserId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'User-Id': userId,
+                },
+            });
+            if (response.ok) {
+                const data = await response.text();
+                getchat(data);
+                const res = await fetch(`${API}/user/chatbox/${userId}`);
+                if (res.ok) {
+                    const chatData = await res.json();
+                    let chatsMap = {};
+                    chatData.forEach(c => chatsMap[c.chatId] = c);
+                    localStorage.setItem("chatsMap", JSON.stringify(chatsMap));
+                    syncChatsMapToDB(chatsMap);
+                }
+                navigate(`/chat/${data}`);
+            } else {
+                alert("Failed to start chat");
+            }
+        } catch (e) {
+            console.error("Error starting chat:", e);
+            alert("Error starting chat");
+        } finally {
+            setIsStartingChat(false);
+        }
+    };
 
     const handleLogout = () => {
         try {
@@ -73,21 +171,21 @@ const ProfilePage = () => {
         toggleSleepMode(newValue);
     };
 
-
-    const handleAvatarView = async () => {
-        if (uploading || !profile) return;
+    const handleAvatarView = async (targetMediaId) => {
+        const pId = targetMediaId || profile;
+        if (uploading || !pId) return;
 
         try {
-            const info = await getMediaInfo(profile);
-            const fullUrl = await getMediaBlob(profile + '_full', info.fileKey, 'mainCache');
+            const info = await getMediaInfo(pId);
+            const fullUrl = await getMediaBlob(pId + '_full', info.fileKey, 'mainCache');
             setViewingMedia({
-                fileUrl: fullUrl || `${API}/files/get-url/${profile}`,
+                fileUrl: fullUrl || `${API}/files/get-url/${pId}`,
                 fileName: 'Profile Picture',
                 fileType: 'image'
             });
         } catch (err) {
             setViewingMedia({
-                fileUrl: `${API}/files/get-url/${profile}`,
+                fileUrl: `${API}/files/get-url/${pId}`,
                 fileName: 'Profile Picture',
                 fileType: 'image'
             });
@@ -122,8 +220,6 @@ const ProfilePage = () => {
                 setProgress(p);
             });
 
-            // result contains { mediaId, mainKey, thumbKey }
-            // Submit to backend
             const res = await fetch(`${API}/user/profile/${result.mediaId}`, {
                 method: 'POST',
                 headers: {
@@ -133,8 +229,6 @@ const ProfilePage = () => {
             });
 
             if (res.ok) {
-                // Success - update local state and storage
-                const imageUrl = `${API}/files/get-url/${result.mediaId}`;
                 localStorage.setItem('profile', result.mediaId);
                 setProfile(result.mediaId);
                 setStage('done');
@@ -153,6 +247,128 @@ const ProfilePage = () => {
         }
     };
 
+    if (isTargetUser) {
+        const displayUser = targetUserData || { userId: targetUserId, userName: targetUserId };
+        return (
+            <div style={containerStyle}>
+                <div style={{ width: '100%', maxWidth: '480px', marginBottom: '12px' }}>
+                    <button 
+                        onClick={() => navigate(-1)}
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: '8px',
+                            background: 'none', border: 'none', color: 'var(--text-secondary)',
+                            cursor: 'pointer', fontSize: '14px', fontWeight: '600', padding: '4px 0'
+                        }}
+                    >
+                        <ArrowLeft size={18} />
+                        Back
+                    </button>
+                </div>
+                <div style={cardStyle}>
+                    <div style={headerStyle}>
+                        <Avatar
+                            chat={{ profile: displayUser.profile, id: displayUser.userId, userName: displayUser.userName, type: 'private' }}
+                            size={120}
+                            highRes={true}
+                            onClick={() => handleAvatarView(displayUser.profile)}
+                        />
+                        <h1 style={nameStyle}>{displayUser.userName || targetUserId}</h1>
+                        <p style={badgeStyle}>User Profile</p>
+                    </div>
+
+                    {/* Account Info */}
+                    <div>
+                        <p style={sectionHeaderStyle}>User Info</p>
+                        <div style={infoSectionStyle}>
+                            <div style={infoItemStyle}>
+                                <span style={labelStyle}>User ID</span>
+                                <span style={valueStyle}>{displayUser.userId}</span>
+                            </div>
+                            <div style={{ ...infoItemStyle, borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+                                <span style={labelStyle}>Username</span>
+                                <span style={valueStyle}>{displayUser.userName || targetUserId}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Action Button: Go to Chat or Start Chat */}
+                    <div>
+                        <button
+                            onClick={handleStartOrGoToChat}
+                            disabled={isStartingChat}
+                            style={{
+                                width: '100%',
+                                padding: '14px',
+                                borderRadius: '14px',
+                                border: 'none',
+                                background: existingChatId 
+                                    ? 'var(--accent-gradient)'
+                                    : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                color: '#ffffff',
+                                fontSize: '16px',
+                                fontWeight: '700',
+                                cursor: isStartingChat ? 'not-allowed' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '10px',
+                                boxShadow: '0 4px 14px rgba(0,0,0,0.2)',
+                                transition: 'all 0.2s ease'
+                            }}
+                        >
+                            <MessageCircle size={20} />
+                            {isStartingChat ? 'Opening Chat...' : existingChatId ? 'Go to Chat' : 'Start Chat'}
+                        </button>
+                    </div>
+
+                    {/* Groups & Classrooms in Common */}
+                    <div>
+                        <p style={sectionHeaderStyle}>Groups & Classrooms in Common ({targetUserCommonGroups.length})</p>
+                        <div style={infoSectionStyle}>
+                            {targetUserCommonGroups.length === 0 ? (
+                                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0, textAlign: 'center' }}>
+                                    No common groups or classrooms found.
+                                </p>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    {targetUserCommonGroups.map((grp) => (
+                                        <div
+                                            key={grp.chatId}
+                                            onClick={() => navigate(`/chat/${grp.chatId}`)}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: '12px',
+                                                padding: '10px 12px', borderRadius: '12px',
+                                                backgroundColor: 'var(--bg-secondary)', cursor: 'pointer',
+                                                border: '1px solid var(--border-color)', transition: 'background-color 0.2s'
+                                            }}
+                                        >
+                                            <Avatar chat={grp} size={36} />
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    {grp.chatName || grp.chatId}
+                                                </div>
+                                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                                                    {grp.isClassroom ? 'Classroom' : grp.isSpace ? 'Space' : 'Group'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {viewingMedia && (
+                    <MediaViewer
+                        media={viewingMedia}
+                        onClose={() => setViewingMedia(null)}
+                    />
+                )}
+            </div>
+        );
+    }
+
     return (
         <div style={containerStyle}>
             <div style={cardStyle}>
@@ -169,10 +385,9 @@ const ProfilePage = () => {
                         size={120}
                         highRes={true}
                         isHovered={isHoveringAvatar}
-                        onClick={handleAvatarView}
+                        onClick={() => handleAvatarView(profile)}
                         style={{ overflow: 'visible' }}
                     >
-                        {/* Edit Button Overlay */}
                         <div
                             style={{
                                 ...editButtonOverlayStyle,
@@ -189,7 +404,6 @@ const ProfilePage = () => {
                             )}
                         </div>
 
-                        {/* Progress Ring or Bar */}
                         {uploading && (
                             <div style={uploadProgressOverlayStyle}>
                                 <div style={{
@@ -370,20 +584,6 @@ const headerStyle = {
     gap: '12px',
     paddingBottom: '20px',
     borderBottom: '1px solid var(--border-color)',
-};
-
-const avatarStyle = {
-    width: '100px',
-    height: '100px',
-    borderRadius: '50%',
-    background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    color: 'white',
-    fontSize: '40px',
-    fontWeight: '800',
-    boxShadow: '0 8px 16px rgba(59, 130, 246, 0.3)'
 };
 
 const nameStyle = {
