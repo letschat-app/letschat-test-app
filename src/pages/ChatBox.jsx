@@ -39,7 +39,9 @@ import {
   Share2,
   Loader2,
   XCircle,
-  Zap
+  Zap,
+  Pencil,
+  Lock
 } from "lucide-react";
 import { useEventMediator } from "../service/EventStorage";
 import AssignmentMessage from "./AssignmentMessage";
@@ -316,6 +318,83 @@ const ChatBox = () => {
   const stripMentionEncoding = (text) => {
     if (!text) return text;
     return text.replace(/(?:<|&lt;)@[^:]+:(.*?)(?:>|&gt;)/g, '@$1');
+  };
+
+  const renderFormattedText = (text) => {
+    if (!text) return null;
+
+    // Check for triple backtick code blocks
+    if (text.includes('```')) {
+      const codeBlockParts = text.split('```');
+      return codeBlockParts.map((part, index) => {
+        if (index % 2 === 1) {
+          const lines = part.split('\n');
+          let lang = 'CODE';
+          let codeContent = part;
+          if (lines.length > 1 && lines[0].trim().length > 0 && !lines[0].includes(' ')) {
+            lang = lines[0].trim().toUpperCase();
+            codeContent = lines.slice(1).join('\n');
+          }
+          return (
+            <div
+              key={index}
+              style={{
+                margin: '8px 0',
+                borderRadius: '10px',
+                backgroundColor: '#0f172a',
+                border: '1px solid rgba(255,255,255,0.12)',
+                overflow: 'hidden',
+                fontFamily: 'Consolas, Monaco, "Andale Mono", monospace',
+                fontSize: '13px'
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justify: 'space-between',
+                  padding: '6px 12px',
+                  backgroundColor: 'rgba(255,255,255,0.06)',
+                  borderBottom: '1px solid rgba(255,255,255,0.08)',
+                  fontSize: '11px',
+                  color: '#94a3b8',
+                  fontWeight: '700',
+                  letterSpacing: '0.05em'
+                }}
+              >
+                <span>{lang}</span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(codeContent.trim());
+                    const btn = e.currentTarget;
+                    btn.innerText = 'Copied! ✓';
+                    setTimeout(() => { btn.innerText = 'Copy Code 📋'; }, 2000);
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#60a5fa',
+                    cursor: 'pointer',
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    outline: 'none'
+                  }}
+                >
+                  Copy Code 📋
+                </button>
+              </div>
+              <pre style={{ margin: 0, padding: '12px', overflowX: 'auto', color: '#e2e8f0', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
+                {codeContent.trim()}
+              </pre>
+            </div>
+          );
+        }
+        return renderLinkifiedText(part);
+      });
+    }
+
+    return renderLinkifiedText(text);
   };
 
   const renderLinkifiedText = (text) => {
@@ -807,12 +886,14 @@ const ChatBox = () => {
     hasMoreInServerRef.current = true;
 
     messageStore.setActivechatbox(chatid);
+    messageStore.setActiveSpace(activeSpace);
     messageStore.addListener(handleNewMessage);
     return () => {
       messageStore.removeListener(handleNewMessage);
       messageStore.removeListener(handleIndicatorUpdate);
       // localStorage.removeItem(chatid);
-      messageStore.setActivechatbox(null)
+      messageStore.setActivechatbox(null);
+      messageStore.setActiveSpace(null);
       const json = {
         purpose: "check-out",
         userchatId: chatid,
@@ -825,7 +906,7 @@ const ChatBox = () => {
       //messageStore.setCount(chatid)
       //navigate("/chats");
     }
-  }, [chatid]);
+  }, [chatid, activeSpace]);
 
   const handleClearChat = (clearAll) => {
     const clearedAtMap = JSON.parse(localStorage.getItem('clearedAt') || '{}');
@@ -1523,14 +1604,15 @@ const ChatBox = () => {
 
   const renderInputBar = () => (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '12px',
-      padding: isMobile ? '10px 14px' : '12px 24px',
+      display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '10px',
+      padding: isMobile ? '8px 10px 8px 8px' : '12px 20px',
       background: 'var(--bg-secondary)',
       borderTop: '1px solid rgba(255, 255, 255, 0.08)',
       position: 'sticky', bottom: 0,
       width: '100%', boxSizing: 'border-box',
       zIndex: 100,
-      paddingBottom: isMobile ? 'max(10px, env(safe-area-inset-bottom))' : '12px',
+      paddingBottom: isMobile ? 'max(8px, env(safe-area-inset-bottom))' : '12px',
+      overflow: 'visible'
     }}>
       {/* Emoji picker — PORTAL position to escape stacking contexts and backdrop filters completely */}
       {showEmojiPicker && createPortal(
@@ -1571,20 +1653,21 @@ const ChatBox = () => {
       {isRecording ? (
         <div style={{
           flex: 1,
+          minWidth: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           background: 'rgba(239, 68, 68, 0.1)',
           border: '1px solid rgba(239, 68, 68, 0.2)',
           borderRadius: '24px',
-          padding: '2px 16px 2px 16px',
+          padding: '2px 14px',
           minHeight: '44px',
           animation: 'muFadeIn 0.2s ease-out'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{
               width: '10px', height: '10px', backgroundColor: '#ef4444',
               borderRadius: '50%', animation: 'recordBlink 1s infinite'
             }} />
-            <span style={{ color: '#ef4444', fontSize: '15px', fontWeight: '600', fontFamily: 'monospace' }}>
+            <span style={{ color: '#ef4444', fontSize: '14.5px', fontWeight: '600', fontFamily: 'monospace' }}>
               {formatRecordingTime(recordingTime)}
             </span>
           </div>
@@ -1598,17 +1681,18 @@ const ChatBox = () => {
             }}
             title="Cancel Recording"
           >
-            <Trash2 size={20} />
+            <Trash2 size={18} />
           </button>
         </div>
       ) : (
         <div style={{
           flex: 1,
+          minWidth: 0,
           display: 'flex', alignItems: 'center',
           background: 'rgba(255, 255, 255, 0.05)',
           border: '1px solid rgba(255, 255, 255, 0.1)',
           borderRadius: '24px',
-          padding: '2px 8px 2px 6px',
+          padding: isMobile ? '2px 6px 2px 4px' : '2px 8px 2px 6px',
           minHeight: '44px',
           transition: 'all 0.2s ease',
         }}>
@@ -1620,14 +1704,14 @@ const ChatBox = () => {
             style={{
               cursor: 'pointer', flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: '36px', height: '36px', borderRadius: '50%',
+              width: isMobile ? '32px' : '36px', height: isMobile ? '32px' : '36px', borderRadius: '50%',
               color: showEmojiPicker ? '#60a5fa' : '#9ca3af',
               transition: 'all 0.2s ease',
             }}
             onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'}
             onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
           >
-            <Smile size={20} strokeWidth={2.5} />
+            <Smile size={isMobile ? 18 : 20} strokeWidth={2.5} />
           </div>
 
           {/* Attach button */}
@@ -1643,7 +1727,7 @@ const ChatBox = () => {
             style={{
               flexShrink: 0,
               color: '#9ca3af',
-              width: '36px', height: '36px',
+              width: isMobile ? '32px' : '36px', height: isMobile ? '32px' : '36px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               borderRadius: '50%',
               transition: 'all 0.2s ease'
@@ -1715,8 +1799,8 @@ const ChatBox = () => {
             }}
             style={{
               flex: 1, background: 'transparent', border: 'none', outline: 'none',
-              fontSize: '15.5px', color: '#fff',
-              padding: '10px 10px 10px 6px', minWidth: 0,
+              fontSize: isMobile ? '14.5px' : '15.5px', color: '#fff',
+              padding: isMobile ? '8px 8px 8px 4px' : '10px 10px 10px 6px', minWidth: 0,
             }}
           />
         </div>
@@ -1731,19 +1815,22 @@ const ChatBox = () => {
           border: 'none',
           padding: 0,
           borderRadius: '50%',
-          width: '44px', height: '44px',
+          width: isMobile ? '40px' : '44px',
+          height: isMobile ? '40px' : '44px',
           flexShrink: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           cursor: 'pointer',
           transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-          transform: isRecording ? 'scale(1.15)' : 'scale(1)',
+          transform: isRecording ? 'scale(1.08)' : 'scale(1)',
+          transformOrigin: 'center center',
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+          marginRight: isMobile ? '2px' : '0',
         }}
-        onMouseEnter={e => e.currentTarget.style.transform = isRecording ? 'scale(1.2)' : 'scale(1.05)'}
-        onMouseLeave={e => e.currentTarget.style.transform = isRecording ? 'scale(1.15)' : 'scale(1)'}
+        onMouseEnter={e => e.currentTarget.style.transform = isRecording ? 'scale(1.12)' : 'scale(1.04)'}
+        onMouseLeave={e => e.currentTarget.style.transform = isRecording ? 'scale(1.08)' : 'scale(1)'}
         title={isRecording ? "Send Voice Note" : (input.trim() ? "Send Message" : "Record Voice Note")}
       >
-        {isRecording ? <ArrowUp size={24} /> : (input.trim() ? <ArrowUp size={24} /> : <Mic size={20} />)}
+        {isRecording ? <ArrowUp size={isMobile ? 22 : 24} /> : (input.trim() ? <ArrowUp size={isMobile ? 22 : 24} /> : <Mic size={isMobile ? 18 : 20} />)}
       </button>
 
       <style>{`
@@ -3143,16 +3230,28 @@ const ChatBox = () => {
                 </div>
               )}
               {isMobile && (
-                <span style={{
-                  fontSize: '10px',
-                  color: 'var(--accent-color)',
-                  fontWeight: '700',
-                  opacity: 0.9,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  marginTop: chat.type === 'private' ? '-1px' : '1px'
-                }}>
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (activeSpace !== 0 && chat?.type !== 'classroom') handleRenameSpace();
+                  }}
+                  style={{
+                    fontSize: '10px',
+                    color: 'var(--accent-color)',
+                    fontWeight: '700',
+                    opacity: 0.9,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    marginTop: chat.type === 'private' ? '-1px' : '1px',
+                    cursor: (activeSpace !== 0 && chat?.type !== 'classroom') ? 'pointer' : 'default',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px'
+                  }}
+                  title={(activeSpace !== 0 && chat?.type !== 'classroom') ? "Click to rename space" : ""}
+                >
                   {spaceName}
+                  {activeSpace !== 0 && chat?.type !== 'classroom' && <Pencil size={10} />}
                 </span>
               )}
               {messageStore.isVolatile(chatid) && chat?.motto && (
@@ -3178,6 +3277,10 @@ const ChatBox = () => {
             }}>
               {/* Subtle Space Name Display */}
               <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (activeSpace !== 0 && chat?.type !== 'classroom') handleRenameSpace();
+                }}
                 style={{
                   padding: '4px 10px',
                   borderRadius: '6px',
@@ -3190,11 +3293,14 @@ const ChatBox = () => {
                   border: '1px solid rgba(59, 130, 246, 0.2)',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px'
+                  gap: '6px',
+                  cursor: (activeSpace !== 0 && chat?.type !== 'classroom') ? 'pointer' : 'default'
                 }}
+                title={(activeSpace !== 0 && chat?.type !== 'classroom') ? "Click to rename space" : ""}
               >
                 <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#60a5fa' }} />
                 {spaceName}
+                {activeSpace !== 0 && chat?.type !== 'classroom' && <Pencil size={12} />}
               </div>
             </div>
           )}
@@ -3581,9 +3687,89 @@ const ChatBox = () => {
         >
 
 
-          {/* Floating space bubbles removed - handled in ChatNames list */}
+          {/* End-to-End Encryption Security Pill */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '8px auto 14px',
+            maxWidth: '92%',
+            padding: '8px 14px',
+            backgroundColor: 'rgba(234, 179, 8, 0.1)',
+            border: '1px solid rgba(234, 179, 8, 0.22)',
+            borderRadius: '12px',
+            color: '#fef08a',
+            fontSize: '12px',
+            lineHeight: '1.4',
+            textAlign: 'center',
+            gap: '8px',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+            userSelect: 'none'
+          }}>
+            <Lock size={14} color="#facc15" style={{ flexShrink: 0 }} />
+            <span>Messages are end-to-end encrypted. Not even LetsChat can read or listen to them.</span>
+          </div>
 
-
+          {/* Empty Space / Chat Suggestion Chips View */}
+          {filteredMessages.length === 0 && !isLoading && (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '40px 20px',
+              textAlign: 'center',
+              color: 'var(--text-secondary)',
+              margin: 'auto 0'
+            }}>
+              <div style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '18px',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--accent-color)',
+                marginBottom: '16px'
+              }}>
+                <Zap size={32} />
+              </div>
+              <h4 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 6px 0' }}>
+                No messages here yet
+              </h4>
+              <p style={{ fontSize: '13px', margin: '0 0 20px 0', maxWidth: '300px', opacity: 0.85 }}>
+                Start the conversation or try one of the quick suggestions below
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', maxWidth: '380px' }}>
+                {[
+                  { text: 'Say Hello 👋', action: () => setNewMsg('Hello 👋') },
+                  { text: 'Share a note 📝', action: () => setNewMsg('Hey! Sharing a quick note: ') },
+                  { text: 'Schedule a meeting 📅', action: () => setShowScheduleModal(true) }
+                ].map((chip, idx) => (
+                  <button
+                    key={idx}
+                    onClick={chip.action}
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: '20px',
+                      border: '1px solid var(--border-color)',
+                      backgroundColor: 'var(--bg-secondary)',
+                      color: 'var(--accent-color)',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.15)'}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--bg-secondary)'}
+                  >
+                    {chip.text}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {filteredMessages.map(msg => {
             const isReceived = msg.userid
@@ -3874,7 +4060,7 @@ const ChatBox = () => {
                             })()}
 
                             <div style={{ fontSize: isMobile ? '13px' : '14px', lineHeight: "1.5" }}>
-                              {msg.type === 'text' && renderLinkifiedText(msg.content)}
+                              {msg.type === 'text' && renderFormattedText(msg.content)}
                               {msg.type == 'assignment' && (<AssignmentMessage id={msg.content} userRole={chat.role} isMobile={isMobile} onOpenPanel={(id) => { setSelectedAssignmentId(id); setShowAssignmentDetail(true); }} />)}
                               {['image', 'video', 'audio', 'file', 'pdf'].includes(msg.type) && msg.content && (
                                 <MediaMessage

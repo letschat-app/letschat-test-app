@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from "react-router-dom";
 import { getchat } from './ChatNames';
 import { API } from '../service/UserAuth';
-import { Search, MessageCircle, Users, RefreshCcw, Share2, Sparkles } from 'lucide-react';
+import { Search, MessageCircle, Users, RefreshCcw, Share2, Sparkles, X, History } from 'lucide-react';
 import userDiscoveryStore from '../service/UserDiscoveryStore';
 import Avatar from '../components/chat/Avatar';
 import { syncChatsMapToDB } from '../service/db';
@@ -18,6 +18,29 @@ const SearchComponent = () => {
   const [isLoading, setIsLoading] = useState(false);
   const userId = localStorage.getItem("userid");
 
+  const [recentSearches, setRecentSearches] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('recentSearches') || '[]');
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const addRecentSearch = (term) => {
+    if (!term || !term.trim()) return;
+    const cleaned = term.trim();
+    setRecentSearches(prev => {
+      const updated = [cleaned, ...prev.filter(item => item !== cleaned)].slice(0, 5);
+      localStorage.setItem('recentSearches', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const clearRecentSearches = () => {
+    setRecentSearches([]);
+    localStorage.removeItem('recentSearches');
+  };
+
   useEffect(() => {
     const id = localStorage.getItem("userid");
     if (!id) {
@@ -25,15 +48,17 @@ const SearchComponent = () => {
     }
   }, []);
 
-  const handleSearch = async () => {
-    if (!userid.trim() || userid===localStorage.getItem("userid")) return;
+  const handleSearch = async (overrideQuery = null) => {
+    const queryToUse = typeof overrideQuery === 'string' ? overrideQuery : userid;
+    if (!queryToUse.trim() || queryToUse === localStorage.getItem("userid")) return;
+    addRecentSearch(queryToUse);
     setIsLoading(true);
     setUserData(null);
     try {
       // Search in the userlist first
       const foundUser = userlist.find(
-        user => user.userName.toLowerCase() === userid.toLowerCase() || 
-                user.userId === userid
+        user => user.userName.toLowerCase() === queryToUse.toLowerCase() || 
+                user.userId === queryToUse
       );
       
       if (foundUser) {
@@ -44,8 +69,7 @@ const SearchComponent = () => {
       }
       
       // If not found in list, try API search
-      const response = await fetch(`${API}/user/search/${userid}`);
-      //const response = await fetch(`https://insistent-zaniyah-prefraternal.ngrok-free.dev/api/user/search/${userid}`);
+      const response = await fetch(`${API}/user/search/${queryToUse}`);
       if (response.ok) {
         const data = await response.json();
         setUserData(data);
@@ -286,7 +310,7 @@ const SearchComponent = () => {
                   }}
                   style={{
                     width: '100%',
-                    padding: '16px 16px 16px 48px',
+                    padding: userid ? '16px 44px 16px 48px' : '16px 16px 16px 48px',
                     border: '2px solid rgba(255, 255, 255, 0.1)',
                     borderRadius: '16px',
                     fontSize: '16px',
@@ -297,6 +321,18 @@ const SearchComponent = () => {
                     boxSizing: 'border-box'
                   }}
                 />
+                {userid && (
+                  <button
+                    onClick={() => { setUserid(''); setUserData(null); setMessage(''); }}
+                    style={{
+                      position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)',
+                      background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer',
+                      padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}
+                  >
+                    <X size={18} />
+                  </button>
+                )}
                 
                 {/* Suggestions Dropdown */}
                 {showSuggestions && filteredUsers.length > 0 && (
@@ -341,6 +377,61 @@ const SearchComponent = () => {
                 {isLoading ? 'Searching...' : 'Search'}
               </button>
             </div>
+
+            {/* Recent Searches Tags */}
+            {recentSearches.length > 0 && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '8px',
+                marginTop: '16px',
+                justifyContent: 'center'
+              }}>
+                <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <History size={14} /> Recents:
+                </span>
+                {recentSearches.map((term, index) => (
+                  <button
+                    key={index}
+                    onClick={() => {
+                      setUserid(term);
+                      handleSearch(term);
+                    }}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '12px',
+                      backgroundColor: 'rgba(51, 65, 85, 0.5)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      color: '#60a5fa',
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      fontWeight: '500',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(51, 65, 85, 0.5)'}
+                  >
+                    {term}
+                  </button>
+                ))}
+                <button
+                  onClick={clearRecentSearches}
+                  style={{
+                    padding: '4px 8px',
+                    borderRadius: '12px',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    color: '#ef4444',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    opacity: 0.8
+                  }}
+                >
+                  Clear
+                </button>
+              </div>
+            )}
 
             {message && (
               <div style={{
@@ -409,7 +500,35 @@ const SearchComponent = () => {
             </button>
           </div>
 
-          {userlist.length === 0 ? (
+          {userlist.length === 0 && isLoading ? (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+              gap: '20px'
+            }}>
+              <style>{`
+                @keyframes searchSkeletonPulse {
+                  0% { opacity: 0.3; }
+                  50% { opacity: 0.8; }
+                  100% { opacity: 0.3; }
+                }
+              `}</style>
+              {[1, 2, 3, 4].map(i => (
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center',
+                    padding: '24px 16px', borderRadius: '16px', backgroundColor: '#1e293b',
+                    border: '1px solid #334155', textAlign: 'center'
+                  }}
+                >
+                  <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.08)', marginBottom: '16px', animation: 'searchSkeletonPulse 1.5s ease-in-out infinite' }} />
+                  <div style={{ width: '60%', height: '16px', borderRadius: '6px', backgroundColor: 'rgba(255,255,255,0.1)', marginBottom: '8px', animation: 'searchSkeletonPulse 1.5s ease-in-out infinite' }} />
+                  <div style={{ width: '40%', height: '12px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.05)', animation: 'searchSkeletonPulse 1.5s ease-in-out infinite' }} />
+                </div>
+              ))}
+            </div>
+          ) : userlist.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748b', backgroundColor: 'rgba(15, 23, 42, 0.4)', borderRadius: '16px', border: '1px dashed #334155' }}>
               <Users size={48} color="#475569" style={{ marginBottom: '16px', opacity: 0.5 }} />
               <div style={{ fontSize: '16px', fontWeight: '500' }}>No users found in discovery</div>

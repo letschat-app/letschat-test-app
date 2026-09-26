@@ -39,17 +39,34 @@ class SpaceStore {
 
   async setSpaceName(chatId, spaceId, spacename) {
     if (parseInt(spaceId) === 0) return;
+    if (!this.spaces[chatId]) this.spaces[chatId] = {};
+    this.spaces[chatId][spaceId] = spacename;
+    this.notify();
+
+    // Update spacesCache in localStorage
+    try {
+      const cache = JSON.parse(localStorage.getItem('spacesCache') || '{}');
+      const chatSpaces = cache[chatId];
+      if (chatSpaces) {
+        const spaceObj = chatSpaces.find(s => s.id === parseInt(spaceId));
+        if (spaceObj) {
+          spaceObj.name = spacename;
+          localStorage.setItem('spacesCache', JSON.stringify(cache));
+          window.dispatchEvent(new CustomEvent('spaces_cache_updated', { detail: { chatId, spaces: chatSpaces } }));
+        }
+      }
+    } catch (e) {
+      console.error("[SpaceStore] Failed to update spacesCache", e);
+    }
+
+    if (chatId === 'simulation_guide') return;
+
     try {
       const res = await fetch(`${API}/user/set-space`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chatId, spaceId, spacename })
       });
-      if (res.ok) {
-        if (!this.spaces[chatId]) this.spaces[chatId] = {};
-        this.spaces[chatId][spaceId] = spacename;
-        this.notify();
-      }
     } catch (e) {
       console.error("[SpaceStore] Update failed:", e);
     }

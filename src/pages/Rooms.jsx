@@ -1,11 +1,46 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Users, Hash, ArrowLeft, Loader2, Sparkles, Pin, PinOff } from 'lucide-react';
+import { Search, Plus, Users, Hash, ArrowLeft, Loader2, Sparkles, Pin, PinOff, RefreshCcw } from 'lucide-react';
 import { API } from '../service/UserAuth';
 import messageStore from './MessageStore';
 import { getchat } from './ChatNames';
 import Avatar from '../components/chat/Avatar';
 import { syncChatsMapToDB } from '../service/db';
+
+const BASE_NICKNAMES = [
+  "Thalapathy",
+  "Vaathi",
+  "AKVerse",
+  "Thala",
+  "Billa",
+  "Master",
+  "Ghilli",
+  "Rolex",
+  "Leo",
+  "Vikram",
+  "Jailer",
+  "Baasha",
+  "MarkAntony",
+  "Captain",
+  "TonyStark",
+  "BruceWayne",
+  "PeterParker",
+  "ClarkKent",
+  "Deadpool",
+  "Logan",
+  "Thor",
+  "Aniyan",
+  "MasterJD",
+  "Suriya"
+];
+
+const generateShuffledSuggestions = () => {
+  const shuffled = [...BASE_NICKNAMES].sort(() => 0.5 - Math.random());
+  return shuffled.map(name => {
+    const num = Math.floor(1000 + Math.random() * 9000);
+    return `${name}${num}`;
+  });
+};
 
 export default function Rooms({ isSidebar = false }) {
   const navigate = useNavigate();
@@ -18,6 +53,8 @@ export default function Rooms({ isSidebar = false }) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => !localStorage.getItem('roomNickname'));
   const [nickname, setNickname] = useState(() => localStorage.getItem('roomNickname') || '');
+  const [suggestedNames, setSuggestedNames] = useState(generateShuffledSuggestions);
+  const [showAllSuggestions, setShowAllSuggestions] = useState(false);
   const [isSettingNickname, setIsSettingNickname] = useState(false);
   const [pinnedRoomIds, setPinnedRoomIds] = useState(() => {
     const saved = localStorage.getItem('pinnedRoomIds');
@@ -449,23 +486,46 @@ export default function Rooms({ isSidebar = false }) {
 
       {/* Onboarding Overlay */}
       {showOnboarding && !isSidebar && (
-        <div className="res-modal-overlay" style={{ ...modalOverlayStyle, zIndex: 1000, backdropFilter: 'blur(10px)' }}>
-          <div className="res-modal" style={{ ...modalContentStyle, maxWidth: '500px', textAlign: 'center', padding: '40px' }}>
-            <Sparkles size={48} color="#fbbf24" style={{ marginBottom: '20px' }} />
-            <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '16px', background: 'linear-gradient(to right, #60a5fa, #a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-              Welcome to Social Discovery!
+        <div className="res-modal-overlay" style={{ ...modalOverlayStyle, zIndex: 1000, backdropFilter: 'blur(16px)' }}>
+          <div className="res-modal" style={{
+            ...modalContentStyle,
+            maxWidth: '460px',
+            textAlign: 'center',
+            padding: '36px 28px',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6)'
+          }}>
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, rgba(96, 165, 250, 0.2) 0%, rgba(167, 139, 250, 0.2) 100%)',
+              border: '1px solid rgba(96, 165, 250, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px auto'
+            }}>
+              <Sparkles size={28} color="#60a5fa" />
+            </div>
+
+            <h2 style={{
+              fontSize: '22px',
+              fontWeight: '800',
+              marginBottom: '8px',
+              background: 'linear-gradient(to right, #60a5fa, #a78bfa)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            }}>
+              Welcome to Public Rooms
             </h2>
-            <p style={{ color: '#9ca3af', lineHeight: '1.6', marginBottom: '24px', fontSize: '15px' }}>
-              This is a social discovery page where anyone can chat in any rooms they like **without revealing your identity**.
-              <br /><br />
-              To keep things safe:
-              <br />
-              • Do not share any personal info.
-              <br />
-              • Set a nickname to use in these rooms (don't use your real name).
+
+            <p style={{ color: '#9ca3af', lineHeight: '1.5', marginBottom: '22px', fontSize: '14px' }}>
+              Public rooms are completely anonymous — nicknames are recommended to protect your privacy.
             </p>
+
             <form onSubmit={handleSetNickname} style={formStyle}>
-              <div style={inputGroupStyle}>
+              <div style={{ ...inputGroupStyle, marginBottom: '14px' }}>
                 <input
                   autoFocus
                   type="text"
@@ -474,11 +534,99 @@ export default function Rooms({ isSidebar = false }) {
                   className="premium-input"
                   value={nickname}
                   onChange={e => setNickname(e.target.value)}
-                  style={{ textAlign: 'center', fontSize: '18px' }}
+                  style={{ textAlign: 'center', fontSize: '16px', fontWeight: '600', letterSpacing: '0.3px' }}
                 />
               </div>
-              {error && <p style={errorStyle}>{error}</p>}
-              <button type="submit" disabled={isSettingNickname} className="submit-btn" style={{ ...submitButtonStyle, marginTop: '10px' }}>
+
+              {/* Random Nickname Suggestions */}
+              <div style={{ marginBottom: '22px' }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: '10px',
+                  padding: '0 4px'
+                }}>
+                  <span style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Suggested Handles
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!showAllSuggestions) {
+                        setSuggestedNames(generateShuffledSuggestions());
+                        setShowAllSuggestions(true);
+                      } else {
+                        setShowAllSuggestions(false);
+                      }
+                    }}
+                    style={{
+                      background: 'rgba(96, 165, 250, 0.1)',
+                      border: '1px solid rgba(96, 165, 250, 0.2)',
+                      color: '#60a5fa',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '3px 10px',
+                      borderRadius: '12px',
+                      transition: 'all 0.2s ease'
+                    }}
+                    title={showAllSuggestions ? "Show fewer suggestions" : "Show all suggested handles"}
+                  >
+                    {showAllSuggestions ? "Show Less" : "+ More"}
+                  </button>
+                </div>
+
+                <div style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '8px',
+                  justifyContent: 'center',
+                  maxHeight: showAllSuggestions ? '180px' : 'none',
+                  overflowY: showAllSuggestions ? 'auto' : 'visible',
+                  padding: '2px'
+                }} className="hide-scrollbar">
+                  {(showAllSuggestions ? suggestedNames : suggestedNames.slice(0, 4)).map((item, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setNickname(item)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '20px',
+                        background: nickname === item ? 'rgba(96, 165, 250, 0.25)' : 'rgba(255, 255, 255, 0.05)',
+                        border: nickname === item ? '1px solid rgba(96, 165, 250, 0.6)' : '1px solid rgba(255, 255, 255, 0.1)',
+                        color: nickname === item ? '#93c5fd' : '#d1d5db',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (nickname !== item) {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (nickname !== item) {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                        }
+                      }}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {error && <p style={{ ...errorStyle, marginBottom: '12px' }}>{error}</p>}
+
+              <button type="submit" disabled={isSettingNickname} className="submit-btn" style={{ ...submitButtonStyle, width: '100%', marginTop: '4px' }}>
                 {isSettingNickname ? 'Saving...' : 'Start Exploring'}
               </button>
             </form>

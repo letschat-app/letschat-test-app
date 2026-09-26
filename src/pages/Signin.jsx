@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { initWebsocket } from "../service/Websocket";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePWA } from "../context/PWAContext";
+import { Eye, EyeOff } from "lucide-react";
 
 function Signin() {
   const navigate = useNavigate();
@@ -11,6 +12,8 @@ function Signin() {
   const [direction, setDirection] = useState(1);
   const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const inputRef = useRef(null);
 
   const [form, setForm] = useState({
@@ -114,16 +117,29 @@ function Signin() {
         return (
           <div style={styles.stepContainer}>
             <h2 style={styles.question}>Set a secure password</h2>
-            <input
-              ref={inputRef}
-              type="password"
-              name="password"
-              value={form.password}
-              onChange={handleChange}
-              placeholder="Password"
-              style={styles.input}
-              onKeyPress={(e) => e.key === 'Enter' && nextStep(e)}
-            />
+            <div style={{ position: 'relative', width: '100%' }}>
+              <input
+                ref={inputRef}
+                type={showPassword ? "text" : "password"}
+                name="password"
+                value={form.password}
+                onChange={handleChange}
+                placeholder="Password"
+                style={{ ...styles.input, paddingRight: '40px' }}
+                onKeyPress={(e) => e.key === 'Enter' && nextStep(e)}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute', right: '4px', top: '50%', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer',
+                  padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
             {errorMsg && <p style={styles.error}>{errorMsg}</p>}
             <div style={styles.buttonGroup}>
               <button onClick={prevStep} style={styles.backButton}>&larr; Back</button>
@@ -135,16 +151,29 @@ function Signin() {
         return (
           <div style={styles.stepContainer}>
             <h2 style={styles.question}>Confirm your password</h2>
-            <input
-              ref={inputRef}
-              type="password"
-              name="confirmPassword"
-              value={confirmPassword}
-              onChange={handleChange}
-              placeholder="Confirm Password"
-              style={styles.input}
-              onKeyPress={(e) => e.key === 'Enter' && handleSignup(e)}
-            />
+            <div style={{ position: 'relative', width: '100%' }}>
+              <input
+                ref={inputRef}
+                type={showConfirmPassword ? "text" : "password"}
+                name="confirmPassword"
+                value={confirmPassword}
+                onChange={handleChange}
+                placeholder="Confirm Password"
+                style={{ ...styles.input, paddingRight: '40px' }}
+                onKeyPress={(e) => e.key === 'Enter' && handleSignup(e)}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                style={{
+                  position: 'absolute', right: '4px', top: '50%', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer',
+                  padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}
+              >
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
             {errorMsg && <p style={styles.error}>{errorMsg}</p>}
             <div style={styles.buttonGroup}>
               <button onClick={prevStep} style={styles.backButton}>&larr; Back</button>

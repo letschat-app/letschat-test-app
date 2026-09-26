@@ -28,28 +28,24 @@ import UpdateToast from "./components/chat/UpdateToast";
 import InAppToast from "./components/chat/InAppToast";
 import { useNotifications } from "./hooks/useNotifications";
 import { useNavigate } from "react-router-dom";
-
-// Lazy-loaded routes for code splitting
-const Rooms = lazyWithSplash(() => import("./pages/Rooms"));
-const ChatNames = lazyWithSplash(() => import("./pages/ChatNames"));
-const Profileupdate = lazyWithSplash(() => import("./pages/Profileupdate"));
-const ProfilePage = lazyWithSplash(() => import("./pages/ProfilePage"));
-const ChatBox = lazyWithSplash(() => import("./pages/ChatBox"));
-const Communities = lazyWithSplash(() => import("./pages/Communities"));
-const RecommendedCommunities = lazyWithSplash(() => import("./pages/RecommendedCommunities"));
-const MyCommunities = lazyWithSplash(() => import("./pages/MyCommunities"));
-const CommunityCreationPage = lazyWithSplash(() => import("./pages/CommunityCreationPage"));
-const UploadPost = lazyWithSplash(() => import("./pages/UploadPost"));
-const MediaFeed = lazyWithSplash(() => import("./pages/MediaFeed"));
-const SmoothCalendar = lazyWithSplash(() => import("./pages/SmoothCalendar"));
-const ShareTargetPage = lazyWithSplash(() => import("./pages/ShareTargetPage"));
-const StarredMessages = lazyWithSplash(() => import("./pages/StarredMessages"));
-const LandingPage = lazyWithSplash(() => import("./pages/LandingPage"));
-const Signin = lazyWithSplash(() => import("./pages/Signin"));
-const Login = lazyWithSplash(() => import("./pages/Login"));
-
+import { WifiOff } from "lucide-react";
 
 function App() {
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
   useEffect(() => {
     // Initial cleanup
     purgeExpiredMessages();
@@ -105,6 +101,29 @@ function App() {
     
     <>
     <PWAProvider>
+    {isOffline && (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 999999,
+        backgroundColor: '#b91c1c',
+        color: '#ffffff',
+        fontSize: '13px',
+        fontWeight: '600',
+        padding: '8px 16px',
+        textAlign: 'center',
+        boxShadow: '0 2px 10px rgba(0,0,0,0.4)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '8px'
+      }}>
+        <WifiOff size={16} />
+        <span>You are currently offline. Messages queued locally will auto-sync when reconnected.</span>
+      </div>
+    )}
     <UpdateToast />
     <EventStorage>
     <EventPanel>

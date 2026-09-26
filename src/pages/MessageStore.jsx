@@ -472,6 +472,12 @@ const messageStore = {
     console.log("changing from", this.activeChat, "to", chatid)
     this.activeChat = chatid
   },
+  getActiveSpace() {
+    return this.activeSpace !== undefined ? this.activeSpace : null;
+  },
+  setActiveSpace(spaceid) {
+    this.activeSpace = (spaceid !== null && spaceid !== undefined) ? parseInt(spaceid) : null;
+  },
   getChatEpoch(chatId) {
     const stored = JSON.parse(localStorage.getItem("visited") || "{}");
     return stored[chatId] || null; // returns null if chatId does not exist

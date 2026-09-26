@@ -10,6 +10,7 @@ const StarredMessages = () => {
     const [searchParams] = useSearchParams();
     const chatid = searchParams.get('chatid');
     const [starredMessages, setStarredMessages] = useState([]);
+    const [filter, setFilter] = useState('all'); // 'all', 'text', 'media'
     const [loading, setLoading] = useState(true);
     const userId = localStorage.getItem('userid');
 
@@ -43,6 +44,12 @@ const StarredMessages = () => {
         navigate(`/chat/${msg.chatid}`, { state: { scrollToMsgId: msg.msgid || msg.tempmsgid } });
     };
 
+    const filteredMessages = starredMessages.filter(msg => {
+        if (filter === 'text') return !msg.type || msg.type === 'text';
+        if (filter === 'media') return msg.type && msg.type !== 'text';
+        return true;
+    });
+
     if (loading) {
         return (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: 'var(--bg-primary)' }}>
@@ -65,34 +72,63 @@ const StarredMessages = () => {
                 padding: '16px 20px', 
                 borderBottom: '1px solid var(--border-color)', 
                 display: 'flex', 
-                alignItems: 'center', 
-                gap: '16px',
+                flexDirection: 'column',
+                gap: '12px',
                 background: 'var(--bg-secondary)',
                 position: 'sticky',
                 top: 0,
                 zIndex: 10
             }}>
-                <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', padding: '4px' }}>
-                    <ArrowLeft size={24} />
-                </button>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Star size={20} fill="var(--accent-color)" color="var(--accent-color)" />
-                    <h1 style={{ fontSize: '20px', fontWeight: '700', margin: 0 }}>
-                        {chatid ? 'Starred in this chat' : 'Starred Messages'}
-                    </h1>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', padding: '4px' }}>
+                        <ArrowLeft size={24} />
+                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Star size={20} fill="var(--accent-color)" color="var(--accent-color)" />
+                        <h1 style={{ fontSize: '20px', fontWeight: '700', margin: 0 }}>
+                            {chatid ? 'Starred in this chat' : 'Starred Messages'}
+                        </h1>
+                    </div>
+                </div>
+
+                {/* Filter Pills */}
+                <div style={{ display: 'flex', gap: '8px', paddingLeft: '40px' }}>
+                    {[
+                        { id: 'all', label: 'All' },
+                        { id: 'text', label: 'Text' },
+                        { id: 'media', label: 'Photos & Media' }
+                    ].map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setFilter(tab.id)}
+                            style={{
+                                padding: '6px 14px',
+                                borderRadius: '20px',
+                                border: filter === tab.id ? '1px solid var(--accent-color)' : '1px solid var(--border-color)',
+                                backgroundColor: filter === tab.id ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                                color: filter === tab.id ? 'var(--accent-color)' : 'var(--text-secondary)',
+                                fontSize: '13px',
+                                fontWeight: filter === tab.id ? '600' : '500',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease'
+                            }}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
                 </div>
             </div>
 
             {/* Content */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }} className="hide-scrollbar">
-                {starredMessages.length === 0 ? (
+                {filteredMessages.length === 0 ? (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', opacity: 0.5 }}>
                         <Star size={64} strokeWidth={1} style={{ marginBottom: '16px' }} />
-                        <p style={{ fontSize: '16px' }}>No starred messages yet</p>
+                        <p style={{ fontSize: '16px' }}>No starred messages found</p>
                     </div>
                 ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
-                        {starredMessages.map((msg) => (
+                        {filteredMessages.map((msg) => (
                             <div 
                                 key={msg.msgid || msg.tempmsgid || msg.timestamp}
                                 onClick={() => handleJumpToChat(msg)}
@@ -123,7 +159,7 @@ const StarredMessages = () => {
                                             </span>
                                         </div>
                                         <div style={{ fontSize: '15px', lineHeight: '1.5', color: 'var(--text-primary)', wordBreak: 'break-word' }}>
-                                            {msg.type === 'text' ? msg.content : `[${msg.type.toUpperCase()}]`}
+                                            {!msg.type || msg.type === 'text' ? msg.content : `[${msg.type.toUpperCase()}]`}
                                         </div>
                                     </div>
                                 </div>

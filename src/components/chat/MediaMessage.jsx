@@ -498,11 +498,30 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
         position: 'relative',
         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
       }}>
-        {renderOptimisticOverlay()}
         {/* Main row: Icon + Waveform */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* Action Button: Download or Play */}
-          {!showFull ? (
+          {/* Action Button: Uploading Ring, Download, or Play */}
+          {isOptimistic && status === 'uploading' ? (
+            <div
+              style={{
+                width: '48px', height: '48px', borderRadius: '50%',
+                background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(96, 165, 250, 0.3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0
+              }}
+            >
+              <div style={{ position: 'relative', width: '28px', height: '28px' }}>
+                <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
+                  <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="3.5" />
+                  <circle 
+                    cx="18" cy="18" r="15" fill="none" stroke="#60a5fa" strokeWidth="3.5" 
+                    strokeDasharray="100" strokeDashoffset={100 - uploadProgress}
+                    style={{ transition: 'stroke-dashoffset 0.2s ease' }}
+                  />
+                </svg>
+              </div>
+            </div>
+          ) : !showFull ? (
             <button
               onClick={(e) => { 
                 if (isSelectionMode) return;
@@ -728,24 +747,46 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
               </div>
             )}
 
-            <div
-              onClick={(e) => {
-                if (isSelectionMode) return;
-                e.stopPropagation();
-                const url = resolvedMain || fileUrl;
-                downloadFile(url, fileName);
-              }}
-              style={{
-                padding: '8px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)',
-                border: '1px solid rgba(255,255,255,0.15)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                transition: 'background 0.2s'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
-            >
-              <Download size={18} color="#ffffff" />
-            </div>
+            {isOptimistic && status === 'uploading' ? (
+              <div
+                style={{
+                  width: '34px', height: '34px', borderRadius: '50%',
+                  background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(96, 165, 250, 0.3)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0
+                }}
+              >
+                <div style={{ position: 'relative', width: '22px', height: '22px' }}>
+                  <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
+                    <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="3.5" />
+                    <circle 
+                      cx="18" cy="18" r="15" fill="none" stroke="#60a5fa" strokeWidth="3.5" 
+                      strokeDasharray="100" strokeDashoffset={100 - uploadProgress}
+                      style={{ transition: 'stroke-dashoffset 0.2s ease' }}
+                    />
+                  </svg>
+                </div>
+              </div>
+            ) : (
+              <div
+                onClick={(e) => {
+                  if (isSelectionMode) return;
+                  e.stopPropagation();
+                  const url = resolvedMain || fileUrl;
+                  downloadFile(url, fileName);
+                }}
+                style={{
+                  padding: '8px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                  transition: 'background 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+              >
+                <Download size={18} color="#ffffff" />
+              </div>
+            )}
           </div>
         </div>
       </div>

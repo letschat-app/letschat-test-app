@@ -2,8 +2,11 @@ import React, { useState } from "react";
 import { loginUser } from "../service/UserAuth";
 import { Link, useNavigate } from "react-router-dom";
 import { initWebsocket } from "../service/Websocket";
+import { Eye, EyeOff } from "lucide-react";
+
 function Login() {
   const [form, setForm] = useState({ userId: "", password: "" });
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const navigate = useNavigate();
@@ -37,7 +40,6 @@ function Login() {
     }
   };
 
-
   return (
     <div style={styles.wrapper}>
       <h1 style={styles.brandName}>LetsChat</h1>
@@ -60,13 +62,35 @@ function Login() {
 
           <div style={styles.inputGroup}>
             <label style={styles.label}>Password</label>
-            <input
-              name="password"
-              type="password"
-              placeholder="••••••••"
-              onChange={handleChange}
-              style={styles.input}
-            />
+            <div style={{ position: 'relative', width: '100%' }}>
+              <input
+                name="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••"
+                onChange={handleChange}
+                style={{ ...styles.input, paddingRight: '42px' }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           {errorMsg && <p style={styles.error}>{errorMsg}</p>}
@@ -170,7 +194,7 @@ const styles = {
     color: "var(--danger-color)",
     textAlign: "center",
     padding: "10px",
-    background: "var(--bg-secondary)", // Neutral background to keep it sleek
+    background: "var(--bg-secondary)",
     borderRadius: "8px",
     border: "1px solid var(--danger-color)"
   },
