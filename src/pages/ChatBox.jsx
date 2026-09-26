@@ -1740,8 +1740,8 @@ const ChatBox = () => {
               position: 'fixed',
               bottom: `${mentionsPos.bottom}px`,
               left: `${mentionsPos.left}px`,
-              background: '#1a1a1a',
-              border: '1px solid rgba(255,255,255,0.12)',
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
               borderRadius: '16px',
               padding: '8px',
               width: '240px',
@@ -3711,7 +3711,7 @@ const ChatBox = () => {
           </div>
 
           {/* Empty Space / Chat Suggestion Chips View */}
-          {filteredMessages.length === 0 && !isLoading && (
+          {filteredMessages.length === 0 && (
             <div style={{
               display: 'flex',
               flexDirection: 'column',

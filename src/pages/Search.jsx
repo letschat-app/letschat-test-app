@@ -242,20 +242,20 @@ const SearchComponent = () => {
           borderRadius: '16px',
           padding: '20px 24px',
           marginBottom: '40px',
-          border: '1px solid rgba(59, 130, 246, 0.2)',
+          border: '1px solid var(--border-color)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
           gap: '16px',
-          boxShadow: '0 10px 25px -5px rgba(59, 130, 246, 0.1)'
+          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)'
         }}>
           <div style={{ flex: '1 1 300px' }}>
-            <h3 style={{ fontSize: '20px', fontWeight: '800', color: '#f8fafc', margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Sparkles size={20} color="#60a5fa" />
+            <h3 style={{ fontSize: '20px', fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 8px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Sparkles size={20} color="var(--accent-color)" />
               Invite Friends to LetsChat
             </h3>
-            <p style={{ fontSize: '14px', color: '#cbd5e1', margin: 0, lineHeight: '1.5' }}>
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.5' }}>
               The best conversations happen together. Invite your friends to explore spaces, public rooms, and more!
             </p>
           </div>
@@ -263,7 +263,7 @@ const SearchComponent = () => {
             onClick={handleInvite}
             style={{
               padding: '12px 24px',
-              background: 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)',
+              background: 'var(--accent-gradient)',
               color: '#fff',
               border: 'none',
               borderRadius: '12px',
@@ -292,13 +292,13 @@ const SearchComponent = () => {
 
         {/* Hero Search Section */}
         <div style={{ textAlign: 'center', marginBottom: '48px' }}>
-          <h1 style={{ fontSize: '32px', fontWeight: '800', color: '#f8fafc', marginBottom: '12px' }}>Find & Connect</h1>
-          <p style={{ fontSize: '16px', color: '#94a3b8', marginBottom: '32px' }}>Search for users by name or ID to start a direct conversation</p>
+          <h1 style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '12px' }}>Find & Connect</h1>
+          <p style={{ fontSize: '16px', color: 'var(--text-secondary)', marginBottom: '32px' }}>Search for users by name or ID to start a direct conversation</p>
           
           <div style={{ maxWidth: '600px', margin: '0 auto', position: 'relative' }}>
             <div className="search-container">
               <div style={{ flex: 1, position: 'relative', width: '100%' }}>
-                <Search size={20} color="#94a3b8" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
+                <Search size={20} color="var(--text-secondary)" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
                 <input
                   type="text"
                   placeholder="Enter User ID or Name"
@@ -306,13 +306,13 @@ const SearchComponent = () => {
                   onChange={handleInputChange}
                   onKeyPress={handleKeyPress}
                   onFocus={(e) => {
-                    e.target.style.borderColor = '#3b82f6';
-                    e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.2)';
+                    e.target.style.borderColor = 'var(--accent-color)';
+                    e.target.style.boxShadow = '0 0 0 3px var(--nav-active-bg)';
                     if (userid.trim()) setShowSuggestions(true);
                   }}
                   onBlur={(e) => {
                     setTimeout(() => {
-                      e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                      e.target.style.borderColor = 'var(--border-color)';
                       e.target.style.boxShadow = 'none';
                       setShowSuggestions(false);
                     }, 200);
@@ -320,13 +320,13 @@ const SearchComponent = () => {
                   style={{
                     width: '100%',
                     padding: userid ? '16px 44px 16px 48px' : '16px 16px 16px 48px',
-                    border: '2px solid rgba(255, 255, 255, 0.1)',
+                    border: '2px solid var(--border-color)',
                     borderRadius: '16px',
                     fontSize: '16px',
                     outline: 'none',
                     transition: 'all 0.2s',
-                    backgroundColor: 'rgba(15, 23, 42, 0.6)',
-                    color: '#f8fafc',
+                    backgroundColor: 'var(--bg-secondary)',
+                    color: 'var(--text-primary)',
                     boxSizing: 'border-box'
                   }}
                 />
@@ -335,7 +335,7 @@ const SearchComponent = () => {
                     onClick={() => { setUserid(''); setUserData(null); setMessage(''); }}
                     style={{
                       position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)',
-                      background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer',
+                      background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer',
                       padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center'
                     }}
                   >
@@ -347,7 +347,7 @@ const SearchComponent = () => {
                 {showSuggestions && filteredUsers.length > 0 && (
                   <div style={{
                     position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '8px',
-                    backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '12px',
+                    backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '12px',
                     maxHeight: '250px', overflowY: 'auto', zIndex: 1000,
                     boxShadow: '0 10px 25px -5px rgba(0,0,0,0.5)',
                     textAlign: 'left'
@@ -358,13 +358,13 @@ const SearchComponent = () => {
                         onClick={() => selectUser(user)}
                         style={{
                           padding: '12px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px',
-                          borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background-color 0.2s'
+                          borderBottom: '1px solid var(--border-color)', transition: 'background-color 0.2s'
                         }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)'}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--nav-active-bg)'}
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                       >
                         <Avatar chat={user} size={36} />
-                        <span style={{ color: '#f1f5f9', fontSize: '15px', fontWeight: '500' }}>{user.userName}</span>
+                        <span style={{ color: 'var(--text-primary)', fontSize: '15px', fontWeight: '500' }}>{user.userName}</span>
                       </div>
                     ))}
                   </div>
@@ -374,7 +374,7 @@ const SearchComponent = () => {
                 className="search-btn"
                 onClick={handleSearch} disabled={isLoading}
                 style={{
-                  padding: '16px 24px', backgroundColor: '#3b82f6', color: '#fff',
+                  padding: '16px 24px', backgroundColor: 'var(--accent-color)', color: '#fff',
                   border: 'none', borderRadius: '16px', fontSize: '16px', fontWeight: '700',
                   cursor: isLoading ? 'not-allowed' : 'pointer', transition: 'all 0.2s',
                   display: 'flex', alignItems: 'center', gap: '8px', opacity: isLoading ? 0.7 : 1,
@@ -397,7 +397,7 @@ const SearchComponent = () => {
                 marginTop: '16px',
                 justifyContent: 'center'
               }}>
-                <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <History size={14} /> Recents:
                 </span>
                 {recentSearches.map((term, index) => (
@@ -410,16 +410,16 @@ const SearchComponent = () => {
                     style={{
                       padding: '4px 10px',
                       borderRadius: '12px',
-                      backgroundColor: 'rgba(51, 65, 85, 0.5)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      color: '#60a5fa',
+                      backgroundColor: 'var(--bg-card)',
+                      border: '1px solid var(--border-color)',
+                      color: 'var(--accent-color)',
                       fontSize: '13px',
                       cursor: 'pointer',
                       fontWeight: '500',
                       transition: 'all 0.2s ease'
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(51, 65, 85, 0.5)'}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--nav-active-bg)'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-card)'}
                   >
                     {term}
                   </button>
@@ -431,7 +431,7 @@ const SearchComponent = () => {
                     borderRadius: '12px',
                     backgroundColor: 'transparent',
                     border: 'none',
-                    color: '#ef4444',
+                    color: 'var(--danger-color)',
                     fontSize: '12px',
                     cursor: 'pointer',
                     opacity: 0.8
@@ -456,16 +456,16 @@ const SearchComponent = () => {
 
             {userData && (
               <div style={{
-                marginTop: '24px', padding: '24px', backgroundColor: '#1e293b',
+                marginTop: '24px', padding: '24px', backgroundColor: 'var(--bg-card)',
                 borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                flexWrap: 'wrap', gap: '16px', border: '1px solid #334155', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.3)',
+                flexWrap: 'wrap', gap: '16px', border: '1px solid var(--border-color)', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.3)',
                 textAlign: 'left'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                   <Avatar chat={userData} size={64} />
                   <div>
-                    <div style={{ fontSize: '20px', fontWeight: '700', color: '#f8fafc', marginBottom: '4px' }}>{userData.userName}</div>
-                    <div style={{ fontSize: '13px', color: '#94a3b8' }}>User ID: {userData.userId}</div>
+                    <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>{userData.userName}</div>
+                    <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>User ID: {userData.userId}</div>
                   </div>
                 </div>
                 <button 
@@ -491,8 +491,8 @@ const SearchComponent = () => {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <Users size={28} color="#3b82f6" />
-              <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#f8fafc', margin: 0 }}>Explore Community</h2>
+              <Users size={28} color="var(--accent-color)" />
+              <h2 style={{ fontSize: '24px', fontWeight: '800', color: 'var(--text-primary)', margin: 0 }}>Explore Community</h2>
             </div>
             <button 
               onClick={() => {
@@ -501,11 +501,11 @@ const SearchComponent = () => {
               }}
               style={{
                 display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px',
-                backgroundColor: 'rgba(51, 65, 85, 0.5)', color: '#f1f5f9', border: '1px solid rgba(255,255,255,0.1)',
+                backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-color)',
                 borderRadius: '12px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(51, 65, 85, 0.8)'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(51, 65, 85, 0.5)'}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--nav-active-bg)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-card)'}
             >
               <RefreshCcw size={16} />
               Refresh List
@@ -530,19 +530,19 @@ const SearchComponent = () => {
                   key={i}
                   style={{
                     display: 'flex', flexDirection: 'column', alignItems: 'center',
-                    padding: '24px 16px', borderRadius: '16px', backgroundColor: '#1e293b',
-                    border: '1px solid #334155', textAlign: 'center'
+                    padding: '24px 16px', borderRadius: '16px', backgroundColor: 'var(--bg-card)',
+                    border: '1px solid var(--border-color)', textAlign: 'center'
                   }}
                 >
-                  <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.08)', marginBottom: '16px', animation: 'searchSkeletonPulse 1.5s ease-in-out infinite' }} />
-                  <div style={{ width: '60%', height: '16px', borderRadius: '6px', backgroundColor: 'rgba(255,255,255,0.1)', marginBottom: '8px', animation: 'searchSkeletonPulse 1.5s ease-in-out infinite' }} />
-                  <div style={{ width: '40%', height: '12px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.05)', animation: 'searchSkeletonPulse 1.5s ease-in-out infinite' }} />
+                  <div style={{ width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'var(--border-color)', marginBottom: '16px', animation: 'searchSkeletonPulse 1.5s ease-in-out infinite' }} />
+                  <div style={{ width: '60%', height: '16px', borderRadius: '6px', backgroundColor: 'var(--border-color)', marginBottom: '8px', animation: 'searchSkeletonPulse 1.5s ease-in-out infinite' }} />
+                  <div style={{ width: '40%', height: '12px', borderRadius: '4px', backgroundColor: 'var(--border-color)', animation: 'searchSkeletonPulse 1.5s ease-in-out infinite' }} />
                 </div>
               ))}
             </div>
           ) : userlist.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px 20px', color: '#64748b', backgroundColor: 'rgba(15, 23, 42, 0.4)', borderRadius: '16px', border: '1px dashed #334155' }}>
-              <Users size={48} color="#475569" style={{ marginBottom: '16px', opacity: 0.5 }} />
+            <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-secondary)', backgroundColor: 'var(--bg-card)', borderRadius: '16px', border: '1px dashed var(--border-color)' }}>
+              <Users size={48} color="var(--text-secondary)" style={{ marginBottom: '16px', opacity: 0.5 }} />
               <div style={{ fontSize: '16px', fontWeight: '500' }}>No users found in discovery</div>
             </div>
           ) : (
@@ -556,32 +556,32 @@ const SearchComponent = () => {
                   key={user.userId}
                   style={{
                     display: 'flex', flexDirection: 'column', alignItems: 'center',
-                    padding: '24px 16px', borderRadius: '16px', backgroundColor: '#1e293b',
-                    border: '1px solid #334155', transition: 'all 0.2s', textAlign: 'center',
+                    padding: '24px 16px', borderRadius: '16px', backgroundColor: 'var(--bg-card)',
+                    border: '1px solid var(--border-color)', transition: 'all 0.2s', textAlign: 'center',
                     boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.transform = 'translateY(-4px)';
                     e.currentTarget.style.boxShadow = '0 12px 20px rgba(0,0,0,0.2)';
-                    e.currentTarget.style.borderColor = '#475569';
+                    e.currentTarget.style.borderColor = 'var(--accent-color)';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.transform = 'translateY(0)';
                     e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
-                    e.currentTarget.style.borderColor = '#334155';
+                    e.currentTarget.style.borderColor = 'var(--border-color)';
                   }}
                 >
                   <div style={{ marginBottom: '16px' }}>
                     <Avatar chat={user} size={80} />
                   </div>
                   <h3 style={{ 
-                    color: '#f8fafc', fontSize: '18px', fontWeight: '700', 
+                    color: 'var(--text-primary)', fontSize: '18px', fontWeight: '700', 
                     margin: '0 0 4px 0', width: '100%', overflow: 'hidden', 
                     textOverflow: 'ellipsis', whiteSpace: 'nowrap' 
                   }}>
                     {user.userName}
                   </h3>
-                  <p style={{ color: '#64748b', fontSize: '12px', margin: '0 0 20px 0', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: '0 0 20px 0', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     ID: {user.userId}
                   </p>
                   
@@ -589,18 +589,18 @@ const SearchComponent = () => {
                     onClick={() => handleChat(user.userId)}
                     style={{
                       width: '100%', padding: '10px', borderRadius: '10px', border: 'none',
-                      backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#60a5fa',
+                      backgroundColor: 'var(--nav-active-bg)', color: 'var(--accent-color)',
                       cursor: 'pointer', fontWeight: '600', fontSize: '14px',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                       transition: 'all 0.2s'
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#3b82f6';
+                      e.currentTarget.style.backgroundColor = 'var(--accent-color)';
                       e.currentTarget.style.color = '#fff';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
-                      e.currentTarget.style.color = '#60a5fa';
+                      e.currentTarget.style.backgroundColor = 'var(--nav-active-bg)';
+                      e.currentTarget.style.color = 'var(--accent-color)';
                     }}
                   >
                     <MessageCircle size={16} />

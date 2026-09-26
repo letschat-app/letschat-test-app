@@ -835,7 +835,7 @@ const mobileBottomNavStyle = (visible) => ({
   zIndex: 99,
   boxSizing: 'border-box',
   backdropFilter: 'blur(12px)',
-  backgroundColor: 'rgba(18, 24, 38, 0.97)',
+  backgroundColor: 'var(--bg-secondary)',
   transform: visible ? 'translateY(0)' : 'translateY(100%)',
   transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
   pointerEvents: visible ? 'auto' : 'none',
