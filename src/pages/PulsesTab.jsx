@@ -630,4 +630,21 @@ const emptyBoxStyle = {
   cursor: 'pointer'
 };
 
+const statusRowStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '14px',
+  padding: '12px 20px',
+  cursor: 'pointer',
+  transition: 'background 0.15s ease',
+  userSelect: 'none',
+};
+
+const emptyTextStyle = {
+  padding: '12px 20px',
+  color: 'var(--text-secondary)',
+  fontSize: '13px',
+  fontStyle: 'italic',
+};
+
 export default PulsesTab;
