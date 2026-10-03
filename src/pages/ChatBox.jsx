@@ -5,8 +5,9 @@ import imageCompression from 'browser-image-compression';
 import { getchat } from "./ChatNames";
 import { v4 as uuidv4 } from "uuid";
 import { API } from "../service/UserAuth";
-import { getsocket, initWebsocket, sendSafe } from "../service/Websocket";
+import { getsocket, initWebsocket, sendSafe, sendMediaOpenedEvent } from "../service/Websocket";
 import messageStore from "./MessageStore";
+import StreakBadge from "../components/pulse/StreakBadge";
 import { initDB, saveUsersBatchToDB, saveGroupMembersToDB, markMessagesAsOldInDB, getGroupMembersFromDB } from '../service/db';
 import { useNotifications } from '../hooks/useNotifications';
 import {
@@ -43,14 +44,18 @@ import {
   Pencil,
   Lock,
   Filter,
-  User
+  User,
+  BarChart3
 } from "lucide-react";
 import { useEventMediator } from "../service/EventStorage";
 import AssignmentMessage from "./AssignmentMessage";
 import EyeIcon from "../components/chat/EyeIcon";
 import EventModal from "../components/modals/EventModal";
 import InfoModal from "../components/modals/InfoModal";
+import MessageStatusInfoModal from "../components/modals/MessageStatusInfoModal";
 import AssignmentPostModal from "../components/modals/AssignmentPostModal";
+import ClassroomMatrixModal from "../components/modals/ClassroomMatrixModal";
+import ClassroomReportModal from "../components/modals/ClassroomReportModal";
 import MediaUploadButton from '../components/MediaUploadButton';
 import EmojiPicker from 'emoji-picker-react';
 import CameraCaptureModal from '../components/modals/CameraCaptureModal';
@@ -61,6 +66,8 @@ import Avatar from '../components/chat/Avatar';
 import PushPermissionPrompt from '../components/chat/PushPermissionPrompt';
 import ScheduleMessageModal from '../components/modals/ScheduleMessageModal';
 import ScheduledListModal from '../components/modals/ScheduledListModal';
+import CreatePollModal from '../components/modals/CreatePollModal';
+import PollWidget from '../components/chat/PollWidget';
 import simulationService from "../service/SimulationService";
 import { SIMULATION_ID } from "../service/SimulationScript";
 import QuickAccessWheel from '../components/chat/QuickAccessWheel';
@@ -219,6 +226,51 @@ const ChatBox = () => {
       fetchMembers();
     }
   }, [chatid, chat, currentUserId]);
+  const handlePollCreated = (pollData) => {
+    if (!pollData || !chatid) return;
+    const tempId = "temp-poll-" + uuidv4();
+    const pollContent = JSON.stringify({ poll_id: pollData.poll_id });
+
+    const pollMsg = {
+      tempmsgid: tempId,
+      chatid: String(chatid),
+      userid: currentUserId,
+      sendername: myDisplayName,
+      type: "poll",
+      content: pollContent,
+      spaceid: activeSpace || 0,
+      timestamp: new Date().toISOString(),
+      status: "pending",
+      poll: {
+        poll_id: pollData.poll_id,
+        question: pollData.question,
+        allow_multiple: pollData.allow_multiple,
+        allow_user_options: pollData.allow_user_options,
+        anonymous: pollData.anonymous,
+        expires_at: pollData.expires_at,
+        total_voters: 0,
+        total_members: (chatMembers && chatMembers.length) || 1,
+        options: (pollData.options || []).map(opt => ({
+          option_id: opt.option_id,
+          option_text: opt.text || opt.option_text || String(opt),
+          count: 0,
+          voters: []
+        })),
+        user_votes: []
+      }
+    };
+
+    messageStore.addMessage(pollMsg);
+
+    sendSafe({
+      tempmsgid: tempId,
+      chatid: String(chatid),
+      type: "poll",
+      content: pollContent,
+      spaceid: activeSpace || 0
+    });
+  };
+
   const { events, updateEvent, addEvent: addEventToMediator } = useEventMediator();
   const messagesContainerRef = useRef(null);
   const isLoadingMoreRef = useRef(false);
@@ -242,6 +294,9 @@ const ChatBox = () => {
   const [reactionInfo, setReactionInfo] = useState(null);
   const isMounted = useRef(true);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
+  const [showClassroomMatrixModal, setShowClassroomMatrixModal] = useState(false);
+  const [showReportExportModal, setShowReportExportModal] = useState(false);
+  const [showPollModal, setShowPollModal] = useState(false);
   const [pendingUnreadCount, setPendingUnreadCount] = useState(0);
   const [unreadMarker, setUnreadMarker] = useState({ count: 0, firstId: null });
 
@@ -265,6 +320,19 @@ const ChatBox = () => {
 
   const [filterMember, setFilterMember] = useState(null);
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [userStreakMap, setUserStreakMap] = useState({});
+
+  useEffect(() => {
+    if (members && members.length > 0) {
+      const map = {};
+      members.forEach(m => {
+        if (m.userId && (m.pulseStreak || m.streak)) {
+          map[m.userId] = m.pulseStreak || m.streak;
+        }
+      });
+      setUserStreakMap(prev => ({ ...prev, ...map }));
+    }
+  }, [members]);
 
   const filteredMessages = useMemo(() => {
     let list = allVisibleMessages.filter(msg => msg.spaceid === activeSpace);
@@ -962,6 +1030,17 @@ const ChatBox = () => {
 
 
   const [showmedia, setshowmedia] = useState(null);
+  const [statusInfoMsg, setStatusInfoMsg] = useState(null);
+
+  useEffect(() => {
+    if (showmedia && (showmedia.msgid || showmedia.tempmsgid)) {
+      const targetMsgId = showmedia.msgid || showmedia.tempmsgid;
+      const targetChatId = showmedia.chatid || chatid || chat?.id || chat?.chatId;
+      if (targetChatId && targetMsgId) {
+        sendMediaOpenedEvent(targetChatId, targetMsgId);
+      }
+    }
+  }, [showmedia, chatid]);
 
   // --- NEW: Header Menu State ---
   const [showHeaderMenu, setShowHeaderMenu] = useState(false);
@@ -3232,6 +3311,9 @@ const ChatBox = () => {
                 <span style={{ color: 'var(--text-primary)', fontWeight: 'bold' }}>
                   {chat?.chatName || "Chat"}
                 </span>
+                {chat?.pulseStreak > 0 && (
+                  <StreakBadge streak={chat.pulseStreak} size="sm" />
+                )}
                 {messageStore.isVolatile(chatid) && (
                   <span
                     title="Messages in this room are temporarily cached for 30 minutes and then automatically deleted."
@@ -3343,6 +3425,31 @@ const ChatBox = () => {
 
           {/* Right Section */}
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', position: 'relative' }}>
+            {chat.type === "classroom" && (chat.role === "faculty" || chat.role === "admin") && (
+              <button
+                onClick={() => setShowClassroomMatrixModal(true)}
+                title="View Assignment Analytics & Export Matrix Report"
+                style={{
+                  padding: isMobile ? '6px 10px' : '8px 14px',
+                  backgroundColor: 'rgba(59, 130, 246, 0.18)',
+                  color: '#60a5fa',
+                  borderRadius: '8px',
+                  fontSize: isMobile ? '12px' : '13px',
+                  fontWeight: '700',
+                  border: '1px solid rgba(59, 130, 246, 0.35)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <BarChart3 size={16} />
+                <span>{!isMobile && 'Export Matrix Report'}</span>
+              </button>
+            )}
+
             {(chat.type === "classroom" || chat.type === "room") && (
               <div style={{ position: 'relative' }}>
                 <button
@@ -3837,6 +3944,14 @@ const ChatBox = () => {
             const isReceived = msg.userid
               ? (String(msg.userid) !== String(localStorage.getItem("userid")))
               : (msg.sendername && msg.sendername !== myDisplayName);
+            const msgSenderId = msg.userid || msg.senderid || msg.senderId;
+            const msgStreak = msg.pulseStreak || msg.senderStreak || (msgSenderId ? userStreakMap[msgSenderId] : 0) || (chat?.type === 'private' && isReceived ? (chat?.pulseStreak || 0) : 0) || 0;
+            let msgFireClass = "";
+            if (msgStreak >= 7) {
+              msgFireClass = "moving-blue-fire-msg-bubble";
+            } else if (msgStreak >= 3) {
+              msgFireClass = "moving-red-fire-msg-bubble";
+            }
             const dateOnly = getDateOnly(msg.timestamp);
             const showDate = dateOnly !== lastdate;
             const event = (msg.msgid && eventByMsgId.get(String(msg.msgid))) || (msg.tempmsgid ? eventByMsgId.get(String(msg.tempmsgid)) : null);
@@ -3996,6 +4111,7 @@ const ChatBox = () => {
                         ) : (
                           <div
                             ref={(el) => (messageRefs.current[msg.msgid] = el)}
+                            className={msgFireClass || undefined}
                             style={{
                               alignSelf: isReceived ? "flex-start" : "flex-end",
                               background: selectedMessages.has(msg)
@@ -4075,8 +4191,14 @@ const ChatBox = () => {
                                 fontWeight: "600",
                                 marginBottom: "6px",
                                 color: "var(--accent-color)",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px"
                               }}>
-                                {msg.sendername}
+                                <span>{msg.sendername}</span>
+                                {msgStreak > 0 && (
+                                  <StreakBadge streak={msgStreak} size="sm" />
+                                )}
                               </div>
                             )}
 
@@ -4124,6 +4246,9 @@ const ChatBox = () => {
                             <div style={{ fontSize: isMobile ? '13px' : '14px', lineHeight: "1.5" }}>
                               {msg.type === 'text' && renderFormattedText(msg.content)}
                               {msg.type == 'assignment' && (<AssignmentMessage id={msg.content} userRole={chat.role} isMobile={isMobile} onOpenPanel={(id) => { setSelectedAssignmentId(id); setShowAssignmentDetail(true); }} />)}
+                               {msg.type === 'poll' && (
+                                 <PollWidget message={msg} currentUserId={currentUserId} />
+                               )}
                               {['image', 'video', 'audio', 'file', 'pdf'].includes(msg.type) && msg.content && (
                                 <MediaMessage
                                   msg={msg}
@@ -4679,6 +4804,21 @@ const ChatBox = () => {
                             <button onClick={handleCopySelected} style={actionBtnStyle()} title="Copy Text">
                               <Copy size={isMobile ? 19 : 16} />
                               <span style={labelStyle}>Copy</span>
+                            </button>
+                          )}
+
+                          {selectedMessages.size === 1 && (
+                            <button
+                              onClick={() => {
+                                const msg = items[0] || Array.from(selectedMessages)[0];
+                                setStatusInfoMsg(msg);
+                                clearSelection();
+                              }}
+                              style={actionBtnStyle()}
+                              title="Message Info"
+                            >
+                              <Info size={isMobile ? 19 : 16} />
+                              <span style={labelStyle}>Info</span>
                             </button>
                           )}
 
@@ -5994,6 +6134,15 @@ const ChatBox = () => {
           />
         )}
 
+        {/* Message Status Details Modal (Read, Delivered, Pending with Authority Hierarchy) */}
+        <MessageStatusInfoModal
+          isOpen={!!statusInfoMsg}
+          onClose={() => setStatusInfoMsg(null)}
+          message={statusInfoMsg}
+          chat={chat}
+          members={members}
+        />
+
         {isMobile && showadd && (
           <AddMemberModal
             chat={chat}
@@ -6127,6 +6276,27 @@ const ChatBox = () => {
 
         {/* Mobile Quick Access Radial Wheel */}
         <QuickAccessWheel currentChatId={chatid} />
+
+        {/* Classroom Matrix Analytics Modal */}
+        {showClassroomMatrixModal && (
+          <ClassroomMatrixModal
+            roomId={chatid}
+            classroomName={chat?.chatName || chat?.name || ''}
+            userRole={chat?.role || 'student'}
+            isOpen={showClassroomMatrixModal}
+            onClose={() => setShowClassroomMatrixModal(false)}
+          />
+        )}
+
+        {/* Classroom Report Export Modal */}
+        {showReportExportModal && (
+          <ClassroomReportModal
+            roomId={chatid}
+            classroomName={chat?.chatName || chat?.name || ''}
+            isOpen={showReportExportModal}
+            onClose={() => setShowReportExportModal(false)}
+          />
+        )}
       </div>
       );
 };

@@ -1,6 +1,7 @@
 import messageStore from "../pages/MessageStore";
-import { updateMessageStatusInDB } from "./db";
+import { updateMessageStatusInDB, bulkUpdateMessageStatusInDB } from "./db";
 import * as SyncService from "./SyncService";
+
 let socket = null;
 let reconnectTimeout = null;
 let reconnectAttempts = 0;
@@ -46,10 +47,6 @@ export function initWebsocket() {
     return;
   }
 
-  // Connection URL
-
-  //socket = new WebSocket(`ws://10.197.48.102:8080/chat?userid=${userid}`);
-  //socket = new WebSocket(`wss://letschat-backend-69jf.onrender.com/chat?userid=${userid}`);//prod server
   socket = new WebSocket(`wss://letschat-5dxg.onrender.com/chat?userid=${userid}`);//test server
   localStorage.setItem('socket', socket);
 
@@ -88,27 +85,56 @@ export function initWebsocket() {
     let msg;
     try {
       msg = JSON.parse(event.data);
-      if (typeof msg === 'string') {
-        msg = JSON.parse(msg); // Handle potentially double-serialized ngrok data
+      // Defensive double-parsing for potentially double-serialized JSON
+      while (typeof msg === 'string') {
+        msg = JSON.parse(msg);
       }
     } catch (e) {
       console.error("[Websocket] Parse error:", e);
       return;
     }
 
+    // 1. Batch ACK Payload Handler (e.g. onconnect, check-in, media-opened)
+    if (msg && Array.isArray(msg.msgids) && ('status' in msg || 'chatid' in msg)) {
+      console.log("[Websocket] Batch ACK received:", msg);
+      bulkUpdateMessageStatusInDB(msg).catch(err => console.error("[DB] Batch ACK error:", err));
+      messageStore.handleBatchAck(msg);
+      return;
+    }
+
+    // 2. Server History Batch Payload
     if (msg.type === 'batch') {
       messageStore.handleBatch(msg);
       return;
     }
 
+    // 3. Typing / Activity Indicators
     if (msg.type === 'indicator') {
       const uid = msg.senderid || msg.userid || msg.senderid_id;
       messageStore.setIndicator(msg.chatid, uid, msg.sendername, msg.content);
       return;
     }
 
+    // 3.5 Real-Time Poll Updates & Voting ACKs
+    if (msg.type === 'poll-update' || msg.user_votes || (msg.poll_id && ('options' in msg || 'total_voters' in msg))) {
+      console.log("[Websocket] Poll update / ACK received:", msg);
+      messageStore.handlePollUpdate(msg);
+      return;
+    }
+
+    // 4. Single Message ACK Response (onrecieve ACK payload)
+    if (('tempmsgid' in msg || 'msgid' in msg) && 'status' in msg && !('sendername' in msg) && !('content' in msg)) {
+      console.log("[Websocket] Single ACK received:", msg);
+      updateMessageStatusInDB(msg).catch(err => console.error(err));
+      messageStore.updateMessageStatus(msg);
+      if (msg.tempmsgid) {
+        SyncService.removeFromQueue(msg.tempmsgid);
+      }
+      return;
+    }
+
+    // 5. Normal Incoming Message or Sync Response
     if ('status' in msg && 'sendername' in msg) {
-      // Normal message or sync response
       messageStore.addMessage(msg);
       
       const actualMsgType = msg.msgtype || msg.type;
@@ -139,15 +165,13 @@ export function initWebsocket() {
       }
     }
     else if ('status' in msg) {
-      // Server Acknowledgement (ACK)
+      // Fallback ACK
       console.log("[Websocket] Ack received:", msg);
-
-      // Update DB and Store
       updateMessageStatusInDB(msg).catch(err => console.error(err));
       messageStore.updateMessageStatus(msg);
-
-      // CRITICAL: Remove from offline sync queue now that we have server confirmation
-      SyncService.removeFromQueue(msg.tempmsgid);
+      if (msg.tempmsgid) {
+        SyncService.removeFromQueue(msg.tempmsgid);
+      }
     }
     else {
       messageStore.addMessage(msg);
@@ -269,5 +293,17 @@ export function toggleSleepMode(enable) {
       initWebsocket();
     }
   }
+}
+
+/**
+ * Outbound trigger: send media-opened frame when recipient views a media attachment
+ */
+export function sendMediaOpenedEvent(chatId, msgId) {
+  if (!chatId || !msgId) return;
+  sendSafe({
+    purpose: "media-opened",
+    userchatid: String(chatId),
+    msgid: String(msgId)
+  });
 }
 

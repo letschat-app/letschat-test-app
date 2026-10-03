@@ -88,7 +88,27 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
 
     // 2. Always fetch from network to get fresh data
     try {
-      if (userRole === 'faculty') {
+      if (userRole === 'faculty' || userRole === 'admin') {
+        // Endpoint A: GET /api/classroom/assignment/{assignmentId}/students
+        try {
+          const studentStatusRes = await fetch(`${API}/classroom/assignment/${id}/students`, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              "User-Id": localStorage.getItem("userid"),
+            },
+          });
+
+          if (studentStatusRes.ok) {
+            const studentStatuses = await studentStatusRes.json();
+            setSubmissions(studentStatuses);
+            saveSubmissionsToDB(id, studentStatuses);
+            return;
+          }
+        } catch (e) {
+          console.warn("Endpoint A student statuses fetch failed, falling back:", e);
+        }
+
         const response = await fetch(
           `${API}/classroom/submissions/getall/${id}`,
           {
@@ -1028,30 +1048,62 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                                 color: 'var(--text-primary)',
                                 fontWeight: '600',
                               }}>
-                                {userProfiles[submission.userId] || submission.studentName || submission.userId}
+                                {submission.userName || userProfiles[submission.userId] || submission.studentName || submission.userId}
                               </p>
                               <p style={{
                                 margin: 0,
                                 fontSize: isMobile ? '11px' : '12px',
                                 color: '#9ca3af',
                               }}>
-                                Submitted: {formatDate(submission.timestamp)}
+                                {submission.submittedAt ? `Submitted: ${formatDate(submission.submittedAt)}` : submission.timestamp ? `Submitted: ${formatDate(submission.timestamp)}` : 'No submission recorded'}
                               </p>
                             </div>
-                            <span style={{
-                              padding: '4px 10px',
-                              backgroundColor: getParsedDate(submission.timestamp) > new Date(assignment.deadline)
-                                ? '#7f1d1d'
-                                : '#065f46',
-                              color: getParsedDate(submission.timestamp) > new Date(assignment.deadline)
-                                ? '#fca5a5'
-                                : '#10b981',
-                              borderRadius: '6px',
-                              fontSize: '11px',
-                              fontWeight: '600',
-                            }}>
-                              {new Date(submission.timestamp) > new Date(assignment.deadline) ? 'Late' : 'On Time'}
-                            </span>
+                            {submission.status === 'MISSING' ? (
+                              <span style={{
+                                padding: '4px 10px',
+                                backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                                color: '#f87171',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: '800',
+                                border: '1px solid rgba(239, 68, 68, 0.3)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }}>
+                                ✘ MISSING
+                              </span>
+                            ) : submission.status === 'SUBMITTED' ? (
+                              <span style={{
+                                padding: '4px 10px',
+                                backgroundColor: 'rgba(16, 185, 129, 0.18)',
+                                color: '#34d399',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: '800',
+                                border: '1px solid rgba(16, 185, 129, 0.3)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                              }}>
+                                ✔ SUBMITTED
+                              </span>
+                            ) : (
+                              <span style={{
+                                padding: '4px 10px',
+                                backgroundColor: getParsedDate(submission.timestamp) > new Date(assignment.deadline)
+                                  ? '#7f1d1d'
+                                  : '#065f46',
+                                color: getParsedDate(submission.timestamp) > new Date(assignment.deadline)
+                                  ? '#fca5a5'
+                                  : '#10b981',
+                                borderRadius: '6px',
+                                fontSize: '11px',
+                                fontWeight: '600',
+                              }}>
+                                {new Date(submission.timestamp) > new Date(assignment.deadline) ? 'Late' : 'On Time'}
+                              </span>
+                            )}
                           </div>
                           
                           {submission.comment && (

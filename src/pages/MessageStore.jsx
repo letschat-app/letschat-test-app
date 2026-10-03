@@ -1,3 +1,22 @@
+const STATUS_ORDER = {
+  sending: 0,
+  uploading: 0,
+  pending: 1,
+  delivered: 2,
+  read: 3,
+  'media-opened': 3
+};
+
+function getHigherStatus(currentStatus, incomingStatus) {
+  if (!incomingStatus) return currentStatus;
+  if (!currentStatus) return incomingStatus;
+  if (typeof incomingStatus === 'string' && incomingStatus.startsWith('deleted')) return incomingStatus;
+  if (incomingStatus === 'revived') return incomingStatus;
+  const currentLevel = STATUS_ORDER[currentStatus] ?? -1;
+  const incomingLevel = STATUS_ORDER[incomingStatus] ?? -1;
+  return incomingLevel > currentLevel ? incomingStatus : currentStatus;
+}
+
 // MessageStore.js
 import { saveMessageToDB, getMessagesFromDB, getUnreadMessagesForChat, getLatestMessagesForAllSpaces, initDB } from "../service/db";
 
@@ -606,46 +625,96 @@ const messageStore = {
     return messages[msgIndex].msgid || null;
   },
   updateMessageStatus(ack) {
-    const { chatid, tempmsgid, msgid, status } = ack;
-    const messages = this.messages[chatid];
+    const { chatid, tempmsgid, msgid, status, timestamp, pending_users, delivered_users, read_users } = ack;
+    const targetChatId = chatid || (this.messages ? Object.keys(this.messages).find(cid => {
+      return this.messages[cid].some(m => (tempmsgid && m.tempmsgid === tempmsgid) || (msgid && m.msgid === msgid));
+    }) : null);
 
-    if (!messages) return;
+    if (!targetChatId || !this.messages[targetChatId]) return;
 
+    const messages = this.messages[targetChatId];
     const msgIndex = messages.findIndex(
-      (msg) => msg.tempmsgid === tempmsgid || msg.msgid === msgid
+      (msg) => (tempmsgid && msg.tempmsgid === tempmsgid) || (msgid && msg.msgid === msgid)
     );
-    if (status.startsWith("deleted")) {
+
+    if (status && status.startsWith("deleted")) {
       if (msgIndex !== -1) {
-        this.messages[chatid][msgIndex] = {
-          ...this.messages[chatid][msgIndex],
+        this.messages[targetChatId][msgIndex] = {
+          ...this.messages[targetChatId][msgIndex],
           isdeletedeone: status.replace("deleted", "")
         };
-        // DB update now handled entirely by updateMessageStatusInDB triggered from Websocket.js
-        this.notifyListeners(this.messages[chatid][msgIndex]);
-        console.log("Message status updated:", this.messages[chatid][msgIndex]);
+        this.notifyListeners(this.messages[targetChatId][msgIndex]);
       }
       return;
     }
-    if (status == "revived") {
+
+    if (status === "revived") {
       if (msgIndex !== -1) {
-        this.messages[chatid][msgIndex] = {
-          ...this.messages[chatid][msgIndex],
+        this.messages[targetChatId][msgIndex] = {
+          ...this.messages[targetChatId][msgIndex],
           isdeletedeone: null,
           revived: true
         };
-        this.notifyListeners(this.messages[chatid][msgIndex]);
-        console.log("Message status updated:", this.messages[chatid][msgIndex]);
+        this.notifyListeners(this.messages[targetChatId][msgIndex]);
       }
       return;
     }
+
     if (msgIndex !== -1) {
-      this.messages[chatid][msgIndex] = {
-        ...this.messages[chatid][msgIndex],
-        msgid,
-        status
+      const existing = this.messages[targetChatId][msgIndex];
+      const updatedMsg = {
+        ...existing,
+        msgid: msgid || existing.msgid,
+        status: getHigherStatus(existing.status, status),
+        ...(timestamp && status === 'delivered' ? { delivertime: timestamp } : {}),
+        ...(timestamp && status === 'read' ? { readtime: timestamp } : {}),
+        ...(timestamp && status === 'media-opened' ? { mediaopenedtime: timestamp } : {}),
+        ...(Array.isArray(pending_users) ? { pending_users } : {}),
+        ...(Array.isArray(delivered_users) ? { delivered_users } : {}),
+        ...(Array.isArray(read_users) ? { read_users } : {})
       };
-      this.notifyListeners(this.messages[chatid][msgIndex]);
-      console.log("Message status updated:", this.messages[chatid][msgIndex]);
+
+      this.messages[targetChatId][msgIndex] = updatedMsg;
+      this.notifyListeners(updatedMsg);
+      console.log("[MessageStore] Message status updated:", updatedMsg);
+    }
+  },
+
+  handleBatchAck(batchAck) {
+    const { chatid, msgids, status, timestamp } = batchAck;
+    if (!msgids || !Array.isArray(msgids) || msgids.length === 0) return;
+
+    const targetChatId = chatid || (this.messages ? Object.keys(this.messages).find(cid => {
+      return this.messages[cid].some(m => msgids.includes(m.msgid) || msgids.includes(m.tempmsgid));
+    }) : null);
+
+    if (!targetChatId || !this.messages[targetChatId]) return;
+
+    const messages = this.messages[targetChatId];
+    let updatedCount = 0;
+
+    msgids.forEach(id => {
+      const idx = messages.findIndex(m => m.msgid === id || m.tempmsgid === id);
+      if (idx !== -1) {
+        const existing = messages[idx];
+        messages[idx] = {
+          ...existing,
+          status: getHigherStatus(existing.status, status),
+          ...(timestamp && status === 'delivered' ? { delivertime: timestamp } : {}),
+          ...(timestamp && status === 'read' ? { readtime: timestamp } : {}),
+          ...(timestamp && status === 'media-opened' ? { mediaopenedtime: timestamp } : {})
+        };
+        updatedCount++;
+      }
+    });
+
+    if (updatedCount > 0) {
+      this.notifyListeners({
+        chatid: targetChatId,
+        type: 'batch_ack_updated',
+        status,
+        msgids
+      });
     }
   },
 
@@ -690,6 +759,58 @@ const messageStore = {
 
     // 3. Notify UI
     this.notifyListeners({ chatid, removedId: tempmsgid });
+  },
+
+  handlePollUpdate(payload) {
+    if (!payload) return;
+    const { chatid, msgid, poll_id, user_votes } = payload;
+    
+    // Find which chat contains this poll
+    const chatsToSearch = chatid ? [chatid] : Object.keys(this.messages);
+
+    for (const cid of chatsToSearch) {
+      if (!this.messages[cid]) continue;
+
+      const targetIdx = this.messages[cid].findIndex(m => {
+        if (msgid && (m.msgid === msgid || m.tempmsgid === msgid)) return true;
+        if (m.poll && Number(m.poll.poll_id) === Number(poll_id)) return true;
+        if (m.content) {
+          try {
+            const parsed = typeof m.content === 'string' ? JSON.parse(m.content) : m.content;
+            if (parsed && Number(parsed.poll_id) === Number(poll_id)) return true;
+          } catch (e) {}
+        }
+        return false;
+      });
+
+      if (targetIdx !== -1) {
+        const targetMsg = { ...this.messages[cid][targetIdx] };
+        const existingPoll = targetMsg.poll || {};
+
+        const updatedPoll = {
+          ...existingPoll,
+          poll_id: poll_id || existingPoll.poll_id,
+          question: payload.question || existingPoll.question,
+          allow_multiple: payload.allow_multiple !== undefined ? payload.allow_multiple : existingPoll.allow_multiple,
+          allow_user_options: payload.allow_user_options !== undefined ? payload.allow_user_options : existingPoll.allow_user_options,
+          anonymous: payload.anonymous !== undefined ? payload.anonymous : existingPoll.anonymous,
+          is_expired: payload.is_expired !== undefined ? payload.is_expired : existingPoll.is_expired,
+          expires_at: payload.expires_at !== undefined ? payload.expires_at : existingPoll.expires_at,
+          total_voters: payload.total_voters !== undefined ? payload.total_voters : existingPoll.total_voters,
+          total_members: payload.total_members !== undefined ? payload.total_members : existingPoll.total_members,
+          options: payload.options || existingPoll.options || [],
+          user_votes: user_votes !== undefined ? user_votes : (payload.option_ids || existingPoll.user_votes || [])
+        };
+
+        targetMsg.poll = updatedPoll;
+        this.messages[cid][targetIdx] = targetMsg;
+
+        const idToSave = targetMsg.msgid || targetMsg.tempmsgid || targetMsg.timestamp;
+        saveMessageToDB(targetMsg, idToSave).catch(console.error);
+        this.notifyListeners({ type: 'poll_update', chatid: cid, msg: targetMsg });
+        return;
+      }
+    }
   },
 
   delete(chatid, msgid, dfor) {

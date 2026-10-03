@@ -43,6 +43,7 @@ const MediaFeed = lazyWithSplash(() => import("./pages/MediaFeed"));
 const SmoothCalendar = lazyWithSplash(() => import("./pages/SmoothCalendar"));
 const ShareTargetPage = lazyWithSplash(() => import("./pages/ShareTargetPage"));
 const StarredMessages = lazyWithSplash(() => import("./pages/StarredMessages"));
+const PulsesTab = lazyWithSplash(() => import("./pages/PulsesTab"));
 const LandingPage = lazyWithSplash(() => import("./pages/LandingPage"));
 const Signin = lazyWithSplash(() => import("./pages/Signin"));
 const Login = lazyWithSplash(() => import("./pages/Login"));
@@ -169,6 +170,7 @@ function App() {
           {/* New Desktop Layout Routing */}
           <Route element={<ChatLayout />}>
             <Route path="/chats" element={<ChatNames/>}/>
+            <Route path="/pulses" element={<PulsesTab/>}/>
             <Route path="/chat/:chatid" element={<ChatBox />} />
             <Route path="/search" element={<Search />}/>
             <Route path="/rooms" element={<Rooms />} />
