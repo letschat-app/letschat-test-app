@@ -1,7 +1,26 @@
+const STATUS_ORDER = {
+  sending: 0,
+  uploading: 0,
+  pending: 1,
+  delivered: 2,
+  read: 3,
+  'media-opened': 3
+};
+
+function getHigherStatus(currentStatus, incomingStatus) {
+  if (!incomingStatus) return currentStatus;
+  if (!currentStatus) return incomingStatus;
+  if (typeof incomingStatus === 'string' && incomingStatus.startsWith('deleted')) return incomingStatus;
+  if (incomingStatus === 'revived') return incomingStatus;
+  const currentLevel = STATUS_ORDER[currentStatus] ?? -1;
+  const incomingLevel = STATUS_ORDER[incomingStatus] ?? -1;
+  return incomingLevel > currentLevel ? incomingStatus : currentStatus;
+}
+
 import { openDB } from 'idb';
 
 const DB_NAME = 'LetsChatDB';
-const DB_VERSION = 15;
+const DB_VERSION = 16;
 
 export const initDB = async () => {
   return openDB(DB_NAME, DB_VERSION, {
@@ -42,6 +61,18 @@ export const initDB = async () => {
       if (!db.objectStoreNames.contains('thumbCache')) {
         const store = db.createObjectStore('thumbCache', { keyPath: 'id' });
         store.createIndex('lastUsed', 'lastUsed', { unique: false });
+      }
+      // Dedicated Pulse Media Cache & Metadata Store
+      if (!db.objectStoreNames.contains('pulseMediaCache')) {
+        const store = db.createObjectStore('pulseMediaCache', { keyPath: 'id' });
+        store.createIndex('expiresAt', 'expiresAt', { unique: false });
+        store.createIndex('lastUsed', 'lastUsed', { unique: false });
+      }
+      if (!db.objectStoreNames.contains('pulseStore')) {
+        const store = db.createObjectStore('pulseStore', { keyPath: 'pulseId' });
+        store.createIndex('expiresAt', 'expiresAt', { unique: false });
+        store.createIndex('userId', 'userId', { unique: false });
+        store.createIndex('status', 'status', { unique: false });
       }
       // Offline Sync Store
       if (!db.objectStoreNames.contains('syncQueue')) {
@@ -405,7 +436,7 @@ export const clearMessagesForChat = async (chatid) => {
 
 export const updateMessageStatusInDB = async (ack) => {
   const db = await initDB();
-  const { tempmsgid, msgid, status } = ack;
+  const { tempmsgid, msgid, status, timestamp, pending_users, delivered_users, read_users } = ack;
 
   try {
     let existingMsg = null;
@@ -435,8 +466,21 @@ export const updateMessageStatusInDB = async (ack) => {
         existingMsg.revived = true;
       } else {
         if (msgid) existingMsg.msgid = msgid;
-        if (status) existingMsg.status = status;
+        if (status) existingMsg.status = getHigherStatus(existingMsg.status, status);
       }
+
+      // Tracking timestamps
+      if (timestamp) {
+        existingMsg.timestamp = existingMsg.timestamp || timestamp;
+        if (status === 'delivered') existingMsg.delivertime = timestamp;
+        if (status === 'read') existingMsg.readtime = timestamp;
+        if (status === 'media-opened') existingMsg.mediaopenedtime = timestamp;
+      }
+
+      // Group Chat Categorized User Lists
+      if (Array.isArray(pending_users)) existingMsg.pending_users = pending_users;
+      if (Array.isArray(delivered_users)) existingMsg.delivered_users = delivered_users;
+      if (Array.isArray(read_users)) existingMsg.read_users = read_users;
 
       existingMsg.idToCheck = existingMsg.msgid || existingMsg.tempmsgid || existingMsg.timestamp;
       await db.put('messages', existingMsg);
@@ -446,6 +490,45 @@ export const updateMessageStatusInDB = async (ack) => {
     }
   } catch (err) {
     console.error("[DB] Error updating message status:", err);
+  }
+};
+
+/**
+ * Bulk updates message statuses for a Batch ACK frame (e.g. onconnect, check-in, media-opened)
+ */
+export const bulkUpdateMessageStatusInDB = async (batchAck) => {
+  const { chatid, msgids, status, timestamp } = batchAck;
+  if (!msgids || !Array.isArray(msgids) || msgids.length === 0) return;
+
+  try {
+    const db = await initDB();
+    const tx = db.transaction('messages', 'readwrite');
+    const store = tx.objectStore('messages');
+
+    for (const id of msgids) {
+      let msg = await store.get(id);
+
+      // Fallback: lookup by index or tempmsgid if direct key lookup misses
+      if (!msg && chatid) {
+        const index = store.index('chatid');
+        const chatMsgs = await index.getAll(IDBKeyRange.only(chatid));
+        msg = chatMsgs.find(m => m.msgid === id || m.tempmsgid === id);
+      }
+
+      if (msg) {
+        if (status) msg.status = getHigherStatus(msg.status, status);
+        if (timestamp) {
+          if (status === 'delivered') msg.delivertime = timestamp;
+          if (status === 'read') msg.readtime = timestamp;
+          if (status === 'media-opened') msg.mediaopenedtime = timestamp;
+        }
+        const idToCheck = msg.msgid || msg.tempmsgid || msg.timestamp;
+        await store.put(msg);
+      }
+    }
+    await tx.done;
+  } catch (err) {
+    console.error("[DB] Error bulk updating message status:", err);
   }
 };
 

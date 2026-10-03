@@ -5,6 +5,7 @@ import { API } from '../service/UserAuth';
 import { Search, MessageCircle, Users, RefreshCcw, Share2, Sparkles, X, History } from 'lucide-react';
 import userDiscoveryStore from '../service/UserDiscoveryStore';
 import Avatar from '../components/chat/Avatar';
+import StreakBadge from '../components/pulse/StreakBadge';
 import { syncChatsMapToDB, getGroupMembersFromDB } from '../service/db';
 
 const SearchComponent = () => {
@@ -393,7 +394,12 @@ const SearchComponent = () => {
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                       >
                         <Avatar chat={user} size={36} />
-                        <span style={{ color: 'var(--text-primary)', fontSize: '15px', fontWeight: '500' }}>{user.userName}</span>
+                        <span style={{ color: 'var(--text-primary)', fontSize: '15px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          {user.userName}
+                          {(user.pulseStreak || user.streak) > 0 && (
+                            <StreakBadge streak={user.pulseStreak || user.streak} size="sm" />
+                          )}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -494,7 +500,12 @@ const SearchComponent = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                     <Avatar chat={userData} size={64} />
                     <div>
-                      <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>{userData.userName}</div>
+                      <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {userData.userName}
+                        {(userData.pulseStreak || userData.streak) > 0 && (
+                          <StreakBadge streak={userData.pulseStreak || userData.streak} size="md" />
+                        )}
+                      </div>
                       <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>User ID: {userData.userId}</div>
                     </div>
                   </div>

@@ -32,6 +32,7 @@
   --message-bg-outgoing: linear-gradient(135deg, #4f46e5 0%, #2563eb 100%);
   --message-bg-incoming: #1f2937;
   --glass-effect: blur(16px) saturate(180%);
+  --status-eye-stroke: rgba(255, 255, 255, 0.9);
   
   color: var(--text-primary);
   background-color: var(--bg-primary);
@@ -257,3 +258,151 @@ button:focus-visible {
   0%, 100% { opacity: 0.6; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.04); }
 }
+
+/* 5-Tier Burning Fire Frame Animations (3, 7, 14, 30, 50 day streak tiers) */
+
+/* Tier 1: Glowing Crimson (Red) - 3+ days */
+@keyframes crimsonFireFlow {
+  0% { background-position: 0% 50%; box-shadow: 0 0 10px rgba(220, 38, 38, 0.85), 0 0 20px rgba(239, 68, 68, 0.6); }
+  50% { background-position: 100% 50%; box-shadow: 0 0 18px rgba(185, 28, 28, 0.95), 0 0 26px rgba(220, 38, 38, 0.7); }
+  100% { background-position: 0% 50%; box-shadow: 0 0 10px rgba(220, 38, 38, 0.85), 0 0 20px rgba(239, 68, 68, 0.6); }
+}
+
+/* Tier 2: Glowing Amber (Orange) - 7+ days */
+@keyframes amberFireFlow {
+  0% { background-position: 0% 50%; box-shadow: 0 0 10px rgba(249, 115, 22, 0.85), 0 0 20px rgba(255, 140, 0, 0.6); }
+  50% { background-position: 100% 50%; box-shadow: 0 0 18px rgba(234, 88, 12, 0.95), 0 0 26px rgba(249, 115, 22, 0.7); }
+  100% { background-position: 0% 50%; box-shadow: 0 0 10px rgba(249, 115, 22, 0.85), 0 0 20px rgba(255, 140, 0, 0.6); }
+}
+
+/* Tier 3: Glowing Sun-Yellow - 14+ days */
+@keyframes yellowFireFlow {
+  0% { background-position: 0% 50%; box-shadow: 0 0 12px rgba(234, 179, 8, 0.9), 0 0 22px rgba(253, 224, 71, 0.7); }
+  50% { background-position: 100% 50%; box-shadow: 0 0 20px rgba(202, 138, 4, 1), 0 0 28px rgba(234, 179, 8, 0.8); }
+  100% { background-position: 0% 50%; box-shadow: 0 0 12px rgba(234, 179, 8, 0.9), 0 0 22px rgba(253, 224, 71, 0.7); }
+}
+
+/* Tier 4: Glowing Diamond White - 30+ days */
+@keyframes whiteFireFlow {
+  0% { background-position: 0% 50%; box-shadow: 0 0 14px rgba(255, 255, 255, 0.95), 0 0 24px rgba(224, 242, 254, 0.8); }
+  50% { background-position: 100% 50%; box-shadow: 0 0 22px rgba(255, 255, 255, 1), 0 0 32px rgba(56, 189, 248, 0.85); }
+  100% { background-position: 0% 50%; box-shadow: 0 0 14px rgba(255, 255, 255, 0.95), 0 0 24px rgba(224, 242, 254, 0.8); }
+}
+
+/* Tier 5: Glowing Hyper-Blue - 50+ days */
+@keyframes blueFireFlow {
+  0% { background-position: 0% 50%; box-shadow: 0 0 14px rgba(6, 182, 212, 0.9), 0 0 24px rgba(59, 130, 246, 0.75); }
+  50% { background-position: 100% 50%; box-shadow: 0 0 22px rgba(14, 165, 233, 1), 0 0 32px rgba(99, 102, 241, 0.85); }
+  100% { background-position: 0% 50%; box-shadow: 0 0 14px rgba(6, 182, 212, 0.9), 0 0 24px rgba(59, 130, 246, 0.75); }
+}
+
+/* Moving Fire Frame Utility Classes */
+.moving-crimson-fire-frame, .moving-red-fire-frame {
+  background: linear-gradient(135deg, #b91c1c, #ef4444, #dc2626, #991b1b, #fca5a5);
+  background-size: 300% 300%;
+  animation: crimsonFireFlow 2s ease infinite;
+}
+
+.moving-amber-fire-frame {
+  background: linear-gradient(135deg, #ea580c, #f97316, #ff8c00, #c2410c, #fdba74);
+  background-size: 300% 300%;
+  animation: amberFireFlow 2s ease infinite;
+}
+
+.moving-yellow-fire-frame {
+  background: linear-gradient(135deg, #ca8a04, #eab308, #fde047, #a16207, #fef08a);
+  background-size: 300% 300%;
+  animation: yellowFireFlow 1.8s ease infinite;
+}
+
+.moving-white-fire-frame {
+  background: linear-gradient(135deg, #ffffff, #e0f2fe, #38bdf8, #f8fafc, #7dd3fc);
+  background-size: 300% 300%;
+  animation: whiteFireFlow 1.6s ease infinite;
+}
+
+.moving-blue-fire-frame {
+  background: linear-gradient(135deg, #06b6d4, #3b82f6, #0284c7, #6366f1, #38bdf8);
+  background-size: 300% 300%;
+  animation: blueFireFlow 1.8s ease infinite;
+}
+
+/* Moving Fire Message Bubble Classes */
+.moving-crimson-fire-msg-bubble, .moving-red-fire-msg-bubble {
+  border: 2px solid #ef4444 !important;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.5), inset 0 0 6px rgba(185, 28, 28, 0.25) !important;
+  animation: crimsonFireFlow 3s ease infinite !important;
+  background-size: 200% 200% !important;
+}
+
+.moving-amber-fire-msg-bubble {
+  border: 2px solid #f97316 !important;
+  box-shadow: 0 0 10px rgba(249, 115, 22, 0.5), inset 0 0 6px rgba(234, 88, 12, 0.25) !important;
+  animation: amberFireFlow 3s ease infinite !important;
+  background-size: 200% 200% !important;
+}
+
+.moving-yellow-fire-msg-bubble {
+  border: 2px solid #eab308 !important;
+  box-shadow: 0 0 12px rgba(234, 179, 8, 0.6), inset 0 0 7px rgba(202, 138, 4, 0.3) !important;
+  animation: yellowFireFlow 2.8s ease infinite !important;
+  background-size: 200% 200% !important;
+}
+
+.moving-white-fire-msg-bubble {
+  border: 2px solid #ffffff !important;
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.7), inset 0 0 8px rgba(56, 189, 248, 0.35) !important;
+  animation: whiteFireFlow 2.5s ease infinite !important;
+  background-size: 200% 200% !important;
+}
+
+.moving-blue-fire-msg-bubble {
+  border: 2px solid #06b6d4 !important;
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.6), inset 0 0 8px rgba(59, 130, 246, 0.3) !important;
+  animation: blueFireFlow 2.8s ease infinite !important;
+  background-size: 200% 200% !important;
+}
+
+/* ── STEP 2: ANIMATED EYE STATUS INDICATOR STYLES ── */
+:root { --status-eye-stroke: rgba(255, 255, 255, 0.9); }
+
+.status-eye {
+  color: var(--status-eye-stroke);
+  flex-shrink: 0;
+  display: inline-block;
+  vertical-align: middle;
+}
+.status-eye.s0 {
+  transform: translateY(1.5px);
+}
+.status-eye .lid2 {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  transition: stroke-dashoffset .4s ease, opacity .1s ease;
+}
+.status-eye .pup {
+  opacity: 0;
+  fill: transparent;
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(.3);
+  transition: opacity .25s ease .1s, transform .3s ease .1s, fill .3s ease;
+}
+.status-eye.s1 .lid2, .status-eye.s2 .lid2, .status-eye.s3 .lid2 {
+  stroke-dashoffset: 0;
+  opacity: 1;
+}
+.status-eye.s2 .pup, .status-eye.s3 .pup {
+  opacity: 1;
+  transform: scale(1);
+}
+.status-eye.s3 .pup {
+  fill: #ffffff;
+}
+@media (prefers-reduced-motion: reduce) {
+  .status-eye .lid2, .status-eye .pup {
+    transition: none;
+  }
+}
+

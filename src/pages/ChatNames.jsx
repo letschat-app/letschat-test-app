@@ -8,6 +8,7 @@ import { getMediaInfo, getMediaBlob } from "../service/MediaCache";
 import { getChatIcon, getChatColor } from "../service/ChatUtils";
 import MediaViewer from "../components/chat/MediaViewer";
 import Avatar from "../components/chat/Avatar";
+import StreakBadge from "../components/pulse/StreakBadge";
 import userDiscoveryStore from "../service/UserDiscoveryStore";
 import { MoreVertical, Pin, Plus, Users, RefreshCcw, Check, X, Pencil } from "lucide-react";
 import { SIMULATION_ID } from "../service/SimulationScript";
@@ -254,6 +255,9 @@ const ChatRow = React.memo(function ChatRow({
               <Pin size={14} style={{ transform: 'rotate(45deg)', color: 'var(--accent-color)' }} />
             )}
             {chat.chatName}
+            {chat?.pulseStreak > 0 && (
+              <StreakBadge streak={chat.pulseStreak} size="sm" />
+            )}
             {spaceName && (
               <span style={{
                 fontSize: '10px',

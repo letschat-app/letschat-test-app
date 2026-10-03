@@ -30,6 +30,11 @@ const MENU_OPTIONS = [
     icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg>,
   },
   {
+    id: 'poll', label: 'Poll', color: '#f59e0b',
+    accept: undefined, capture: undefined,
+    icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M18 20V10" /><path d="M12 20V4" /><path d="M6 20v-6" /></svg>,
+  },
+  {
     id: 'schedule', label: 'Schedule Message', color: '#10b981',
     accept: undefined, capture: undefined,
     icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
@@ -68,6 +73,7 @@ export default function MediaUploadButton({
   onError, 
   onCameraClick,
   onScheduleClick,
+  onPollClick,
   onFileSelect, 
   disabled = false, 
   style = {}, 
@@ -169,7 +175,7 @@ export default function MediaUploadButton({
   return (
     <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
       {/* Hidden file inputs */}
-      {MENU_OPTIONS.filter(opt => opt.id !== 'schedule').map(opt => (
+      {MENU_OPTIONS.filter(opt => opt.id !== 'schedule' && opt.id !== 'poll').map(opt => (
         <input
           key={opt.id}
           id={`mu-${opt.id}`}
@@ -201,7 +207,7 @@ export default function MediaUploadButton({
             animation: 'muMenuUp 0.2s cubic-bezier(0.32,0.72,0,1)',
           }}
         >
-          {MENU_OPTIONS.filter(opt => opt.id !== 'schedule' || onScheduleClick).map((opt, i) => (
+          {MENU_OPTIONS.filter(opt => (opt.id !== 'schedule' || onScheduleClick) && (opt.id !== 'poll' || onPollClick)).map((opt, i) => (
             <button
               key={opt.id}
               onClick={() => {
@@ -210,6 +216,8 @@ export default function MediaUploadButton({
                   onCameraClick();
                 } else if (opt.id === 'schedule' && onScheduleClick) {
                   onScheduleClick();
+                } else if (opt.id === 'poll' && onPollClick) {
+                  onPollClick();
                 } else {
                   inputRefs.current[opt.id]?.click();
                 }

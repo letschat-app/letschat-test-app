@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getsocket, toggleSleepMode } from '../service/Websocket';
-import { API } from '../service/UserAuth';
+import { API, toggle2FA } from '../service/UserAuth';
 import { uploadMedia, STAGE_LABELS } from '../service/MediaUploader';
 import { getMediaInfo, getMediaBlob } from '../service/MediaCache';
 import MediaViewer from '../components/chat/MediaViewer';
-import { Camera, Loader2, LogOut, CheckCircle2, Bell, Moon, MessageCircle, ArrowLeft } from 'lucide-react';
+import { Camera, Loader2, LogOut, CheckCircle2, Bell, Moon, MessageCircle, ArrowLeft, ShieldCheck } from 'lucide-react';
 import Avatar from '../components/chat/Avatar';
+import StreakBadge from '../components/pulse/StreakBadge';
 import { useNotifications } from '../hooks/useNotifications';
 import { getGroupMembersFromDB, syncChatsMapToDB } from '../service/db';
 import { getchat } from './ChatNames';
@@ -31,6 +32,8 @@ const ProfilePage = () => {
     const [viewingMedia, setViewingMedia] = useState(null);
     const [isHoveringAvatar, setIsHoveringAvatar] = useState(false);
     const [isSleepMode, setIsSleepMode] = useState(localStorage.getItem('sleepMode') === 'true');
+    const [is2FAEnabled, setIs2FAEnabled] = useState(false);
+    const [toggling2FA, setToggling2FA] = useState(false);
 
     useEffect(() => {
         if (isTargetUser) {
@@ -108,6 +111,11 @@ const ProfilePage = () => {
                             localStorage.setItem('profile', data.profile);
                             setProfile(data.profile);
                         }
+                        if (data.is2FAEnabled !== undefined) {
+                            setIs2FAEnabled(Boolean(data.is2FAEnabled));
+                        } else if (data.twoFactorEnabled !== undefined) {
+                            setIs2FAEnabled(Boolean(data.twoFactorEnabled));
+                        }
                     }
                 } catch (err) {
                     console.error('[ProfilePage] Fetch user data fail:', err);
@@ -116,6 +124,28 @@ const ProfilePage = () => {
             fetchUserData();
         }
     }, [targetUserId, userId, isTargetUser]);
+
+    const handle2FAToggle = async () => {
+        if (!userId) return;
+        setToggling2FA(true);
+        try {
+            const nextState = !is2FAEnabled;
+            const res = await toggle2FA(nextState, userId);
+            const data = res.data;
+            if (data && (data.status === 'SUCCESS' || data.success || res.status === 200)) {
+                setIs2FAEnabled(nextState);
+                alert(data.message || `2FA ${nextState ? 'enabled' : 'disabled'} successfully!`);
+            } else {
+                alert(data?.message || 'Failed to update 2FA setting.');
+            }
+        } catch (err) {
+            console.error('Failed to toggle 2FA:', err);
+            const errMsg = err.response?.data?.message || err.message || 'Error toggling 2FA';
+            alert(errMsg);
+        } finally {
+            setToggling2FA(false);
+        }
+    };
 
     const handleStartOrGoToChat = async () => {
         if (existingChatId) {
@@ -267,12 +297,17 @@ const ProfilePage = () => {
                 <div style={cardStyle}>
                     <div style={headerStyle}>
                         <Avatar
-                            chat={{ profile: displayUser.profile, id: displayUser.userId, userName: displayUser.userName, type: 'private' }}
+                            chat={{ profile: displayUser.profile, id: displayUser.userId, userName: displayUser.userName, type: 'private', pulseStreak: displayUser.pulseStreak || displayUser.streak }}
                             size={120}
                             highRes={true}
                             onClick={() => handleAvatarView(displayUser.profile)}
                         />
-                        <h1 style={nameStyle}>{displayUser.userName || targetUserId}</h1>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
+                            <h1 style={nameStyle}>{displayUser.userName || targetUserId}</h1>
+                            {(displayUser.pulseStreak || displayUser.streak) > 0 && (
+                                <StreakBadge streak={displayUser.pulseStreak || displayUser.streak} size="md" />
+                            )}
+                        </div>
                         <p style={badgeStyle}>User Profile</p>
                     </div>
 
@@ -522,6 +557,47 @@ const ProfilePage = () => {
                             }}
                         >
                             {isSleepMode ? 'Wake Up (Go Online)' : 'Enter Sleep Mode'}
+                        </button>
+                    </div>
+                </div>
+
+                {/* Security & 2FA Settings */}
+                <div>
+                    <p style={sectionHeaderStyle}>Security & Authentication</p>
+                    <div style={infoSectionStyle}>
+                        <div style={{ ...infoItemStyle, marginBottom: '4px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <ShieldCheck size={16} color={is2FAEnabled ? '#10b981' : 'var(--accent-color)'} />
+                                <span style={{ ...labelStyle, color: 'var(--text-primary)', fontWeight: '600' }}>2-Factor Authentication</span>
+                            </div>
+                            {is2FAEnabled ? (
+                                <span style={{ color: '#10b981', fontSize: '12px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <CheckCircle2 size={13} /> Enabled
+                                </span>
+                            ) : (
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '700' }}>Disabled</span>
+                            )}
+                        </div>
+
+                        <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0 0 4px 0', lineHeight: '1.5' }}>
+                            {is2FAEnabled
+                                ? "An OTP email code will be required whenever you sign in."
+                                : "Add an extra layer of security to your account with email OTP verification."}
+                        </p>
+
+                        <button
+                            onClick={handle2FAToggle}
+                            disabled={toggling2FA}
+                            style={{
+                                ...notificationEnableButtonStyle,
+                                background: is2FAEnabled ? 'rgba(239, 68, 68, 0.1)' : 'var(--accent-color)',
+                                color: is2FAEnabled ? '#ef4444' : 'white',
+                                border: is2FAEnabled ? '1px solid rgba(239, 68, 68, 0.2)' : 'none',
+                                opacity: toggling2FA ? 0.7 : 1,
+                                cursor: toggling2FA ? 'not-allowed' : 'pointer'
+                            }}
+                        >
+                            {toggling2FA ? 'Updating...' : is2FAEnabled ? 'Disable 2FA' : 'Enable 2-Factor Authentication'}
                         </button>
                     </div>
                 </div>
