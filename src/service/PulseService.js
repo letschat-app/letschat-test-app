@@ -12,7 +12,6 @@ const getHeaders = () => {
   return {
     "Content-Type": "application/json",
     "User-Id": userId,
-    "User-id": userId,
   };
 };
 
