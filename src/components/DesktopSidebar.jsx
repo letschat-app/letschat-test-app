@@ -4,8 +4,16 @@ import { getsocket } from '../service/Websocket';
 import { MessageSquare, Users, Search, Calendar, LogOut, User, Star } from 'lucide-react';
 import { removeFCMToken } from '../service/UserAuth';
 
+const PulsesIcon = ({ size = 22, color = 'currentColor', strokeWidth = 2 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="9" />
+    <polygon points="10 8 16 12 10 16 10 8" fill={color} stroke="none" />
+  </svg>
+);
+
 const topMenuItems = [
     { id: 'chats', path: '/chats', icon: MessageSquare, label: 'Chats' },
+    { id: 'pulses', path: '/pulses', icon: PulsesIcon, label: 'Pulses' },
     { id: 'search', path: '/search', icon: Search, label: 'Search' },
     { id: 'starred', path: '/starred', icon: Star, label: 'Starred' },
     { id: 'rooms', path: '/rooms', icon: Users, label: 'Rooms' },

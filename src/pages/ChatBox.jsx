@@ -323,16 +323,16 @@ const ChatBox = () => {
   const [userStreakMap, setUserStreakMap] = useState({});
 
   useEffect(() => {
-    if (members && members.length > 0) {
+    if (chatMembers && chatMembers.length > 0) {
       const map = {};
-      members.forEach(m => {
+      chatMembers.forEach(m => {
         if (m.userId && (m.pulseStreak || m.streak)) {
           map[m.userId] = m.pulseStreak || m.streak;
         }
       });
       setUserStreakMap(prev => ({ ...prev, ...map }));
     }
-  }, [members]);
+  }, [chatMembers]);
 
   const filteredMessages = useMemo(() => {
     let list = allVisibleMessages.filter(msg => msg.spaceid === activeSpace);
@@ -352,8 +352,8 @@ const ChatBox = () => {
 
   const filterCandidates = useMemo(() => {
     const map = new Map();
-    if (members && members.length > 0) {
-      members.forEach(m => map.set(String(m.userId), { userId: m.userId, userName: m.userName, profile: m.profile, role: m.role }));
+    if (chatMembers && chatMembers.length > 0) {
+      chatMembers.forEach(m => map.set(String(m.userId), { userId: m.userId, userName: m.userName, profile: m.profile, role: m.role }));
     }
     allVisibleMessages.forEach(msg => {
       const uId = msg.userid ? String(msg.userid) : null;
@@ -367,7 +367,7 @@ const ChatBox = () => {
       }
     });
     return Array.from(map.values());
-  }, [members, allVisibleMessages]);
+  }, [chatMembers, allVisibleMessages]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -6140,7 +6140,7 @@ const ChatBox = () => {
           onClose={() => setStatusInfoMsg(null)}
           message={statusInfoMsg}
           chat={chat}
-          members={members}
+          members={chatMembers}
         />
 
         {isMobile && showadd && (
