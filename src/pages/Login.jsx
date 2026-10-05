@@ -12,13 +12,13 @@ import { motion, AnimatePresence } from "framer-motion";
  * Step 2 (If 2FA_REQUIRED): POST /api/user/login/2fa-verify { identifier: "...", otp: "123456" }
  */
 function Login() {
-  const [form, setForm] = useState({ userid: "", password: "" });
+  const [form, setForm] = useState({ identifier: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [infoMsg, setInfoMsg] = useState("");
   const [step, setStep] = useState("login"); // 'login' | '2fa'
-  const [identifier, setIdentifier] = useState("");
+  const [tempIdentifier, setTempIdentifier] = useState("");
   const [otp, setOtp] = useState("");
   const otpInputRef = useRef(null);
   const navigate = useNavigate();
@@ -41,16 +41,16 @@ function Login() {
     setErrorMsg("");
     setInfoMsg("");
 
-    const cleanUserid = (form.userid || "").trim();
-    if (!cleanUserid || !form.password) {
-      setErrorMsg("Please enter both User ID / Email and Password.");
+    const cleanIdentifier = (form.identifier || form.userid || "").trim();
+    if (!cleanIdentifier || !form.password) {
+      setErrorMsg("Please enter both UserId or Email and Password.");
       return;
     }
 
     setLoading(true);
     try {
       const res = await loginUser({
-        userid: cleanUserid,
+        identifier: cleanIdentifier,
         password: form.password,
       });
 
@@ -58,13 +58,14 @@ function Login() {
 
       // Handle 2FA Required Response
       if (
+        data?.is2FARequired ||
         data?.status === "2FA_REQUIRED" ||
         data === "2FA_REQUIRED" ||
         data?.message === "2FA_REQUIRED"
       ) {
-        setIdentifier(cleanUserid);
+        setTempIdentifier(cleanIdentifier);
         setStep("2fa");
-        setInfoMsg("Password verified! A 6-digit 2FA verification code has been sent to your email.");
+        setInfoMsg("Password verified! Enter the 6-digit code sent to your registered email.");
         return;
       }
 
@@ -72,15 +73,21 @@ function Login() {
       if (
         data?.status === "SUCCESS" ||
         data === "login succesfull" ||
+        data?.message === "login succesfull" ||
         res.status === 200 ||
         res.status === 201
       ) {
         const loggedUserId =
-          data?.userId || data?.userid || data?.id || data?.data?.userId || cleanUserid;
+          data?.userId || data?.userid || data?.id || data?.data?.userId || cleanIdentifier;
 
         localStorage.setItem("userid", loggedUserId);
         if (data?.email) localStorage.setItem("email", data.email);
-        if (data?.username || data?.userName) localStorage.setItem("username", data.username || data.userName);
+        if (data?.username || data?.userName || data?.publicName) {
+          localStorage.setItem("username", data.username || data.userName || data.publicName);
+        }
+        if (data?.is2FAEnabled !== undefined) {
+          localStorage.setItem("is2FAEnabled", String(data.is2FAEnabled));
+        }
 
         initWebsocket();
         navigate("/chats", { replace: true });
@@ -91,10 +98,10 @@ function Login() {
       console.error("Login error:", err);
       const serverMsg = err.response?.data?.message || err.response?.data?.error;
       
-      if (serverMsg === "2FA_REQUIRED") {
-        setIdentifier(cleanUserid);
+      if (serverMsg === "2FA_REQUIRED" || err.response?.data?.is2FARequired) {
+        setTempIdentifier(cleanIdentifier);
         setStep("2fa");
-        setInfoMsg("Password verified! A 6-digit 2FA verification code has been sent to your email.");
+        setInfoMsg("Password verified! Enter the 6-digit code sent to your registered email.");
       } else {
         setErrorMsg(serverMsg || "Login failed. Please check your credentials and try again.");
       }
@@ -118,7 +125,7 @@ function Login() {
     setLoading(true);
     try {
       const res = await verify2FALogin({
-        identifier: identifier,
+        identifier: tempIdentifier.trim(),
         otp: cleanOtp,
       });
 
@@ -127,15 +134,21 @@ function Login() {
       if (
         data?.status === "SUCCESS" ||
         data === "login succesfull" ||
+        data?.message === "login succesfull" ||
         res.status === 200 ||
         res.status === 201
       ) {
         const loggedUserId =
-          data?.userId || data?.userid || data?.id || data?.data?.userId || identifier;
+          data?.userId || data?.userid || data?.id || data?.data?.userId || tempIdentifier;
 
         localStorage.setItem("userid", loggedUserId);
         if (data?.email) localStorage.setItem("email", data.email);
-        if (data?.username || data?.userName) localStorage.setItem("username", data.username || data.userName);
+        if (data?.username || data?.userName || data?.publicName) {
+          localStorage.setItem("username", data.username || data.userName || data.publicName);
+        }
+        if (data?.is2FAEnabled !== undefined) {
+          localStorage.setItem("is2FAEnabled", String(data.is2FAEnabled));
+        }
 
         initWebsocket();
         navigate("/chats", { replace: true });
@@ -167,20 +180,20 @@ function Login() {
             >
               <div style={styles.header}>
                 <h2 style={styles.heading}>Welcome Back</h2>
-                <p style={styles.subtitle}>Enter your credentials (User ID or Email) to continue</p>
+                <p style={styles.subtitle}>Enter your credentials (UserId or Email) to continue</p>
               </div>
 
               <form onSubmit={handleLogin} style={styles.form}>
-                {/* Flexible Login Input: User ID or Email */}
+                {/* Flexible Login Input: UserId or Email */}
                 <div style={styles.inputGroup}>
-                  <label style={styles.label}>User ID or Email</label>
+                  <label style={styles.label}>UserId or Email</label>
                   <div style={styles.inputWrapper}>
                     <User size={18} color="var(--text-secondary, #94a3b8)" style={styles.inputIcon} />
                     <input
-                      name="userid"
+                      name="identifier"
                       required
-                      placeholder="AAA005 or user@example.com"
-                      value={form.userid}
+                      placeholder="UserId or Email"
+                      value={form.identifier || form.userid || ""}
                       onChange={handleChange}
                       style={styles.input}
                     />
@@ -260,7 +273,7 @@ function Login() {
                 </div>
                 <h2 style={styles.heading}>2FA Verification</h2>
                 <p style={styles.subtitle}>
-                  Enter the 6-digit 2FA OTP code sent to your email for <strong style={{ color: "var(--text-primary)" }}>{identifier}</strong>
+                  Enter the 6-digit code sent to your registered email
                 </p>
               </div>
 

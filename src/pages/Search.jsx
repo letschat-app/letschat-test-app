@@ -52,16 +52,18 @@ const SearchComponent = () => {
   }, []);
 
   const handleSearch = async (overrideQuery = null) => {
-    const queryToUse = typeof overrideQuery === 'string' ? overrideQuery : userid;
-    if (!queryToUse.trim() || queryToUse === localStorage.getItem("userid")) return;
+    const rawQuery = typeof overrideQuery === 'string' ? overrideQuery : userid;
+    const queryToUse = rawQuery.trim();
+    if (!queryToUse || queryToUse === localStorage.getItem("userid")) return;
     addRecentSearch(queryToUse);
     setIsLoading(true);
     setUserData(null);
     try {
-      // Search in the userlist first
+      // Search in the local userlist first (by userName, userId, or email)
       const foundUser = userlist.find(
-        user => user.userName.toLowerCase() === queryToUse.toLowerCase() || 
-                user.userId === queryToUse
+        user => (user.userName && user.userName.toLowerCase() === queryToUse.toLowerCase()) || 
+                String(user.userId) === queryToUse ||
+                (user.email && user.email.toLowerCase() === queryToUse.toLowerCase())
       );
       
       if (foundUser) {
@@ -71,9 +73,18 @@ const SearchComponent = () => {
         return;
       }
       
-      // If not found in list, try API search
-      const response = await fetch(`${API}/user/search/${queryToUse}`);
-      if (response.ok) {
+      // Try API search endpoints (/api/user/search or /api/user/getme)
+      let response = await fetch(`${API}/user/search/${encodeURIComponent(queryToUse)}`);
+      if (!response.ok) {
+        response = await fetch(`${API}/user/search?query=${encodeURIComponent(queryToUse)}`);
+      }
+      if (!response.ok && queryToUse.includes('@')) {
+        response = await fetch(`${API}/user/getme`, {
+          headers: { 'User-Id': queryToUse }
+        });
+      }
+
+      if (response && response.ok) {
         const data = await response.json();
         setUserData(data);
         setMessage('');
@@ -323,7 +334,7 @@ const SearchComponent = () => {
         {/* Hero Search Section */}
         <div style={{ textAlign: 'center', marginBottom: '48px' }}>
           <h1 style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary)', marginBottom: '12px' }}>Find & Connect</h1>
-          <p style={{ fontSize: '16px', color: 'var(--text-secondary)', marginBottom: '32px' }}>Search for users by name or ID to start a direct conversation</p>
+          <p style={{ fontSize: '16px', color: 'var(--text-secondary)', marginBottom: '32px' }}>Search for users by UserId or Email to start a direct conversation</p>
           
           <div style={{ maxWidth: '600px', margin: '0 auto', position: 'relative' }}>
             <div className="search-container">
@@ -331,7 +342,7 @@ const SearchComponent = () => {
                 <Search size={20} color="var(--text-secondary)" style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)' }} />
                 <input
                   type="text"
-                  placeholder="Enter User ID or Name"
+                  placeholder="Search by UserId or Email"
                   value={userid}
                   onChange={handleInputChange}
                   onKeyPress={handleKeyPress}
@@ -501,12 +512,15 @@ const SearchComponent = () => {
                     <Avatar chat={userData} size={64} />
                     <div>
                       <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {userData.userName}
+                        {userData.userName || userData.publicName || userData.name}
                         {(userData.pulseStreak || userData.streak) > 0 && (
                           <StreakBadge streak={userData.pulseStreak || userData.streak} size="md" />
                         )}
                       </div>
                       <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>User ID: {userData.userId}</div>
+                      {userData.email && (
+                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>Email: {userData.email}</div>
+                      )}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
