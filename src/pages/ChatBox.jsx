@@ -698,6 +698,10 @@ const ChatBox = () => {
   const [selectedMessages, setSelectedMessages] = useState(new Set());
   const [isSharingMedia, setIsSharingMedia] = useState(false);
   const activeUploads = useRef(new Map()); // Map<tempmsgid, AbortController>
+  const [showMediaWaitModal, setShowMediaWaitModal] = useState(false);
+  const [pendingTextMessage, setPendingTextMessage] = useState(null);
+  const queuedTextMessagesRef = useRef([]);
+  const [queuedCount, setQueuedCount] = useState(0);
   const lastSoundTimeRef = useRef(0);
 
   // Scheduled Messages State
@@ -1344,13 +1348,45 @@ const ChatBox = () => {
   };
   // ----------------------
 
-  const sendMessage = async () => {
-    if (input.trim()) {
-      let processedInput = input;
+  const flushQueuedTextMessages = async () => {
+    if (queuedTextMessagesRef.current.length > 0) {
+      console.log(`[MediaQueue] Flushing ${queuedTextMessagesRef.current.length} queued text messages...`);
+      const queue = [...queuedTextMessagesRef.current];
+      queuedTextMessagesRef.current = [];
+      setQueuedCount(0);
+      for (const item of queue) {
+        await sendMessage(item.text, item.mentions, item.repliedto);
+      }
+    }
+  };
+
+  const handleSendMessageClick = () => {
+    if (!input.trim()) return;
+
+    const isMediaUploading = activeUploads.current.size > 0;
+    if (isMediaUploading) {
+      setPendingTextMessage({
+        text: input,
+        mentions: [...activeMentions],
+        repliedto: repliedto
+      });
+      setShowMediaWaitModal(true);
+    } else {
+      sendMessage();
+    }
+  };
+
+  const sendMessage = async (overrideText = null, overrideMentions = null, overrideRepliedTo = null) => {
+    const textToSend = typeof overrideText === 'string' ? overrideText : input;
+    const mentionsToSend = Array.isArray(overrideMentions) ? overrideMentions : activeMentions;
+    const repliedtoToSend = overrideRepliedTo !== undefined && overrideRepliedTo !== null ? overrideRepliedTo : repliedto;
+
+    if (textToSend && textToSend.trim()) {
+      let processedInput = textToSend;
       
-      if (activeMentions.length > 0) {
+      if (mentionsToSend && mentionsToSend.length > 0) {
         // Sort by name length descending to replace longest names first (e.g. 'John Doe' before 'John')
-        const sortedMentions = [...activeMentions].sort((a, b) => b.name.length - a.name.length);
+        const sortedMentions = [...mentionsToSend].sort((a, b) => b.name.length - a.name.length);
         
         // Use placeholders to prevent nested replacements
         sortedMentions.forEach((mention, index) => {
@@ -1371,7 +1407,7 @@ const ChatBox = () => {
         type: "text",
         content: processedInput,
         timestamp: getCurrentLocalDateTimeString(),
-        repliedto: repliedto ? repliedto.msgid : null,
+        repliedto: repliedtoToSend ? (repliedtoToSend.msgid || repliedtoToSend) : null,
         forwardedfrom: null,
         spaceid: activeSpace
       };
@@ -1394,7 +1430,7 @@ const ChatBox = () => {
       setrepliedto(null);
       setshowreplytomsg(false);
       setShowEmojiPicker(false);
-      setInput("");
+      if (!overrideText) setInput("");
       setActiveMentions([]);
       stopIndicators();
       resetInChatTimer();
@@ -1538,6 +1574,9 @@ const ChatBox = () => {
       }
     } finally {
       activeUploads.current.delete(originalMeta.tempmsgid);
+      if (activeUploads.current.size === 0) {
+        flushQueuedTextMessages();
+      }
     }
   };
 
@@ -1911,7 +1950,7 @@ const ChatBox = () => {
             onChange={handleInputChange}
             placeholder="Type a message..."
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && input.trim()) sendMessage();
+              if (e.key === 'Enter' && input.trim()) handleSendMessageClick();
               if (e.key === 'Escape') setShowEmojiPicker(false);
             }}
             style={{
@@ -1925,7 +1964,7 @@ const ChatBox = () => {
 
       {/* Send or Mic button */}
       <button
-        onClick={isRecording ? () => stopRecording(false) : (input.trim() ? sendMessage : startRecording)}
+        onClick={isRecording ? () => stopRecording(false) : (input.trim() ? handleSendMessageClick : startRecording)}
         style={{
           background: isRecording ? '#10b981' : (input.trim() ? '#2563eb' : '#10b981'),
           color: 'white',
@@ -1949,6 +1988,192 @@ const ChatBox = () => {
       >
         {isRecording ? <ArrowUp size={isMobile ? 22 : 24} /> : (input.trim() ? <ArrowUp size={isMobile ? 22 : 24} /> : <Mic size={isMobile ? 18 : 20} />)}
       </button>
+
+      {/* Queued Messages Status Pill */}
+      {queuedCount > 0 && (
+        <div style={{
+          position: 'absolute', bottom: '100%', left: '16px', right: '16px', marginBottom: '8px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '8px 14px',
+          backgroundColor: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)',
+          borderRadius: '14px', fontSize: '13px', color: '#f59e0b', backdropFilter: 'blur(8px)',
+          boxShadow: '0 4px 14px rgba(0,0,0,0.3)', zIndex: 101
+        }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '600' }}>
+            <Clock size={15} /> {queuedCount} message{queuedCount > 1 ? 's' : ''} waiting for media upload...
+          </span>
+          <button
+            type="button"
+            onClick={flushQueuedTextMessages}
+            style={{
+              background: '#f59e0b', border: 'none', borderRadius: '8px', color: '#000',
+              padding: '4px 12px', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(245, 158, 11, 0.3)'
+            }}
+          >
+            Send Now
+          </button>
+        </div>
+      )}
+
+      {/* Media Upload Options Modal (Wait for Media vs Send Anyway) */}
+      {showMediaWaitModal && pendingTextMessage && createPortal(
+        <div
+          onClick={() => setShowMediaWaitModal(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 999999,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '16px'
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '20px',
+              padding: isMobile ? '18px 16px' : '24px',
+              maxWidth: '420px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              animation: 'muFadeIn 0.2s ease-out'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '42px', height: '42px', borderRadius: '50%',
+                backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <Clock size={22} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                  Media Uploading in Progress
+                </h3>
+                <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                  A media file is currently uploading. How would you like to send this message?
+                </p>
+              </div>
+            </div>
+
+            {/* Message Preview Box */}
+            <div style={{
+              padding: '12px 14px',
+              borderRadius: '12px',
+              backgroundColor: 'var(--bg-secondary)',
+              border: '1px solid var(--border-color)',
+              fontSize: '14px',
+              color: 'var(--text-primary)',
+              wordBreak: 'break-word',
+              maxHeight: '100px',
+              overflowY: 'auto'
+            }}>
+              "{pendingTextMessage.text}"
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
+              {/* Option A: Wait for Media */}
+              <button
+                type="button"
+                onClick={() => {
+                  const isStillUploading = activeUploads.current.size > 0;
+                  if (!isStillUploading) {
+                    // Edge case: Upload completed while the modal was open! Send immediately!
+                    const msgToSend = pendingTextMessage;
+                    setShowMediaWaitModal(false);
+                    setPendingTextMessage(null);
+                    setInput("");
+                    setActiveMentions([]);
+                    sendMessage(msgToSend.text, msgToSend.mentions, msgToSend.repliedto);
+                  } else {
+                    queuedTextMessagesRef.current.push({
+                      text: pendingTextMessage.text,
+                      mentions: pendingTextMessage.mentions,
+                      repliedto: pendingTextMessage.repliedto
+                    });
+                    setQueuedCount(queuedTextMessagesRef.current.length);
+                    setInput("");
+                    setActiveMentions([]);
+                    setrepliedto(null);
+                    setshowreplytomsg(false);
+                    setShowMediaWaitModal(false);
+                    setPendingTextMessage(null);
+                  }
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '12px',
+                  padding: '14px 16px', borderRadius: '14px',
+                  backgroundColor: 'var(--bg-secondary)',
+                  border: '1.5px solid var(--border-color)',
+                  color: 'var(--text-primary)', cursor: 'pointer',
+                  textAlign: 'left', transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-color)'}
+                onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-color)'}
+              >
+                <div style={{
+                  width: '36px', height: '36px', borderRadius: '50%',
+                  backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                }}>
+                  <Clock size={18} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: '600', fontSize: '14.5px' }}>⏳ Wait for Media</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                    Hold message until media upload completes to preserve exact order.
+                  </div>
+                </div>
+              </button>
+
+              {/* Option B: Send Anyway */}
+              <button
+                type="button"
+                onClick={() => {
+                  const msgToSend = pendingTextMessage;
+                  setShowMediaWaitModal(false);
+                  setPendingTextMessage(null);
+                  setInput("");
+                  setActiveMentions([]);
+                  sendMessage(msgToSend.text, msgToSend.mentions, msgToSend.repliedto);
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '12px',
+                  padding: '14px 16px', borderRadius: '14px',
+                  backgroundColor: 'var(--accent-color, #2563eb)',
+                  border: 'none',
+                  color: '#ffffff', cursor: 'pointer',
+                  textAlign: 'left', transition: 'all 0.2s ease',
+                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)'
+                }}
+              >
+                <div style={{
+                  width: '36px', height: '36px', borderRadius: '50%',
+                  backgroundColor: 'rgba(255, 255, 255, 0.2)', color: '#ffffff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                }}>
+                  <Send size={18} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: '700', fontSize: '14.5px' }}>🚀 Send Anyway</div>
+                  <div style={{ fontSize: '12px', opacity: 0.9, marginTop: '2px' }}>
+                    Bypass media upload and send text message right now.
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       <style>{`
         @keyframes recordBlink {
