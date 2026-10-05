@@ -10,6 +10,7 @@ import messageStore from "./MessageStore";
 import StreakBadge from "../components/pulse/StreakBadge";
 import { initDB, saveUsersBatchToDB, saveGroupMembersToDB, markMessagesAsOldInDB, getGroupMembersFromDB } from '../service/db';
 import { useNotifications } from '../hooks/useNotifications';
+import { useTheme } from '../context/ThemeContext';
 import {
   ArrowUp,
   Plus,
@@ -80,6 +81,7 @@ import { Edit2 } from "lucide-react";
 const ChatBox = () => {
   const { chatid } = useParams();
   const navigate = useNavigate();
+  const { theme } = useTheme();
   const isSimulation = chatid === SIMULATION_ID;
 
   const [chat, setChat] = useState(() => {
@@ -1722,7 +1724,7 @@ const ChatBox = () => {
       display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '10px',
       padding: isMobile ? '8px 10px 8px 8px' : '12px 20px',
       background: 'var(--bg-secondary)',
-      borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+      borderTop: '1px solid var(--border-color)',
       position: 'sticky', bottom: 0,
       width: '100%', boxSizing: 'border-box',
       zIndex: 100,
@@ -1742,15 +1744,15 @@ const ChatBox = () => {
           }}
         >
           <style>{`
-            .epr-main { background: #1a1a1a !important; border: 1px solid rgba(255,255,255,0.12) !important; border-radius:16px !important; box-shadow: 0 16px 48px rgba(0,0,0,0.7) !important; }
-            .epr-category-nav { background: transparent !important; border-bottom: 1px solid rgba(255,255,255,0.08) !important; }
-            .epr-search-container input { background: rgba(255,255,255,0.06) !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 10px !important; color: #ddd !important; }
-            .epr-emoji-category-label { background: #1a1a1a !important; color: rgba(255,255,255,0.35) !important; font-size: 11px !important; }
-            .epr-btn:hover { background: rgba(255,255,255,0.08) !important; }
+            .epr-main { background: var(--bg-card) !important; border: 1px solid var(--border-color) !important; border-radius:16px !important; box-shadow: 0 16px 48px rgba(0,0,0,0.3) !important; }
+            .epr-category-nav { background: transparent !important; border-bottom: 1px solid var(--border-color) !important; }
+            .epr-search-container input { background: var(--bg-secondary) !important; border: 1px solid var(--border-color) !important; border-radius: 10px !important; color: var(--text-primary) !important; }
+            .epr-emoji-category-label { background: var(--bg-card) !important; color: var(--text-secondary) !important; font-size: 11px !important; }
+            .epr-btn:hover { background: var(--bg-hover) !important; }
             .epr-skin-tones { display: none !important; }
           `}</style>
           <EmojiPicker
-            theme="dark"
+            theme={theme === 'light' ? 'light' : 'dark'}
             onEmojiClick={(d) => {
               setInput(p => p + d.emoji);
               inputRef.current?.focus();
@@ -1804,8 +1806,8 @@ const ChatBox = () => {
           flex: 1,
           minWidth: 0,
           display: 'flex', alignItems: 'center',
-          background: 'rgba(255, 255, 255, 0.05)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border-color)',
           borderRadius: '24px',
           padding: isMobile ? '2px 6px 2px 4px' : '2px 8px 2px 6px',
           minHeight: '44px',
@@ -1820,10 +1822,10 @@ const ChatBox = () => {
               cursor: 'pointer', flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               width: isMobile ? '32px' : '36px', height: isMobile ? '32px' : '36px', borderRadius: '50%',
-              color: showEmojiPicker ? '#60a5fa' : '#9ca3af',
+              color: showEmojiPicker ? 'var(--accent-color, #60a5fa)' : 'var(--text-secondary)',
               transition: 'all 0.2s ease',
             }}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
             onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
           >
             <Smile size={isMobile ? 18 : 20} strokeWidth={2.5} />
@@ -1841,7 +1843,7 @@ const ChatBox = () => {
             }}
             style={{
               flexShrink: 0,
-              color: '#9ca3af',
+              color: 'var(--text-secondary)',
               width: isMobile ? '32px' : '36px', height: isMobile ? '32px' : '36px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               borderRadius: '50%',
@@ -1877,11 +1879,11 @@ const ChatBox = () => {
                     width: '100%', padding: '10px 14px',
                     background: 'transparent', border: 'none',
                     borderRadius: '10px', cursor: 'pointer',
-                    color: '#f0f0f0', fontSize: '14px', fontWeight: '500',
+                    color: 'var(--text-primary)', fontSize: '14px', fontWeight: '500',
                     textAlign: 'left',
                     marginBottom: i < filteredMembers.length - 1 ? '2px' : 0,
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-hover)'}
                   onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                 >
                   <div style={{
@@ -1914,7 +1916,7 @@ const ChatBox = () => {
             }}
             style={{
               flex: 1, background: 'transparent', border: 'none', outline: 'none',
-              fontSize: isMobile ? '14.5px' : '15.5px', color: '#fff',
+              fontSize: isMobile ? '14.5px' : '15.5px', color: 'var(--text-primary)',
               padding: isMobile ? '8px 8px 8px 4px' : '10px 10px 10px 6px', minWidth: 0,
             }}
           />
@@ -4987,7 +4989,7 @@ const ChatBox = () => {
                         <div
                           style={{
                             fontSize: "13px",
-                            color: "#ffffff",
+                            color: "var(--text-primary)",
                             wordWrap: "break-word",
                           }}
                         >

@@ -13,6 +13,7 @@ import UpdateToast from "./components/chat/UpdateToast";
 import InAppToast from "./components/chat/InAppToast";
 import { useNotifications } from "./hooks/useNotifications";
 import { WifiOff } from "lucide-react";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 // Custom lazy wrapper to remove splash screen ONLY when the first dynamic chunk resolves
 const lazyWithSplash = (importFunc) => {
@@ -160,40 +161,39 @@ function App() {
     }}>
     {showNavbar && <Navbar />}
     <Suspense fallback={null}>
-      
-      <SwipeWrapper>
-        <Routes location={location}>
-          <Route path="/" element={<Navigate to="/welcome" />} />
-          <Route path="/welcome" element={<LandingPage />} />
-          <Route path="/signin" element={<Signin />} />
-          <Route path="/login" element={<Login />} />
-          {/* New Desktop Layout Routing */}
-          <Route element={<ChatLayout />}>
-            <Route path="/chats" element={<ChatNames/>}/>
-            <Route path="/pulses" element={<PulsesTab/>}/>
-            <Route path="/chat/:chatid" element={<ChatBox />} />
-            <Route path="/search" element={<Search />}/>
-            <Route path="/rooms" element={<Rooms />} />
-            <Route path="/calendar" element={<SmoothCalendar/>}/>
-            <Route path="/profile/:targetUserId?" element={<ProfilePage/>}/>
-            <Route path="/profileupdate" element={<Profileupdate/>}/>
-            <Route path="/starred" element={<StarredMessages />} />
-          </Route>
+      <ErrorBoundary key={location.pathname}>
+        <SwipeWrapper>
+          <Routes location={location}>
+            <Route path="/" element={<Navigate to="/welcome" />} />
+            <Route path="/welcome" element={<LandingPage />} />
+            <Route path="/signin" element={<Signin />} />
+            <Route path="/login" element={<Login />} />
+            {/* New Desktop Layout Routing */}
+            <Route element={<ChatLayout />}>
+              <Route path="/chats" element={<ChatNames/>}/>
+              <Route path="/pulses" element={<PulsesTab/>}/>
+              <Route path="/chat/:chatid" element={<ChatBox />} />
+              <Route path="/search" element={<Search />}/>
+              <Route path="/rooms" element={<Rooms />} />
+              <Route path="/calendar" element={<SmoothCalendar/>}/>
+              <Route path="/profile/:targetUserId?" element={<ProfilePage/>}/>
+              <Route path="/profileupdate" element={<Profileupdate/>}/>
+              <Route path="/starred" element={<StarredMessages />} />
+            </Route>
 
-          <Route path="/communities" element={<Communities />}>
-            <Route path="recommended" element={<RecommendedCommunities />} />
-            <Route path="my" element={<MyCommunities />} />
-            <Route path="create" element={<CommunityCreationPage />} />
-            <Route path="" element={<Navigate to="recommended" />} />
-          </Route>
-          <Route path="/post/:communityId" element={<UploadPost/>} />
-          <Route path="/feed" element={<MediaFeed/>}/>
-          <Route path="/calendar" element={<SmoothCalendar/>}/>
-          <Route path="/share-target" element={<ShareTargetPage />} />
-        </Routes>
-      </SwipeWrapper>
-      
-      
+            <Route path="/communities" element={<Communities />}>
+              <Route path="recommended" element={<RecommendedCommunities />} />
+              <Route path="my" element={<MyCommunities />} />
+              <Route path="create" element={<CommunityCreationPage />} />
+              <Route path="" element={<Navigate to="recommended" />} />
+            </Route>
+            <Route path="/post/:communityId" element={<UploadPost/>} />
+            <Route path="/feed" element={<MediaFeed/>}/>
+            <Route path="/calendar" element={<SmoothCalendar/>}/>
+            <Route path="/share-target" element={<ShareTargetPage />} />
+          </Routes>
+        </SwipeWrapper>
+      </ErrorBoundary>
     </Suspense>
     </div>
     </EventPanel>
