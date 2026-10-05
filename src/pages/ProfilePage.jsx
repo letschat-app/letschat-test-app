@@ -32,7 +32,7 @@ const ProfilePage = () => {
     const [viewingMedia, setViewingMedia] = useState(null);
     const [isHoveringAvatar, setIsHoveringAvatar] = useState(false);
     const [isSleepMode, setIsSleepMode] = useState(localStorage.getItem('sleepMode') === 'true');
-    const [is2FAEnabled, setIs2FAEnabled] = useState(false);
+    const [is2FAEnabled, setIs2FAEnabled] = useState(localStorage.getItem('is2FAEnabled') === 'true');
     const [toggling2FA, setToggling2FA] = useState(false);
 
     useEffect(() => {
