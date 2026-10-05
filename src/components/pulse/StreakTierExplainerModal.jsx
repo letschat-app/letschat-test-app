@@ -99,35 +99,6 @@ const StreakTierExplainerModal = ({ isOpen, onClose, onPreviewUpgrade }) => {
             </div>
           </div>
 
-          {/* Preview Transition Button */}
-          {onPreviewUpgrade && (
-            <button
-              onClick={() => {
-                const prevStreak = selectedIdx > 0 ? thresholds[selectedIdx - 1].streak : 2;
-                onPreviewUpgrade(prevStreak, currentThreshold.streak);
-              }}
-              style={{
-                width: '100%',
-                marginTop: '16px',
-                padding: '12px',
-                borderRadius: '12px',
-                border: 'none',
-                background: 'linear-gradient(135deg, #6366f1, #3b82f6)',
-                color: '#ffffff',
-                fontWeight: '800',
-                fontSize: '13px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)'
-              }}
-            >
-              <Sparkles size={16} /> Preview Frame Upgrade Morph
-            </button>
-          )}
-
         </div>
 
       </div>

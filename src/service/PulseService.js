@@ -1,5 +1,5 @@
 import { API } from "./UserAuth";
-import { savePulseToStore, savePulsesBatchToStore, purgeExpiredPulseMedia, saveMineDataToDB, getMineDataFromDB } from "./PulseMediaCache";
+import { savePulseToStore, savePulsesBatchToStore, purgeExpiredPulseMedia, saveMineDataToDB, getMineDataFromDB, saveFeedDataToDB, getFeedDataFromDB } from "./PulseMediaCache";
 
 /**
  * Pulse API Service
@@ -152,6 +152,10 @@ export const getMyPulses = async () => {
   return data;
 };
 
+export const getPulseFeedOffline = async () => {
+  return await getFeedDataFromDB();
+};
+
 export const getPulseFeed = async () => {
   // Purge expired client-side first
   await purgeExpiredPulseMedia();
@@ -167,8 +171,9 @@ export const getPulseFeed = async () => {
   const data = await res.json();
   const feedList = Array.isArray(data) ? data : (data?.feed || []);
 
-  // Cache feed pulses in IndexedDB
+  // Cache feed pulses & list in IndexedDB for instant offline-first rendering
   if (Array.isArray(feedList)) {
+    await saveFeedDataToDB(feedList);
     feedList.forEach(item => {
       if (item.pulses) {
         savePulsesBatchToStore(item.pulses);
@@ -192,4 +197,108 @@ export const recordPulseView = async (pulseId) => {
   } catch (err) {
     console.warn(`[PulseService] View record failed for pulse ${pulseId}:`, err);
   }
+};
+
+/**
+ * Safely parses pulse dates returned by server.
+ * Handles Java LocalDateTime arrays [year, month, day, hour, min, sec, nano],
+ * ISO strings, timestamp numbers, and Date objects.
+ */
+export const parsePulseDate = (val) => {
+  if (!val) return null;
+  if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+
+  if (Array.isArray(val)) {
+    const [year, month, day, hour = 0, minute = 0, second = 0, nano = 0] = val;
+    const ms = Math.floor(nano / 1000000);
+    // Month in JS Date is 0-indexed (0 = Jan, 9 = Oct)
+    const d = new Date(Date.UTC(year, month - 1, day, hour, minute, second, ms));
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  if (typeof val === 'number') {
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  if (typeof val === 'string') {
+    if (/^\d+$/.test(val)) {
+      const d = new Date(parseInt(val, 10));
+      if (!isNaN(d.getTime())) return d;
+    }
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  return null;
+};
+
+export const formatPulseTime = (val, fallback = 'Just now') => {
+  const d = parsePulseDate(val);
+  if (!d) return fallback;
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+/**
+ * Formats viewer timestamp according to strict LetsChat specifications:
+ * - Main part (dynamic, changes over time):
+ *   - < 5 min: "Just now"
+ *   - 5..59 min: "N min ago"
+ *   - >= 60 min (same day): "1:01 PM"
+ *   - >= 60 min (previous day): "Yesterday, 1:01 PM"
+ * - Bracket part (fixed, never changes):
+ *   - "(within N min)" = gap between status posted time and viewed time, rounded up to whole minutes.
+ *   - Shown ONLY if view happened within 1 hour of status creation.
+ */
+export const formatViewerTime = (viewedAtInput, createdAtInput, currentTimeInput = new Date()) => {
+  const viewedDate = parsePulseDate(viewedAtInput);
+  const createdDate = parsePulseDate(createdAtInput);
+  const currentDate = parsePulseDate(currentTimeInput) || new Date();
+
+  if (!viewedDate) return 'Recently';
+
+  const viewedMs = viewedDate.getTime();
+  const currentMs = currentDate.getTime();
+  const createdMs = createdDate ? createdDate.getTime() : null;
+
+  // 1. Main Part (Time since view)
+  const diffFromCurrentMs = Math.max(0, currentMs - viewedMs);
+  const diffFromCurrentMins = Math.floor(diffFromCurrentMs / 60000);
+
+  let mainPart = '';
+
+  if (diffFromCurrentMins < 5) {
+    mainPart = 'Just now';
+  } else if (diffFromCurrentMins < 60) {
+    mainPart = `${diffFromCurrentMins} min ago`;
+  } else {
+    const timeString = viewedDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+    const nowLocalDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+    const viewedLocalDate = new Date(viewedDate.getFullYear(), viewedDate.getMonth(), viewedDate.getDate());
+    const dayDiff = Math.round((nowLocalDate - viewedLocalDate) / (1000 * 60 * 60 * 24));
+
+    if (dayDiff === 0) {
+      mainPart = timeString;
+    } else if (dayDiff === 1) {
+      mainPart = `Yesterday, ${timeString}`;
+    } else {
+      const monthDayStr = viewedDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      mainPart = `${monthDayStr}, ${timeString}`;
+    }
+  }
+
+  // 2. Bracket Part (Gap between posted time and viewed time)
+  let bracketPart = '';
+  if (createdMs && viewedMs >= createdMs) {
+    const gapMs = viewedMs - createdMs;
+    const gapMinutes = Math.ceil(gapMs / 60000); // Rounded up to whole minutes
+
+    if (gapMinutes <= 60) {
+      const displayGap = gapMinutes < 1 ? 1 : gapMinutes;
+      bracketPart = ` (within ${displayGap} min)`;
+    }
+  }
+
+  return `${mainPart}${bracketPart}`;
 };

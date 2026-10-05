@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, ChevronDown, ChevronUp, Eye, Sparkles, Clock, Flame, X, Loader2 } from 'lucide-react';
-import { getPulseFeed, getMyPulses } from '../service/PulseService';
+import { getPulseFeed, getMyPulses, getPulseFeedOffline, getMinePulsesOffline, parsePulseDate, formatPulseTime } from '../service/PulseService';
 import Avatar from '../components/chat/Avatar';
 import StreakBadge from '../components/pulse/StreakBadge';
 import CreatePulseModal from '../components/pulse/CreatePulseModal';
 import PulseStoryViewer from '../components/pulse/PulseStoryViewer';
 import StreakTierExplainerModal from '../components/pulse/StreakTierExplainerModal';
-import StreakUpgradeModal from '../components/pulse/StreakUpgradeModal';
+import PulseViewersModal from '../components/pulse/PulseViewersModal';
 import { getTierIndexFromStreak } from '../components/pulse/SquircleFireAvatar';
 
 const PulsesTab = () => {
@@ -15,8 +15,7 @@ const PulsesTab = () => {
   const [myPulsesData, setMyPulsesData] = useState({ totalViews: 0, activePulses: [], expiredPulses: [] });
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showExplainerModal, setShowExplainerModal] = useState(false);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [upgradeModalData, setUpgradeModalData] = useState({ oldStreak: 3, newStreak: 7 });
+  const [selectedPulseViewers, setSelectedPulseViewers] = useState(null);
   
   // Dismissible Streak Banner State (Persisted in localStorage)
   const [bannerDismissed, setBannerDismissed] = useState(() => {
@@ -45,35 +44,42 @@ const PulsesTab = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Check if user streak crossed a milestone set point (3, 7, 14, 30, 50 days) up or down
-  useEffect(() => {
-    const currentTier = getTierIndexFromStreak(userStreak);
-    const storedLastTier = localStorage.getItem('lastKnownStreakTier');
-
-    if (storedLastTier !== null) {
-      const lastTier = parseInt(storedLastTier, 10);
-      if (currentTier !== lastTier) {
-        // Tier boundary crossed! Show upgrade or degraded modal
-        const oldStreakVal = [0, 3, 7, 14, 30, 50][lastTier] || 0;
-        setUpgradeModalData({ oldStreak: oldStreakVal, newStreak: userStreak });
-        setShowUpgradeModal(true);
-        localStorage.setItem('lastKnownStreakTier', currentTier.toString());
-      }
-    } else {
-      // First load: store current tier level
-      localStorage.setItem('lastKnownStreakTier', currentTier.toString());
-    }
-  }, [userStreak]);
-
   const fetchData = async () => {
-    setLoading(true);
+    // 1. Instant rendering from IndexedDB cache
+    try {
+      const [cachedFeed, cachedMine] = await Promise.all([
+        getPulseFeedOffline().catch(() => null),
+        getMinePulsesOffline().catch(() => null)
+      ]);
+
+      if (cachedFeed && Array.isArray(cachedFeed) && cachedFeed.length > 0) {
+        setFeed(cachedFeed);
+        setLoading(false);
+      }
+      if (cachedMine) {
+        const active = cachedMine.activePulses || cachedMine.pulses || [];
+        const totalV = cachedMine.totalViews || active.reduce((sum, p) => sum + (p.viewCount || p.viewsCount || 0), 0);
+        setMyPulsesData({
+          totalViews: totalV,
+          activePulses: active,
+          expiredPulses: cachedMine.expiredPulses || []
+        });
+        setLoading(false);
+      }
+    } catch (e) {
+      console.warn('[PulsesTab] IDB cache error:', e);
+    }
+
+    // 2. Fetch fresh network data in background and update UI + IDB
     try {
       const [feedData, ownerData] = await Promise.all([
         getPulseFeed().catch(() => []),
         getMyPulses().catch(() => null)
       ]);
 
-      setFeed(Array.isArray(feedData) ? feedData : []);
+      if (Array.isArray(feedData) && feedData.length > 0) {
+        setFeed(feedData);
+      }
 
       if (ownerData) {
         const active = ownerData.activePulses || ownerData.pulses || [];
@@ -100,7 +106,7 @@ const PulsesTab = () => {
     const userIdVal = item.contactUserId || item.userId;
     const userNameVal = item.contactName || item.userName || userIdVal;
     const profileVal = item.contactProfile || item.profile;
-    const activePulses = (item.pulses || []).filter(p => p.status !== 'expired' && (!p.expiresAt || new Date(p.expiresAt).getTime() > now));
+    const activePulses = (item.pulses || []).filter(p => p.status !== 'expired' && (!p.expiresAt || (parsePulseDate(p.expiresAt)?.getTime() || (now + 1)) > now));
     const allSeenNow = activePulses.length > 0 && activePulses.every(p => p.hasSeen || p.seen);
     return {
       ...item,
@@ -292,11 +298,17 @@ const PulsesTab = () => {
                               {pulse.caption || pulse.content || `${pulse.type} Status`}
                             </div>
                             <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                              {pulse.createdAt ? new Date(pulse.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Active'}
+                              {pulse.createdAt ? formatPulseTime(pulse.createdAt, 'Active') : 'Active'}
                             </div>
                           </div>
-                          <div style={{ fontSize: '12px', fontWeight: '800', color: 'var(--accent-color)' }}>
-                            👁️ {pulse.viewCount || pulse.viewsCount || 0}
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedPulseViewers(pulse);
+                            }}
+                            style={{ fontSize: '12px', fontWeight: '800', color: 'var(--accent-color)', cursor: 'pointer', padding: '4px 8px', borderRadius: '8px', backgroundColor: 'rgba(99, 102, 241, 0.12)' }}
+                          >
+                            👁️ {pulse.totalViews ?? pulse.viewCount ?? pulse.viewsCount ?? pulse.viewers?.length ?? 0}
                           </div>
                         </div>
                       ))
@@ -353,7 +365,7 @@ const PulsesTab = () => {
                               {item.userName || item.userId}
                             </div>
                             <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {item.pulses?.[0]?.content || item.pulses?.[0]?.caption || (item.pulses?.[0]?.createdAt ? `Today at ${new Date(item.pulses[0].createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Recent update')}
+                              {item.pulses?.[0]?.content || item.pulses?.[0]?.caption || (item.pulses?.[0]?.createdAt ? `Today at ${formatPulseTime(item.pulses[0].createdAt)}` : 'Recent update')}
                             </div>
                           </div>
                         </div>
@@ -411,7 +423,7 @@ const PulsesTab = () => {
                               {item.userName || item.userId}
                             </div>
                             <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {item.pulses?.[0]?.content || item.pulses?.[0]?.caption || (item.pulses?.[0]?.createdAt ? `Yesterday at ${new Date(item.pulses[0].createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Viewed update')}
+                              {item.pulses?.[0]?.content || item.pulses?.[0]?.caption || (item.pulses?.[0]?.createdAt ? `Yesterday at ${formatPulseTime(item.pulses[0].createdAt)}` : 'Viewed update')}
                             </div>
                           </div>
                         </div>
@@ -557,23 +569,13 @@ const PulsesTab = () => {
       <StreakTierExplainerModal
         isOpen={showExplainerModal}
         onClose={() => setShowExplainerModal(false)}
-        onPreviewUpgrade={(oldS, newS) => {
-          setUpgradeModalData({ oldStreak: oldS, newStreak: newS });
-          setShowUpgradeModal(true);
-        }}
       />
 
-      {/* Streak Milestone Upgrade Congratulatory Modal */}
-      <StreakUpgradeModal
-        isOpen={showUpgradeModal}
-        onClose={() => setShowUpgradeModal(false)}
-        oldStreak={upgradeModalData.oldStreak}
-        newStreak={upgradeModalData.newStreak}
-        userProfile={userProfile}
-        userName={userName}
-        onActionClick={(isDegraded) => {
-          if (isDegraded) setShowCreateModal(true);
-        }}
+      {/* Pulse Viewers Modal */}
+      <PulseViewersModal
+        isOpen={!!selectedPulseViewers}
+        onClose={() => setSelectedPulseViewers(null)}
+        pulse={selectedPulseViewers}
       />
 
     </div>

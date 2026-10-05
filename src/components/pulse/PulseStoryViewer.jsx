@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Volume2, VolumeX, Play, Pause } from 'lucide-react';
+import { X, Volume2, VolumeX, Play, Pause, Eye } from 'lucide-react';
 import Avatar from '../chat/Avatar';
 import StreakBadge from './StreakBadge';
-import { recordPulseView } from '../../service/PulseService';
+import PulseViewersModal from './PulseViewersModal';
+import { recordPulseView, formatPulseTime } from '../../service/PulseService';
 
 const DEFAULT_SLIDE_DURATION = 5000; // 5 seconds for text / image
 
@@ -15,13 +16,16 @@ const PulseStoryViewer = ({ contactsFeed = [], initialUserIndex = 0, onClose, on
   const [showPauseIndicator, setShowPauseIndicator] = useState(false);
   const [progress, setProgress] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
+  const [showViewersModal, setShowViewersModal] = useState(false);
 
   // Swipe Gesture Tracking
   const touchStartRef = useRef({ x: 0, y: 0, time: 0 });
 
+  const myUserId = localStorage.getItem('userid');
   const currentUser = contactsFeed[userIndex] || contactsFeed[0];
   const pulses = currentUser?.pulses || [];
   const currentPulse = pulses[pulseIndex] || pulses[0];
+  const isMine = currentUser?.isMine || String(currentUser?.userId || '') === String(myUserId || '');
 
   const timerRef = useRef(null);
   const elapsedRef = useRef(0);
@@ -242,7 +246,7 @@ const PulseStoryViewer = ({ contactsFeed = [], initialUserIndex = 0, onClose, on
                   <StreakBadge streak={currentUser.pulseStreak} size="sm" />
                 </div>
                 <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '11px', marginTop: '2px' }}>
-                  {currentPulse?.createdAt ? new Date(currentPulse.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
+                  {currentPulse?.createdAt ? formatPulseTime(currentPulse.createdAt, 'Just now') : 'Just now'}
                 </div>
               </div>
             </div>
@@ -377,18 +381,55 @@ const PulseStoryViewer = ({ contactsFeed = [], initialUserIndex = 0, onClose, on
           )}
         </div>
 
-        {/* Bottom Overlay: Caption */}
-        {currentPulse?.content && currentPulse.type !== 'text' && (
+        {/* Bottom Overlay: Caption & Owner Eye Icon Button */}
+        {(currentPulse?.content || isMine) && (
           <div style={{
             position: 'absolute', bottom: 0, left: 0, right: 0,
-            padding: '24px 16px 20px',
-            background: 'linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%)',
-            color: '#ffffff', fontSize: '15px', fontWeight: '600',
-            textAlign: 'center', zIndex: 20
+            padding: '30px 16px 20px',
+            background: 'linear-gradient(0deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0) 100%)',
+            color: '#ffffff',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px',
+            zIndex: 20
           }}>
-            {currentPulse.content}
+            {currentPulse?.content && currentPulse.type !== 'text' && (
+              <div style={{ fontSize: '15px', fontWeight: '600', textAlign: 'center', wordBreak: 'break-word', width: '100%' }}>
+                {currentPulse.content}
+              </div>
+            )}
+
+            {isMine && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsPaused(true);
+                  setShowViewersModal(true);
+                }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '8px 16px', borderRadius: '20px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.25)', backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(255, 255, 255, 0.35)', color: '#ffffff',
+                  fontSize: '13px', fontWeight: '700', cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
+                }}
+              >
+                <Eye size={16} color="#ffffff" />
+                <span>{currentPulse?.totalViews ?? currentPulse?.viewers?.length ?? 0} Views</span>
+              </button>
+            )}
           </div>
         )}
+
+        {/* Viewers Modal */}
+        <PulseViewersModal
+          isOpen={showViewersModal}
+          onClose={() => {
+            setShowViewersModal(false);
+            setIsPaused(false);
+          }}
+          pulse={currentPulse}
+        />
       </div>
     </div>
   );

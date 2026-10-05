@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { loginUser, verify2FALogin } from "../service/UserAuth";
 import { Link, useNavigate } from "react-router-dom";
 import { initWebsocket } from "../service/Websocket";
-import { Eye, EyeOff, ShieldCheck, Lock, Mail, ArrowRight, Loader2, CheckCircle2, AlertCircle, KeyRound } from "lucide-react";
+import { Eye, EyeOff, ShieldCheck, Lock, Mail, ArrowRight, Loader2, CheckCircle2, AlertCircle, KeyRound, User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 /**

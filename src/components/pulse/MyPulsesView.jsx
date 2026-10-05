@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Eye, Clock, Trash2, Flame, Loader2, Users } from 'lucide-react';
-import { getMyPulses, getMinePulsesOffline } from '../../service/PulseService';
+import { getMyPulses, getMinePulsesOffline, formatPulseTime } from '../../service/PulseService';
 import Avatar from '../chat/Avatar';
 import StreakBadge from './StreakBadge';
+import PulseViewersModal from './PulseViewersModal';
 
 const MyPulsesView = ({ onBack, onOpenCreate }) => {
   const [loading, setLoading] = useState(true);
@@ -245,59 +246,11 @@ const MyPulsesView = ({ onBack, onOpenCreate }) => {
       </div>
 
       {/* Viewers Bottom Drawer Modal */}
-      {selectedPulseViewers && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 10000,
-          backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
-          display: 'flex', justifyContent: 'center', alignItems: 'flex-end'
-        }} onClick={() => setSelectedPulseViewers(null)}>
-          <div style={{
-            width: '100%', maxWidth: '500px',
-            backgroundColor: 'var(--bg-card)',
-            borderRadius: '24px 24px 0 0',
-            border: '1px solid var(--border-color)',
-            maxHeight: '70vh', display: 'flex', flexDirection: 'column',
-            overflow: 'hidden', animation: 'slideUp 0.3s ease-out'
-          }} onClick={e => e.stopPropagation()}>
-            
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Eye size={18} color="var(--accent-color)" />
-                <h3 style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-primary)', margin: 0 }}>
-                  Pulse Viewers ({(selectedPulseViewers.viewers || []).length})
-                </h3>
-              </div>
-              <button onClick={() => setSelectedPulseViewers(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontWeight: '700' }}>
-                ✕
-              </button>
-            </div>
-
-            <div style={{ padding: '12px 20px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {(!selectedPulseViewers.viewers || selectedPulseViewers.viewers.length === 0) ? (
-                <div style={{ textAlign: 'center', padding: '30px 16px', color: 'var(--text-secondary)', fontSize: '14px' }}>
-                  No viewers yet.
-                </div>
-              ) : (
-                selectedPulseViewers.viewers.map((v, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '12px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <Avatar chat={{ profile: v.viewerProfile, userName: v.viewerName }} size={38} />
-                      <div>
-                        <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>
-                          {v.viewerName || v.viewerId}
-                        </div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                          {v.viewedAt ? new Date(v.viewedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recently'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <PulseViewersModal
+        isOpen={!!selectedPulseViewers}
+        onClose={() => setSelectedPulseViewers(null)}
+        pulse={selectedPulseViewers}
+      />
 
       <style>{`
         @keyframes slideUp {

@@ -55,6 +55,39 @@ export const getMineDataFromDB = async () => {
 };
 
 /**
+ * Save contact pulse feed data to IndexedDB for instant offline-first rendering
+ */
+export const saveFeedDataToDB = async (feedData) => {
+  if (!feedData) return;
+  try {
+    const db = await initDB();
+    const userId = localStorage.getItem("userid") || "default";
+    await db.put('pulseStore', {
+      pulseId: `feed_${userId}`,
+      isFeedCache: true,
+      data: feedData,
+      lastUpdated: Date.now()
+    });
+  } catch (e) {
+    console.warn('[PulseMediaCache] Failed to save feed data to DB:', e);
+  }
+};
+
+/**
+ * Get contact pulse feed data from IndexedDB
+ */
+export const getFeedDataFromDB = async () => {
+  try {
+    const db = await initDB();
+    const userId = localStorage.getItem("userid") || "default";
+    const res = await db.get('pulseStore', `feed_${userId}`);
+    return res ? res.data : null;
+  } catch (err) {
+    return null;
+  }
+};
+
+/**
  * Store pulse metadata in pulseStore
  */
 export const savePulseToStore = async (pulse) => {
