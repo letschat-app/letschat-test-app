@@ -59,3 +59,18 @@ export const getChatName = (chatid) => {
     return null;
   }
 };
+
+/**
+ * Normalizes user input identifiers:
+ * - If input contains '@' (email), preserves casing.
+ * - Otherwise (UserId, e.g. aaa002), converts letters to uppercase (AAA002).
+ */
+export const normalizeIdentifier = (input) => {
+  if (!input) return "";
+  const trimmed = String(input).trim();
+  if (trimmed.includes("@")) {
+    return trimmed;
+  }
+  return trimmed.toUpperCase();
+};
+
