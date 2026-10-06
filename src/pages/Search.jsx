@@ -110,7 +110,7 @@ const SearchComponent = () => {
         const rawMap = localStorage.getItem("chatsMap");
         if (!rawMap) return;
         const chatsMap = JSON.parse(rawMap);
-        const groupChats = Object.values(chatsMap).filter(c => c.isGroupChat || c.isSpace || c.isClassroom);
+        const groupChats = Object.values(chatsMap).filter(c => c.type === 'group' || c.type === 'classroom' || c.type === 'room' || c.isGroupChat || c.isSpace || c.isClassroom);
         const shared = [];
         for (const grp of groupChats) {
           const members = await getGroupMembersFromDB(grp.chatId);

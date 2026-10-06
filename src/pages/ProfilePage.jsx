@@ -74,7 +74,7 @@ const ProfilePage = () => {
                     const rawMap = localStorage.getItem("chatsMap");
                     if (!rawMap) return;
                     const chatsMap = JSON.parse(rawMap);
-                    const groupChats = Object.values(chatsMap).filter(c => c.isGroupChat || c.isSpace || c.isClassroom);
+                    const groupChats = Object.values(chatsMap).filter(c => c.type === 'group' || c.type === 'classroom' || c.type === 'room' || c.isGroupChat || c.isSpace || c.isClassroom);
                     const shared = [];
                     for (const grp of groupChats) {
                         const members = await getGroupMembersFromDB(grp.chatId);
@@ -297,7 +297,17 @@ const ProfilePage = () => {
                 <div style={cardStyle}>
                     <div style={headerStyle}>
                         <Avatar
-                            chat={{ profile: displayUser.profile, id: displayUser.userId, userName: displayUser.userName, type: 'private', pulseStreak: displayUser.pulseStreak || displayUser.streak }}
+                            chat={{
+                                profile: displayUser.profile,
+                                id: displayUser.userId,
+                                userName: displayUser.userName,
+                                type: 'private',
+                                pulseStreak: displayUser.pulseStreak || displayUser.streak,
+                                hasActivePulse: displayUser.hasActivePulse,
+                                allSeen: displayUser.allSeen
+                            }}
+                            hasActivePulse={displayUser.hasActivePulse}
+                            allSeen={displayUser.allSeen}
                             size={120}
                             highRes={true}
                             onClick={() => handleAvatarView(displayUser.profile)}
