@@ -5,6 +5,8 @@ import { initWebsocket } from "../service/Websocket";
 import { Eye, EyeOff, ShieldCheck, Lock, Mail, ArrowRight, Loader2, CheckCircle2, AlertCircle, KeyRound, User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
+import { normalizeIdentifier } from "../service/ChatUtils";
+
 /**
  * Login Component
  * Supports Flexible Login (UserId or Email) & 2-Factor Authentication (2FA) Verification Flow.
@@ -41,7 +43,8 @@ function Login() {
     setErrorMsg("");
     setInfoMsg("");
 
-    const cleanIdentifier = (form.identifier || form.userid || "").trim();
+    const rawInput = (form.identifier || form.userid || "").trim();
+    const cleanIdentifier = normalizeIdentifier(rawInput);
     if (!cleanIdentifier || !form.password) {
       setErrorMsg("Please enter both UserId or Email and Password.");
       return;
@@ -50,7 +53,7 @@ function Login() {
     setLoading(true);
     try {
       const res = await loginUser({
-        identifier: cleanIdentifier,
+        userId: cleanIdentifier,
         password: form.password,
       });
 
@@ -125,7 +128,7 @@ function Login() {
     setLoading(true);
     try {
       const res = await verify2FALogin({
-        identifier: tempIdentifier.trim(),
+        identifier: normalizeIdentifier(tempIdentifier),
         otp: cleanOtp,
       });
 

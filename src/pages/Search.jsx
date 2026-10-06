@@ -7,6 +7,7 @@ import userDiscoveryStore from '../service/UserDiscoveryStore';
 import Avatar from '../components/chat/Avatar';
 import StreakBadge from '../components/pulse/StreakBadge';
 import { syncChatsMapToDB, getGroupMembersFromDB } from '../service/db';
+import { normalizeIdentifier } from '../service/ChatUtils';
 
 const SearchComponent = () => {
   const navigate = useNavigate();
@@ -53,7 +54,7 @@ const SearchComponent = () => {
 
   const handleSearch = async (overrideQuery = null) => {
     const rawQuery = typeof overrideQuery === 'string' ? overrideQuery : userid;
-    const queryToUse = rawQuery.trim();
+    const queryToUse = normalizeIdentifier(rawQuery);
     if (!queryToUse || queryToUse === localStorage.getItem("userid")) return;
     addRecentSearch(queryToUse);
     setIsLoading(true);

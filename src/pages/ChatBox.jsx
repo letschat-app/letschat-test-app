@@ -702,6 +702,7 @@ const ChatBox = () => {
   const [pendingTextMessage, setPendingTextMessage] = useState(null);
   const queuedTextMessagesRef = useRef([]);
   const [queuedCount, setQueuedCount] = useState(0);
+  const [selectedQueuedMsg, setSelectedQueuedMsg] = useState(null);
   const lastSoundTimeRef = useRef(0);
 
   // Scheduled Messages State
@@ -1355,9 +1356,33 @@ const ChatBox = () => {
       queuedTextMessagesRef.current = [];
       setQueuedCount(0);
       for (const item of queue) {
-        await sendMessage(item.text, item.mentions, item.repliedto);
+        if (item.tempmsgid) {
+          messageStore.removeOptimistic(chatid, item.tempmsgid);
+        }
+        await sendMessage(item.content || item.text, item.rawMentions || item.mentions, item.repliedto);
       }
     }
+  };
+
+  const handleSendQueuedNow = (msg) => {
+    if (!msg) return;
+    queuedTextMessagesRef.current = queuedTextMessagesRef.current.filter(m => m.tempmsgid !== msg.tempmsgid);
+    setQueuedCount(queuedTextMessagesRef.current.length);
+    if (msg.tempmsgid) {
+      messageStore.removeOptimistic(chatid, msg.tempmsgid);
+    }
+    sendMessage(msg.content || msg.text, msg.rawMentions || msg.mentions, msg.repliedto);
+    setSelectedQueuedMsg(null);
+  };
+
+  const handleDeleteQueued = (msg) => {
+    if (!msg) return;
+    queuedTextMessagesRef.current = queuedTextMessagesRef.current.filter(m => m.tempmsgid !== msg.tempmsgid);
+    setQueuedCount(queuedTextMessagesRef.current.length);
+    if (msg.tempmsgid) {
+      messageStore.removeOptimistic(chatid, msg.tempmsgid);
+    }
+    setSelectedQueuedMsg(null);
   };
 
   const handleSendMessageClick = () => {
@@ -2094,11 +2119,27 @@ const ChatBox = () => {
                     setActiveMentions([]);
                     sendMessage(msgToSend.text, msgToSend.mentions, msgToSend.repliedto);
                   } else {
-                    queuedTextMessagesRef.current.push({
+                    const tempmsgid = uuidv4().toString();
+                    const queuedMsg = {
+                      tempmsgid,
+                      chatid,
+                      userid: localStorage.getItem('userid'),
+                      sendername: myDisplayName,
+                      type: "text",
+                      content: pendingTextMessage.text,
+                      timestamp: getCurrentLocalDateTimeString(),
+                      repliedto: pendingTextMessage.repliedto ? (pendingTextMessage.repliedto.msgid || pendingTextMessage.repliedto) : null,
+                      forwardedfrom: null,
+                      spaceid: activeSpace,
+                      isQueuedForMedia: true,
+                      status: 'waiting_for_upload',
+                      rawMentions: pendingTextMessage.mentions,
                       text: pendingTextMessage.text,
-                      mentions: pendingTextMessage.mentions,
-                      repliedto: pendingTextMessage.repliedto
-                    });
+                      mentions: pendingTextMessage.mentions
+                    };
+
+                    messageStore.addMessage(queuedMsg);
+                    queuedTextMessagesRef.current.push(queuedMsg);
                     setQueuedCount(queuedTextMessagesRef.current.length);
                     setInput("");
                     setActiveMentions([]);
@@ -2166,6 +2207,130 @@ const ChatBox = () => {
                   <div style={{ fontWeight: '700', fontSize: '14.5px' }}>🚀 Send Anyway</div>
                   <div style={{ fontSize: '12px', opacity: 0.9, marginTop: '2px' }}>
                     Bypass media upload and send text message right now.
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Selected Queued Message Action Modal (Send Now vs Delete) */}
+      {selectedQueuedMsg && createPortal(
+        <div
+          onClick={() => setSelectedQueuedMsg(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 999999,
+            backgroundColor: 'rgba(0, 0, 0, 0.65)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '16px'
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '20px',
+              padding: isMobile ? '18px 16px' : '24px',
+              maxWidth: '400px',
+              width: '100%',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              animation: 'muFadeIn 0.2s ease-out'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '42px', height: '42px', borderRadius: '50%',
+                backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <Clock size={22} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                  Queued Message Options
+                </h3>
+                <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                  This message is currently waiting for media upload to finish.
+                </p>
+              </div>
+            </div>
+
+            {/* Message Content Preview */}
+            <div style={{
+              padding: '12px 14px',
+              borderRadius: '12px',
+              backgroundColor: 'var(--bg-secondary)',
+              border: '1px solid var(--border-color)',
+              fontSize: '14px',
+              color: 'var(--text-primary)',
+              wordBreak: 'break-word',
+              maxHeight: '100px',
+              overflowY: 'auto'
+            }}>
+              "{selectedQueuedMsg.content || selectedQueuedMsg.text}"
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
+              {/* Option A: Send Now */}
+              <button
+                type="button"
+                onClick={() => handleSendQueuedNow(selectedQueuedMsg)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '12px',
+                  padding: '14px 16px', borderRadius: '14px',
+                  backgroundColor: 'var(--accent-color, #2563eb)',
+                  border: 'none',
+                  color: '#ffffff', cursor: 'pointer',
+                  textAlign: 'left', transition: 'all 0.2s ease',
+                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)'
+                }}
+              >
+                <div style={{
+                  width: '36px', height: '36px', borderRadius: '50%',
+                  backgroundColor: 'rgba(255, 255, 255, 0.2)', color: '#ffffff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                }}>
+                  <Send size={18} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: '700', fontSize: '14.5px' }}>🚀 Send Now (Send Anyway)</div>
+                  <div style={{ fontSize: '12px', opacity: 0.9, marginTop: '2px' }}>
+                    Release from queue and send over WebSocket immediately.
+                  </div>
+                </div>
+              </button>
+
+              {/* Option B: Delete Message */}
+              <button
+                type="button"
+                onClick={() => handleDeleteQueued(selectedQueuedMsg)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '12px',
+                  padding: '14px 16px', borderRadius: '14px',
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                  color: '#ef4444', cursor: 'pointer',
+                  textAlign: 'left', transition: 'all 0.2s ease'
+                }}
+              >
+                <div style={{
+                  width: '36px', height: '36px', borderRadius: '50%',
+                  backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#ef4444',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                }}>
+                  <Trash2 size={18} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: '700', fontSize: '14.5px' }}>🗑️ Delete Message</div>
+                  <div style={{ fontSize: '12px', opacity: 0.85, marginTop: '2px' }}>
+                    Cancel this message and remove it from chat.
                   </div>
                 </div>
               </button>
@@ -4555,7 +4720,18 @@ const ChatBox = () => {
                                   fontWeight: "500",
                                   fontSize: "11px"
                                 }}>
-                                  {formatTime12Hour(msg.timestamp, selectedMessages.has(msg))}
+                                  {msg.isQueuedForMedia || msg.status === 'waiting_for_upload' ? (
+                                    <span
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedQueuedMsg(msg);
+                                      }}
+                                      style={{ color: '#f59e0b', fontWeight: '600', cursor: 'pointer' }}
+                                      title="Click to Send Now or Delete"
+                                    >
+                                      Waiting for upload ⏳
+                                    </span>
+                                  ) : formatTime12Hour(msg.timestamp, selectedMessages.has(msg))}
                                 </span>
                               {msg.revived && (
                                   <span style={{
