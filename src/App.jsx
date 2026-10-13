@@ -49,6 +49,8 @@ const LandingPage = lazyWithSplash(() => import("./pages/LandingPage"));
 const Signin = lazyWithSplash(() => import("./pages/Signin"));
 const Login = lazyWithSplash(() => import("./pages/Login"));
 
+import { initSystemBroadcastSync } from "./service/SystemBroadcastService";
+
 function App() {
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
@@ -83,6 +85,9 @@ function App() {
   const showNavbar = localStorage.getItem("userid") && location.pathname !== "/signin" && location.pathname !== "/login" && location.pathname !== "/welcome";
 
   useEffect(() => {
+    // System Broadcast Sync
+    const cleanupBroadcast = initSystemBroadcastSync();
+
    // initWebsocket();
     const connectWS = () => {
       if (navigator.onLine) initWebsocket();
@@ -104,7 +109,10 @@ function App() {
         navigate("/welcome", { replace: true });
       }
     }
-    return () => window.removeEventListener("online", connectWS);
+    return () => {
+      window.removeEventListener("online", connectWS);
+      if (cleanupBroadcast) cleanupBroadcast();
+    };
   }, [location.pathname]);
   
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);

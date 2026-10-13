@@ -255,6 +255,22 @@ const ChatRow = React.memo(function ChatRow({
               <Pin size={14} style={{ transform: 'rotate(45deg)', color: 'var(--accent-color)' }} />
             )}
             {chat.chatName}
+            {(chat.chatId === "BROADCAST_SYSTEM" || chat.isSystem || chat.verified) && (
+              <span title="Official Verified Channel" style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '16px',
+                height: '16px',
+                borderRadius: '50%',
+                backgroundColor: '#3b82f6',
+                color: '#ffffff',
+                fontSize: '10px',
+                fontWeight: 'bold',
+                marginLeft: '3px',
+                flexShrink: 0
+              }}>✓</span>
+            )}
             {chat?.pulseStreak > 0 && (
               <StreakBadge streak={chat.pulseStreak} size="sm" />
             )}
@@ -385,6 +401,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
   });
   const hasAutoOpenedRef = useRef(false);
   const prevRouteRef = useRef(activeChatRoute);
+  const userClosedSpacesRef = useRef(null);
   const [isCreatingSpace, setIsCreatingSpace] = useState(false);
   const [newSpaceName, setNewSpaceName] = useState("");
   const [isAddingSpace, setIsAddingSpace] = useState(false);
@@ -836,13 +853,30 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
     if (!walkthroughCompleted && !searchQuery) {
       const guideChat = {
         chatId: SIMULATION_ID,
-        chatName: "LetsChat Guide 🤖",
+        chatName: "LetsChat",
         type: "guide",
         isSimulation: true
       };
       // Check if it's already in filtered (shouldn't be, but safe check)
       if (!filtered.some(c => c.chatId === SIMULATION_ID)) {
         filtered.unshift(guideChat);
+      }
+    }
+
+    // Inject Broadcast System Chat if system messages or broadcast entry exist
+    const systemMsgs = messageStore.getMessages("BROADCAST_SYSTEM");
+    const cachedMap = JSON.parse(localStorage.getItem('chatsMap') || '{}');
+    if ((cachedMap["BROADCAST_SYSTEM"] || (systemMsgs && systemMsgs.length > 0)) && !searchQuery) {
+      const broadcastChat = {
+        chatId: "BROADCAST_SYSTEM",
+        id: "BROADCAST_SYSTEM",
+        chatName: "Letschat",
+        type: "broadcast",
+        isSystem: true,
+        verified: true
+      };
+      if (!filtered.some(c => c.chatId === "BROADCAST_SYSTEM")) {
+        filtered.unshift(broadcastChat);
       }
     }
 
@@ -1051,6 +1085,13 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
   }, []);
 
   const handleChatClick = useCallback(async (chat, shouldNavigate = true) => {
+    userClosedSpacesRef.current = null;
+
+    // Auto-navigate to space 0 on desktop immediately (synchronously)
+    if (isDesktop && shouldNavigate) {
+      navigate(`/chat/${chat.chatId}?space=0`);
+    }
+
     if (chat.type === 'classroom') {
       const spaces = [
         { id: 0, name: "Announcements", icon: "📢" },
@@ -1086,7 +1127,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
 
             // update currently selected chat if it's still the same
             setSelectedChatForSpaces(prev => {
-              if (prev && prev.chatId === chat.chatId) {
+              if (prev && String(prev.chatId) === String(chat.chatId)) {
                 return { ...prev, spaces: fetchedSpaces };
               }
               return prev;
@@ -1097,45 +1138,41 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
         console.error("Failed to fetch spaces:", err);
       }
     }
-
-    // Auto-navigate to space 0 on desktop
-    if (isDesktop && shouldNavigate) {
-      navigate(`/chat/${chat.chatId}?space=0`);
-    }
   }, [spacesCache, isDesktop, navigate]);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     let targetChatId = location.state?.showSpacesForChat || searchParams.get('showSpacesForChat');
     
-    // If not in state, try to get it from the active route on initial load/refresh
-    if (!targetChatId && activeChatRoute?.startsWith('/chat/') && !hasAutoOpenedRef.current) {
-      const parts = activeChatRoute.split('/');
-      if (parts.length >= 3) {
-        targetChatId = parts[2].split('?')[0]; // Strip any query params
+    // Extract targetChatId from active route when on a chat route
+    if (!targetChatId && activeChatRoute?.startsWith('/chat/')) {
+      const parts = activeChatRoute.split('/chat/')[1];
+      if (parts) {
+        targetChatId = parts.split('?')[0]; // Strip any query params
       }
-      hasAutoOpenedRef.current = true;
     }
 
     if (targetChatId && chatNames.length > 0) {
-      if (!selectedChatForSpaces || String(selectedChatForSpaces.chatId) !== String(targetChatId)) {
-        const chat = chatNames.find(c => String(c.chatId) === String(targetChatId));
-        if (chat) {
-          // Use handleChatClick to ensure dynamic spaces are fetched correctly
-          // Pass false to avoid redundant navigation if we're already there
-          handleChatClick(chat, false);
+      // If user hasn't explicitly closed space view for this specific chat, sync space list
+      if (userClosedSpacesRef.current !== String(targetChatId)) {
+        if (!selectedChatForSpaces || String(selectedChatForSpaces.chatId) !== String(targetChatId)) {
+          const chat = chatNames.find(c => String(c.chatId) === String(targetChatId));
+          if (chat) {
+            handleChatClick(chat, false);
+          }
         }
       }
       
       // Clear state to avoid sticky behavior if it came from location.state or query param
-      if (location.state?.showSpacesForChat || searchParams.get('showSpacesForChat')) {
-        navigate('/chats', { replace: true });
+      if (location.state?.showSpacesForChat) {
+        navigate(location.pathname + location.search, { replace: true, state: { ...location.state, showSpacesForChat: undefined } });
+      } else if (searchParams.get('showSpacesForChat')) {
+        navigate(location.pathname, { replace: true });
       }
     } else if (!targetChatId && selectedChatForSpaces && !activeChatRoute?.startsWith('/chat/')) {
-      // Clear the space selection when navigating back to the main chat list ONLY IF we actually navigated back from a chat route
-      if (prevRouteRef.current?.startsWith('/chat/')) {
-        setSelectedChatForSpaces(null);
-      }
+      // Clear the space selection when navigating back to the main chat list
+      setSelectedChatForSpaces(null);
+      userClosedSpacesRef.current = null;
     }
     
     // Update ref for next render
@@ -1413,7 +1450,12 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
               marginBottom: '8px'
             }}>
               <button
-                onClick={() => setSelectedChatForSpaces(null)}
+                onClick={() => {
+                  if (selectedChatForSpaces) {
+                    userClosedSpacesRef.current = String(selectedChatForSpaces.chatId);
+                  }
+                  setSelectedChatForSpaces(null);
+                }}
                 style={{
                   background: 'none',
                   border: 'none',

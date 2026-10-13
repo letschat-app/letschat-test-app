@@ -8,6 +8,7 @@ import { API } from "../service/UserAuth";
 import { getsocket, initWebsocket, sendSafe, sendMediaOpenedEvent } from "../service/Websocket";
 import messageStore from "./MessageStore";
 import StreakBadge from "../components/pulse/StreakBadge";
+import { getPulseFromStore, pulsePreviewCache } from '../service/PulseMediaCache';
 import { initDB, saveUsersBatchToDB, saveGroupMembersToDB, markMessagesAsOldInDB, getGroupMembersFromDB } from '../service/db';
 import { useNotifications } from '../hooks/useNotifications';
 import { useTheme } from '../context/ThemeContext';
@@ -69,6 +70,7 @@ import ScheduleMessageModal from '../components/modals/ScheduleMessageModal';
 import ScheduledListModal from '../components/modals/ScheduledListModal';
 import CreatePollModal from '../components/modals/CreatePollModal';
 import PollWidget from '../components/chat/PollWidget';
+import AttachPulseModal from '../components/pulse/AttachPulseModal';
 import simulationService from "../service/SimulationService";
 import { SIMULATION_ID } from "../service/SimulationScript";
 import QuickAccessWheel from '../components/chat/QuickAccessWheel';
@@ -77,6 +79,316 @@ import { uploadMedia, formatFileSize, getFileCategory, getVideoThumbnail, getPdf
 import { saveBlobToCache, getMediaInfo, renameCacheKey } from '../service/MediaCache';
 import spaceStore from "../service/SpaceStore";
 import { Edit2 } from "lucide-react";
+
+const MARBLE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="48"><filter id="m" x="0" y="0" width="100%" height="100%"><feTurbulence type="turbulence" baseFrequency="0.018 0.06" numOctaves="2" seed="11"/><feColorMatrix values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 -1.6 0 0 0 0.42"/></filter><rect width="96" height="48" filter="url(#m)"/></svg>';
+const MARBLE_URL = `url("data:image/svg+xml,${encodeURIComponent(MARBLE_SVG)}")`;
+
+const PulseQuoteCard = ({ repliedtoStr, isReceived }) => {
+  const isPulseReply = repliedtoStr.startsWith("PULSE_REPLY:");
+  const pulseId = repliedtoStr.split(":")[1];
+  const headerTitle = isPulseReply ? "Replied to Pulse" : "Tagged a Pulse";
+
+  const [pulseData, setPulseData] = useState(() => pulsePreviewCache.get(String(pulseId)) || null);
+
+  useEffect(() => {
+    if (!pulseData && pulseId) {
+      let isMounted = true;
+      getPulseFromStore(pulseId).then((res) => {
+        if (isMounted && res) {
+          setPulseData(res);
+        }
+      });
+      return () => { isMounted = false; };
+    }
+  }, [pulseId, pulseData]);
+
+  const mediaUrl = pulseData?.imageUrl || pulseData?.mediaUrl || (pulseData?.type !== 'text' ? pulseData?.content : null);
+  const isImageOrVideo = pulseData?.type === 'image' || pulseData?.type === 'video' || pulseData?.type === 'image_audio';
+
+  return (
+    <div
+      style={{
+        backgroundColor: isReceived ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.18)",
+        borderLeft: "3px solid var(--accent-color, #3b82f6)",
+        padding: '6px 10px',
+        borderRadius: "6px",
+        marginBottom: "8px",
+        fontSize: '12px',
+        display: 'flex',
+        alignItems: 'center',
+        justify: 'space-between',
+        gap: '8px'
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: "700", color: 'var(--accent-color, #3b82f6)', marginBottom: "2px", display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <span>{isPulseReply ? '💬 ' : '🏷️ '}{headerTitle}</span>
+        </div>
+        <div style={{ opacity: 0.9, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {pulseData ? (
+            pulseData.type === 'text'
+              ? (pulseData.content || 'Text Pulse')
+              : (pulseData.content || `${pulseData.type?.toUpperCase() || 'PULSE'} Story`)
+          ) : (
+            `Pulse #${pulseId}`
+          )}
+        </div>
+      </div>
+      {pulseData && isImageOrVideo && mediaUrl && (
+        <div style={{ width: '36px', height: '36px', borderRadius: '4px', overflow: 'hidden', flexShrink: 0, backgroundColor: '#000' }}>
+          <img src={mediaUrl} alt="Pulse Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        </div>
+      )}
+    </div>
+  );
+};
+
+const isEmojiReaction = (str) => {
+  if (!str || typeof str !== 'string') return false;
+  const trimmed = str.trim();
+  if (!trimmed) return false;
+  const emojiRegex = /^(?:[\p{Extended_Pictographic}\p{Emoji_Presentation}\u{1F1E6}-\u{1F1FF}](?:\uFE0F|\p{Emoji_Modifier})?(?:\u200D[\p{Extended_Pictographic}\p{Emoji_Presentation}\u{1F1E6}-\u{1F1FF}](?:\uFE0F|\p{Emoji_Modifier})?)*|[0-9#*]\uFE0F?\u20E3)+$/u;
+  return emojiRegex.test(trimmed);
+};
+
+const ReactorsModal = ({ reactionInfo, onClose, onSendReaction, isMobile }) => {
+  const [activeTab, setActiveTab] = useState('all');
+  const currentUserId = localStorage.getItem('userid');
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  if (!reactionInfo) return null;
+
+  const reactionsObj = reactionInfo.reactions || {};
+  const msgObj = reactionInfo.msg || {};
+
+  const validEntries = Object.entries(reactionsObj)
+    .filter(([_, reactors]) => Array.isArray(reactors) && reactors.length > 0)
+    .sort((a, b) => b[1].length - a[1].length);
+
+  const emojiEntries = validEntries.filter(([key]) => isEmojiReaction(key));
+  const textEntries = validEntries.filter(([key]) => !isEmojiReaction(key));
+  const textReactionsCount = textEntries.reduce((sum, [_, reactors]) => sum + reactors.length, 0);
+
+  const totalCount = validEntries.reduce((sum, [_, reactors]) => sum + reactors.length, 0);
+
+  let allItems = [];
+  validEntries.forEach(([emoji, reactors]) => {
+    const isEmoji = isEmojiReaction(emoji);
+    reactors.forEach(reactor => {
+      allItems.push({
+        emoji,
+        isEmoji,
+        userId: reactor.userId,
+        username: reactor.username,
+        profile: reactor.profile,
+        pulseStreak: reactor.pulseStreak
+      });
+    });
+  });
+
+  allItems.sort((a, b) => {
+    const isAMine = String(a.userId) === String(currentUserId);
+    const isBMine = String(b.userId) === String(currentUserId);
+    if (isAMine && !isBMine) return -1;
+    if (!isAMine && isBMine) return 1;
+    return 0;
+  });
+
+  const displayedItems = activeTab === 'all'
+    ? allItems
+    : activeTab === '__text_abc__'
+      ? allItems.filter(item => !item.isEmoji)
+      : allItems.filter(item => item.emoji === activeTab);
+
+  const handleRowClick = (item) => {
+    if (String(item.userId) === String(currentUserId) && msgObj) {
+      onSendReaction(msgObj, item.emoji);
+      onClose();
+    }
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Reactions"
+      style={{
+        position: 'fixed', inset: 0, zIndex: 99999,
+        display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center',
+        backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)'
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          backgroundColor: 'var(--bg-card)',
+          border: '1px solid var(--border-color)',
+          borderTopLeftRadius: '20px',
+          borderTopRightRadius: '20px',
+          borderBottomLeftRadius: isMobile ? '0' : '20px',
+          borderBottomRightRadius: isMobile ? '0' : '20px',
+          padding: '16px',
+          width: '100%',
+          maxWidth: isMobile ? '100%' : '420px',
+          maxHeight: '75vh',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+          boxShadow: '0 20px 50px rgba(0,0,0,0.5)'
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div style={{
+          width: '36px', height: '4px', borderRadius: '2px',
+          backgroundColor: 'var(--text-secondary)', opacity: 0.4,
+          margin: '0 auto 4px'
+        }} />
+
+        <div
+          role="tablist"
+          style={{
+            display: 'flex', gap: '8px', overflowX: 'auto',
+            paddingBottom: '4px', scrollbarWidth: 'none'
+          }}
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'all'}
+            onClick={() => setActiveTab('all')}
+            style={{
+              padding: '6px 14px', borderRadius: '16px', fontSize: '12px', fontWeight: '700',
+              cursor: 'pointer', border: 'none', whiteSpace: 'nowrap',
+              background: activeTab === 'all' ? 'var(--accent-gradient)' : 'var(--bg-secondary)',
+              color: activeTab === 'all' ? '#ffffff' : 'var(--text-primary)'
+            }}
+          >
+            All {totalCount}
+          </button>
+          {emojiEntries.map(([emoji, reactors]) => (
+            <button
+              key={emoji}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === emoji}
+              onClick={() => setActiveTab(emoji)}
+              style={{
+                padding: '6px 14px', borderRadius: '16px', fontSize: '12px', fontWeight: '700',
+                cursor: 'pointer', border: 'none', whiteSpace: 'nowrap',
+                background: activeTab === emoji ? 'var(--accent-gradient)' : 'var(--bg-secondary)',
+                color: activeTab === emoji ? '#ffffff' : 'var(--text-primary)'
+              }}
+            >
+              {emoji} {reactors.length}
+            </button>
+          ))}
+          {textReactionsCount > 0 && (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === '__text_abc__'}
+              onClick={() => setActiveTab('__text_abc__')}
+              style={{
+                padding: '6px 14px', borderRadius: '16px', fontSize: '12px', fontWeight: '700',
+                cursor: 'pointer', border: 'none', whiteSpace: 'nowrap',
+                background: activeTab === '__text_abc__' ? 'var(--accent-gradient)' : 'var(--bg-secondary)',
+                color: activeTab === '__text_abc__' ? '#ffffff' : 'var(--text-primary)'
+              }}
+            >
+              abc {textReactionsCount}
+            </button>
+          )}
+        </div>
+
+        <div style={{
+          flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px',
+          maxHeight: '340px', paddingRight: '2px'
+        }}>
+          {displayedItems.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-secondary)', fontSize: '13px' }}>
+              No reactions found.
+            </div>
+          ) : (
+            displayedItems.map((item, idx) => {
+              const isMine = String(item.userId) === String(currentUserId);
+              return (
+                <div
+                  key={`${item.userId}_${item.emoji}_${idx}`}
+                  onClick={() => handleRowClick(item)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '8px 12px', borderRadius: '14px',
+                    backgroundColor: isMine ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
+                    border: isMine ? '1px solid rgba(59, 130, 246, 0.25)' : '1px solid transparent',
+                    cursor: isMine ? 'pointer' : 'default',
+                    transition: 'background 0.15s ease'
+                  }}
+                  title={isMine ? 'Tap to remove your reaction' : undefined}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                    <Avatar
+                      chat={{
+                        userId: item.userId,
+                        userName: item.username,
+                        profile: item.profile,
+                        pulseStreak: item.pulseStreak
+                      }}
+                      size={36}
+                      showStreak={true}
+                    />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{
+                        fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
+                      }}>
+                        {isMine ? 'You' : (item.username || item.userId)}
+                      </div>
+                      {isMine && (
+                        <div style={{ fontSize: '10px', color: '#ef4444', fontWeight: '600', marginTop: '1px' }}>
+                          Tap to remove your reaction
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {item.isEmoji ? (
+                    <span style={{ fontSize: '18px', flexShrink: 0 }}>
+                      {item.emoji}
+                    </span>
+                  ) : (
+                    <span style={{
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      padding: '4px 10px',
+                      borderRadius: '999px',
+                      backgroundColor: 'var(--bg-secondary)',
+                      border: '1px solid var(--border-color)',
+                      color: 'var(--text-primary)',
+                      flexShrink: 0,
+                      maxWidth: '150px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {String(item.emoji).slice(0, 15)}
+                    </span>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const ChatBox = () => {
   const { chatid } = useParams();
@@ -88,7 +400,7 @@ const ChatBox = () => {
     if (chatid === SIMULATION_ID) {
       return {
         id: SIMULATION_ID,
-        chatName: "LetsChat Guide 🤖",
+        chatName: "LetsChat",
         type: "guide",
         role: "student"
       };
@@ -101,7 +413,7 @@ const ChatBox = () => {
     if (chatid === SIMULATION_ID) {
       setChat({
         id: SIMULATION_ID,
-        chatName: "LetsChat Guide 🤖",
+        chatName: "LetsChat",
         type: "guide",
         role: "student"
       });
@@ -294,11 +606,14 @@ const ChatBox = () => {
   const [hoveredMsgId, setHoveredMsgId] = useState(null);
   const [reactionPickerTarget, setReactionPickerTarget] = useState(null);
   const [reactionInfo, setReactionInfo] = useState(null);
+  const [customReactionText, setCustomReactionText] = useState('');
   const isMounted = useRef(true);
   const [showPermissionModal, setShowPermissionModal] = useState(false);
   const [showClassroomMatrixModal, setShowClassroomMatrixModal] = useState(false);
   const [showReportExportModal, setShowReportExportModal] = useState(false);
   const [showPollModal, setShowPollModal] = useState(false);
+  const [showAttachPulseModal, setShowAttachPulseModal] = useState(false);
+  const [attachedPulse, setAttachedPulse] = useState(null);
   const [pendingUnreadCount, setPendingUnreadCount] = useState(0);
   const [unreadMarker, setUnreadMarker] = useState({ count: 0, firstId: null });
 
@@ -843,11 +1158,12 @@ const ChatBox = () => {
   };
 
   const sendReaction = (msg, text) => {
-    if (!text) return;
+    const cleanText = typeof text === 'string' ? text.trim().slice(0, 15) : '';
+    if (!cleanText) return;
     const reactionMsg = {
       chatid,
       tempmsgid: `reaction-${uuidv4()}`,
-      content: text,
+      content: cleanText,
       type: 'text',
       msgtype: 'reaction',
       repliedTo: msg.msgid || msg.tempmsgid,
@@ -866,6 +1182,7 @@ const ChatBox = () => {
     sendSafe(reactionMsg);
 
     setReactionPickerTarget(null);
+    setCustomReactionText('');
   };
 
   const [repliedto, setrepliedto] = useState(null);
@@ -1386,7 +1703,7 @@ const ChatBox = () => {
   };
 
   const handleSendMessageClick = () => {
-    if (!input.trim()) return;
+    if (!input.trim() && !attachedPulse) return;
 
     const isMediaUploading = activeUploads.current.size > 0;
     if (isMediaUploading) {
@@ -1402,9 +1719,16 @@ const ChatBox = () => {
   };
 
   const sendMessage = async (overrideText = null, overrideMentions = null, overrideRepliedTo = null) => {
-    const textToSend = typeof overrideText === 'string' ? overrideText : input;
+    const textToSend = typeof overrideText === 'string'
+      ? overrideText
+      : (input.trim() ? input : (attachedPulse ? "Check out this pulse!" : ""));
     const mentionsToSend = Array.isArray(overrideMentions) ? overrideMentions : activeMentions;
-    const repliedtoToSend = overrideRepliedTo !== undefined && overrideRepliedTo !== null ? overrideRepliedTo : repliedto;
+    const repliedtoToSend = overrideRepliedTo !== undefined && overrideRepliedTo !== null
+      ? overrideRepliedTo
+      : (attachedPulse ? `PULSE_TAG:${attachedPulse.pulse.pulseId || attachedPulse.pulse.id}` : repliedto);
+    const spaceIdToSend = (attachedPulse && attachedPulse.targetSpaceId !== undefined)
+      ? attachedPulse.targetSpaceId
+      : activeSpace;
 
     if (textToSend && textToSend.trim()) {
       let processedInput = textToSend;
@@ -1434,7 +1758,7 @@ const ChatBox = () => {
         timestamp: getCurrentLocalDateTimeString(),
         repliedto: repliedtoToSend ? (repliedtoToSend.msgid || repliedtoToSend) : null,
         forwardedfrom: null,
-        spaceid: activeSpace
+        spaceid: spaceIdToSend
       };
       await sendSafe(msg);
 
@@ -1452,6 +1776,7 @@ const ChatBox = () => {
 
       autoPinIfRoom();
       messageStore.addMessage(msg);
+      setAttachedPulse(null);
       setrepliedto(null);
       setshowreplytomsg(false);
       setShowEmojiPicker(false);
@@ -1901,6 +2226,8 @@ const ChatBox = () => {
             onFileSelect={setPendingMediaFile}
             onError={err => alert('Upload failed: ' + err.message)}
             onCameraClick={handleCameraClick}
+            onPollClick={() => setShowPollModal(true)}
+            onPulseClick={() => setShowAttachPulseModal(true)}
             onScheduleClick={() => {
               setScheduleEditData(null);
               setShowScheduleModal(true);
@@ -3701,7 +4028,22 @@ const ChatBox = () => {
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ color: 'var(--text-primary)', fontWeight: 'bold' }}>
-                  {chat?.chatName || "Chat"}
+                  {chatid === "BROADCAST_SYSTEM" ? "Letschat" : (chat?.chatName || "Chat")}
+                  {(chatid === "BROADCAST_SYSTEM" || chat?.isSystem || chat?.verified) && (
+                    <span title="Official Verified Channel" style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '50%',
+                      backgroundColor: '#3b82f6',
+                      color: '#ffffff',
+                      fontSize: '10px',
+                      fontWeight: 'bold',
+                      marginLeft: '2px'
+                    }}>✓</span>
+                  )}
                 </span>
                 {chat?.pulseStreak > 0 && (
                   <StreakBadge streak={chat.pulseStreak} size="sm" />
@@ -4464,6 +4806,7 @@ const ChatBox = () => {
                         display: "flex",
                         flexDirection: "column",
                         animation: "fadeIn 0.3s ease-in",
+                        marginBottom: (msg.reactions && Object.values(msg.reactions).some(r => Array.isArray(r) && r.length > 0)) ? '24px' : '8px'
                       }}>
                         {msg.isdeleted || msg.isdeletedeone ? (
                           <div
@@ -4595,6 +4938,9 @@ const ChatBox = () => {
                             )}
 
                             {msg.repliedto && (() => {
+                              if (typeof msg.repliedto === 'string' && (msg.repliedto.startsWith("PULSE_REPLY:") || msg.repliedto.startsWith("PULSE_TAG:"))) {
+                                return <PulseQuoteCard repliedtoStr={msg.repliedto} isReceived={isReceived} />;
+                              }
                               const repliedMsg = messages.find(m => m.msgid === msg.repliedto);
                               return repliedMsg ? (
                                 <div
@@ -4653,37 +4999,66 @@ const ChatBox = () => {
                               )}
                             </div>
 
-                            {/* Reactions Display */}
-                            {msg.reactions && Object.keys(msg.reactions).length > 0 && (
-                              <div style={{
-                                display: 'flex',
-                                flexWrap: 'wrap',
-                                gap: '4px',
-                                marginTop: '8px'
-                              }}>
-                                {Object.entries(msg.reactions).map(([text, reactors]) => (
-                                  <div
-                                    key={text}
-                                    title={reactors.map(r => r.username).join(', ')}
-                                    style={{
-                                      backgroundColor: isReceived ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
-                                      padding: '2px 6px',
-                                      borderRadius: '12px',
-                                      fontSize: '11px',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '3px',
-                                      border: '1px solid rgba(255,255,255,0.05)',
-                                      cursor: 'pointer'
-                                    }}
-                                    onClick={() => setReactionInfo({ emoji: text, reactors })}
-                                  >
-                                    <span>{text}</span>
-                                    <span style={{ opacity: 0.8, fontSize: '9px', fontWeight: '700' }}>{reactors.length}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                            {/* Reactions Display (WhatsApp Style Glass Pill) */}
+                            {(() => {
+                              const validEntries = Object.entries(msg.reactions || {})
+                                .filter(([_, reactors]) => Array.isArray(reactors) && reactors.length > 0);
+                              if (validEntries.length === 0) return null;
+
+                              const sortedEntries = [...validEntries].sort((a, b) => b[1].length - a[1].length);
+                              const totalCount = sortedEntries.reduce((sum, [_, reactors]) => sum + reactors.length, 0);
+                              const topEmojis = sortedEntries.slice(0, 3).map(([emoji]) => emoji);
+
+                              const tooltipTitle = sortedEntries
+                                .map(([emoji, reactors]) => `${emoji} ${reactors.map(r => r.username || 'User').join(', ')}`)
+                                .join('\n');
+
+                              const ariaText = `${totalCount} reaction${totalCount === 1 ? '' : 's'}. Show who reacted`;
+
+                              return (
+                                <button
+                                  type="button"
+                                  aria-label={ariaText}
+                                  title={tooltipTitle}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setReactionInfo({ reactions: msg.reactions, msg });
+                                  }}
+                                  style={{
+                                    position: 'absolute',
+                                    bottom: '-10px',
+                                    ...(isReceived ? { left: '8px' } : { right: '8px' }),
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '2px',
+                                    padding: '2px 6px',
+                                    borderRadius: '999px',
+                                    lineHeight: 1.1,
+                                    zIndex: 2,
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    border: '1px solid rgba(255,255,255,0.4)',
+                                    color: '#ffffff',
+                                    backgroundImage: `${MARBLE_URL}, linear-gradient(180deg, rgba(255,255,255,0.38) 0%, rgba(255,255,255,0) 55%), var(--accent-gradient)`,
+                                    backgroundSize: '96px 48px, auto, auto',
+                                    boxShadow: '0 0 0 2px var(--bg-primary), inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -1px 0 rgba(0,0,0,0.15), 0 3px 8px rgba(0,0,0,0.3)',
+                                    outlineOffset: '2px'
+                                  }}
+                                >
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '12px', lineHeight: 1 }}>
+                                    {topEmojis.map(emoji => (
+                                      <span key={emoji}>{String(emoji).slice(0, 15)}</span>
+                                    ))}
+                                  </span>
+                                  {totalCount > 1 && (
+                                    <span style={{ fontSize: '10px', fontWeight: 700, color: '#ffffff', marginLeft: '2px', lineHeight: 1 }}>
+                                      {totalCount}
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })()}
+
 
                             <div style={{
                               display: "flex",
@@ -5259,57 +5634,101 @@ const ChatBox = () => {
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      padding: "8px 16px",
+                      flexWrap: "wrap",
+                      padding: "10px 14px",
                       background: "var(--bg-secondary)",
                       borderTop: "1px solid var(--border-color)",
                       borderBottomLeftRadius: isMobile ? "0" : "16px",
                       borderBottomRightRadius: isMobile ? "0" : "16px",
-                      gap: isMobile ? "12px" : "16px",
-                      overflowX: "auto",
-                      WebkitOverflowScrolling: "touch"
+                      gap: isMobile ? "8px" : "12px",
                     }}>
-                      {['👍', '❤️', '😂', '😮', '😢', '🙏'].map(emoji => (
+                      <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "8px" : "12px" }}>
+                        {['👍', '❤️', '😂', '😮', '😢', '🙏'].map(emoji => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            onClick={() => {
+                              const msg = Array.from(selectedMessages)[0];
+                              sendReaction(msg, emoji);
+                              clearSelection();
+                            }}
+                            style={{
+                              background: 'none', border: 'none', fontSize: isMobile ? '22px' : '24px',
+                              cursor: 'pointer', transition: 'transform 0.15s ease', padding: '4px',
+                              flexShrink: 0, lineHeight: 1
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.25)'}
+                            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        background: 'var(--bg-primary)',
+                        border: '1px solid var(--accent-color)',
+                        borderRadius: '999px',
+                        padding: '4px 6px 4px 12px',
+                        flexShrink: 0,
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
+                      }}>
+                        <input
+                          type="text"
+                          maxLength={15}
+                          value={customReactionText}
+                          onChange={e => setCustomReactionText(e.target.value.slice(0, 15))}
+                          placeholder="Text reaction..."
+                          style={{
+                            width: isMobile ? '115px' : '135px',
+                            background: 'transparent',
+                            border: 'none',
+                            outline: 'none',
+                            color: 'var(--text-primary)',
+                            fontSize: '13px',
+                            lineHeight: 1.2
+                          }}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' && customReactionText.trim()) {
+                              const msg = Array.from(selectedMessages)[0];
+                              sendReaction(msg, customReactionText.trim().slice(0, 15));
+                              clearSelection();
+                            }
+                          }}
+                        />
+                        <span style={{
+                          fontSize: '10px',
+                          color: 'var(--text-secondary)',
+                          userSelect: 'none'
+                        }}>
+                          {customReactionText.length}/15
+                        </span>
                         <button
-                          key={emoji}
+                          type="button"
                           onClick={() => {
-                            const msg = Array.from(selectedMessages)[0];
-                            sendReaction(msg, emoji);
-                            clearSelection();
+                            if (customReactionText.trim()) {
+                              const msg = Array.from(selectedMessages)[0];
+                              sendReaction(msg, customReactionText.trim().slice(0, 15));
+                              clearSelection();
+                            }
                           }}
                           style={{
-                            background: 'none', border: 'none', fontSize: '24px',
-                            cursor: 'pointer', transition: 'transform 0.15s ease', padding: '4px',
-                            flexShrink: 0
+                            background: customReactionText.trim() ? 'var(--accent-gradient)' : 'var(--bg-card)',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '999px',
+                            padding: '4px 10px',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            cursor: customReactionText.trim() ? 'pointer' : 'default',
+                            opacity: customReactionText.trim() ? 1 : 0.5
                           }}
-                          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.25)'}
-                          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                         >
-                          {emoji}
+                          +
                         </button>
-                      ))}
-                      <input
-                        type="text"
-                        placeholder="+"
-                        style={{
-                          width: '40px',
-                          minWidth: '40px',
-                          flexShrink: 0,
-                          background: 'var(--bg-card)',
-                          border: '1px solid var(--border-color)',
-                          borderRadius: '12px',
-                          color: 'var(--text-primary)',
-                          textAlign: 'center',
-                          padding: '6px',
-                          fontSize: '18px'
-                        }}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter' && e.target.value.trim()) {
-                            const msg = Array.from(selectedMessages)[0];
-                            sendReaction(msg, e.target.value.trim());
-                            clearSelection();
-                          }
-                        }}
-                      />
+                      </div>
                     </div>
                   )}
                 </div>
@@ -5425,7 +5844,70 @@ const ChatBox = () => {
                     </div>
                   )}
 
-                  {((chat.status === 'allowed' || chat.type === 'room' || chat.type === 'direct' || !chat.type) && chat.status !== 'removed' && chat.status !== 'left') ? (
+                  {attachedPulse && (
+                    <div
+                      style={{
+                        backgroundColor: "var(--bg-card)",
+                        borderLeft: "4px solid #ec4899",
+                        border: "1px solid var(--border-color)",
+                        padding: "8px 12px",
+                        borderRadius: "10px",
+                        display: "flex",
+                        justify: "space-between",
+                        alignItems: "center",
+                        marginBottom: "6px"
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Zap size={18} color="#ec4899" />
+                        <div>
+                          <div style={{ fontWeight: "700", fontSize: "13px", color: "#ec4899" }}>
+                            Tagging Pulse by {attachedPulse.pulse?.userName || attachedPulse.pulse?.user_name || 'User'}
+                          </div>
+                          <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                            {attachedPulse.pulse?.type === 'text' ? attachedPulse.pulse?.content : (attachedPulse.pulse?.content || `${attachedPulse.pulse?.type?.toUpperCase() || 'PULSE'} Story`)}
+                            {attachedPulse.targetSpaceId !== undefined && (
+                              <span style={{ marginLeft: '8px', opacity: 0.85, fontWeight: '600' }}>
+                                • 📍 Space: {spaceStore.getSpaceName(chatid, attachedPulse.targetSpaceId)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setAttachedPulse(null)}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "#f54d4d",
+                          fontSize: "18px",
+                          cursor: "pointer",
+                          padding: "2px 6px"
+                        }}
+                        title="Detach pulse"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+
+                  {chatid === "BROADCAST_SYSTEM" || chat?.isSystem || chat?.type === "broadcast" ? (
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: "14px 20px",
+                      backgroundColor: "var(--bg-card)",
+                      borderTop: "1px solid var(--border-color)",
+                      color: "var(--text-secondary)",
+                      fontSize: "14px",
+                      fontWeight: "500",
+                      gap: "8px"
+                    }}>
+                      <span style={{ fontSize: "16px" }}>📢</span>
+                      <span>This is an official read-only broadcast channel.</span>
+                    </div>
+                  ) : ((chat.status === 'allowed' || chat.type === 'room' || chat.type === 'direct' || !chat.type) && chat.status !== 'removed' && chat.status !== 'left') ? (
                     chat.type === 'classroom' ? (
                       activeSpace !== 0 && activeSpace !== 1 ? (
                         /* Classroom + activeSpace not 0 or 1 → normal chat for everyone */
@@ -6612,44 +7094,12 @@ const ChatBox = () => {
         )}
 
         {reactionInfo && (
-          <div 
-            style={{
-              position: 'fixed', inset: 0, zIndex: 99999,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)'
-            }}
-            onClick={() => setReactionInfo(null)}
-          >
-            <div 
-              style={{
-                backgroundColor: '#1e293b', borderRadius: '16px',
-                padding: '20px', width: '90%', maxWidth: '320px',
-                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)',
-                border: '1px solid rgba(255,255,255,0.1)'
-              }}
-              onClick={e => e.stopPropagation()}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h3 style={{ margin: 0, color: '#f8fafc', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  Reaction {reactionInfo.emoji}
-                </h3>
-                <button 
-                  onClick={() => setReactionInfo(null)}
-                  style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '18px' }}
-                >×</button>
-              </div>
-              <div style={{ maxHeight: '200px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {reactionInfo.reactors.map((reactor, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
-                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'rgba(59, 130, 246, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#60a5fa', fontWeight: 'bold' }}>
-                      {(reactor.username || '?')[0].toUpperCase()}
-                    </div>
-                    <span style={{ color: '#e2e8f0', fontSize: '15px' }}>{reactor.userId === localStorage.getItem('userid') ? 'You' : reactor.username}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <ReactorsModal
+            reactionInfo={reactionInfo}
+            onClose={() => setReactionInfo(null)}
+            onSendReaction={sendReaction}
+            isMobile={isMobile}
+          />
         )}
 
         {/* Copied Toast Indicator */}
@@ -6700,6 +7150,18 @@ const ChatBox = () => {
             onClose={() => setShowReportExportModal(false)}
           />
         )}
+        {/* Attach Pulse Modal */}
+        <AttachPulseModal
+          isOpen={showAttachPulseModal}
+          onClose={() => setShowAttachPulseModal(false)}
+          onSelectPulse={(pulse, targetSpaceId) => {
+            setAttachedPulse({ pulse, targetSpaceId });
+          }}
+          chatId={chatid}
+          chatMembers={chatMembers}
+          chatType={chat?.type}
+          currentActiveSpace={activeSpace}
+        />
       </div>
       );
 };

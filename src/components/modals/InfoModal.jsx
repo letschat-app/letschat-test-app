@@ -8,6 +8,8 @@ import { getMediaInfo, getMediaBlob } from '../../service/MediaCache';
 import Avatar from '../chat/Avatar';
 import MediaViewer from '../chat/MediaViewer';
 import { toggleMuteChat, isChatMuted, saveChatInfoToDB, getChatInfoFromDB, saveGroupMembersToDB, saveUsersBatchToDB, getGroupMembersFromDB } from '../../service/db';
+import { useUsernameCheck } from '../../hooks/useUsernameCheck';
+import { UsernameStatusIndicator } from '../common/UsernameStatusIndicator';
 
 const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) => {
   const [members, setMembers] = useState([]);
@@ -15,7 +17,15 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
   const [infoLoading, setInfoLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [myDisplayName, setMyDisplayName] = useState('');
+  const [initialDisplayName, setInitialDisplayName] = useState('');
   const [myProfile, setMyProfile] = useState('');
+
+  const usernameCheck = useUsernameCheck({
+    username: myDisplayName,
+    originalName: initialDisplayName,
+    excludeUserId: currentUserId,
+    debounceMs: 400
+  });
   const [selectedMember, setSelectedMember] = useState(null);
   const [showMemberActions, setShowMemberActions] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
@@ -114,6 +124,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
       if (res.ok) {
         const data = await res.json();
         setMyDisplayName(data.userName || '');
+        setInitialDisplayName(data.userName || '');
         setMyProfile(data.profile || '');
         if (data.memberCount !== undefined) {
            setMemberCount(data.memberCount);
@@ -128,6 +139,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
          if (cached) {
             console.log("Loaded cached userinfo from offline cache");
             setMyDisplayName(cached.userName || '');
+            setInitialDisplayName(cached.userName || '');
             setMyProfile(cached.profile || '');
          }
       });
@@ -241,6 +253,16 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
       return;
     }
 
+    if (usernameCheck.isBlocked) {
+      alert(usernameCheck.message || "Please choose a valid and available username.");
+      return;
+    }
+
+    if (usernameCheck.isChecking) {
+      alert("Validating name availability, please wait a moment...");
+      return;
+    }
+
     if (chat.type === 'group' || chat.type === 'classroom') {
       const normalizedNewName = myDisplayName.trim().toLowerCase().replace(/\s+/g, '');
       const isTaken = members.some(m => {
@@ -269,6 +291,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
         }),
       });
       if (res.ok) {
+        setInitialDisplayName(myDisplayName.trim());
         setEditMode(false);
       }
     } catch (ex) {
@@ -655,27 +678,44 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
                   style={{ display: 'none' }}
                 />
                 
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1, position: 'relative' }}>
                   <input
                     type="text"
                     value={myDisplayName}
                     onChange={(e) => setMyDisplayName(e.target.value)}
                     placeholder="Your Name"
-                    style={inputStyle}
+                    style={{
+                      ...inputStyle,
+                      paddingRight: '36px',
+                      borderColor: usernameCheck.status === 'block' ? '#ef4444' : usernameCheck.status === 'warn' ? '#f59e0b' : usernameCheck.status === 'allow' ? '#10b981' : undefined
+                    }}
                   />
+                  <div style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center' }}>
+                    <UsernameStatusIndicator checkResult={usernameCheck} showInlineIcon={true} />
+                  </div>
                 </div>
               </div>
+              
+              <UsernameStatusIndicator checkResult={usernameCheck} containerStyle={{ marginBottom: '8px' }} />
               
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button 
                   onClick={handleSaveMyInfo} 
-                  disabled={uploading}
-                  style={{...primaryBtnStyle, flex: 1, opacity: uploading ? 0.7 : 1}}
+                  disabled={uploading || usernameCheck.isBlocked || usernameCheck.isChecking}
+                  style={{
+                    ...primaryBtnStyle,
+                    flex: 1,
+                    opacity: (uploading || usernameCheck.isBlocked || usernameCheck.isChecking) ? 0.6 : 1,
+                    cursor: (uploading || usernameCheck.isBlocked || usernameCheck.isChecking) ? 'not-allowed' : 'pointer'
+                  }}
                 >
-                  Save Changes
+                  {usernameCheck.isChecking ? 'Checking...' : 'Save Changes'}
                 </button>
                 <button 
-                  onClick={() => setEditMode(false)} 
+                  onClick={() => {
+                    setMyDisplayName(initialDisplayName);
+                    setEditMode(false);
+                  }} 
                   disabled={uploading}
                   style={{...secondaryBtnStyle, flex: 1}}
                 >

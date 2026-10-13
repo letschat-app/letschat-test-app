@@ -249,5 +249,59 @@ export const purgeExpiredPulseMedia = async () => {
   }
 };
 
+export const pulsePreviewCache = new Map();
+
+export const cachePulsePreview = (pulse) => {
+  if (!pulse) return;
+  const pId = String(pulse.pulseId || pulse.pulse_id || pulse.id);
+  if (pId) {
+    pulsePreviewCache.set(pId, pulse);
+  }
+};
+
+export const getPulseFromStore = async (pulseId) => {
+  if (!pulseId) return null;
+  const pIdStr = String(pulseId);
+  if (pulsePreviewCache.has(pIdStr)) {
+    return pulsePreviewCache.get(pIdStr);
+  }
+
+  try {
+    const db = await initDB();
+    const item = await db.get('pulseStore', pIdStr);
+    if (item && item.pulse) {
+      pulsePreviewCache.set(pIdStr, item.pulse);
+      return item.pulse;
+    }
+
+    // Check feed cache in DB
+    const feed = await getFeedDataFromDB();
+    if (Array.isArray(feed)) {
+      for (const fItem of feed) {
+        const pulses = fItem.pulses || (fItem.pulseId || fItem.pulse_id ? [fItem] : []);
+        const match = pulses.find(p => String(p.pulseId || p.id || p.pulse_id) === pIdStr);
+        if (match) {
+          pulsePreviewCache.set(pIdStr, match);
+          return match;
+        }
+      }
+    }
+
+    // Check mine data in DB
+    const mine = await getMineDataFromDB();
+    if (mine) {
+      const active = mine.activePulses || mine.pulses || [];
+      const match = active.find(p => String(p.pulseId || p.id || p.pulse_id) === pIdStr);
+      if (match) {
+        pulsePreviewCache.set(pIdStr, match);
+        return match;
+      }
+    }
+  } catch (e) {
+    console.warn('[PulseMediaCache] getPulseFromStore error:', e);
+  }
+  return null;
+};
+
 purgeExpiredPulseMedia();
 setInterval(purgeExpiredPulseMedia, 60 * 1000);

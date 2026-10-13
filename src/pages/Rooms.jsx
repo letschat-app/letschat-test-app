@@ -6,6 +6,8 @@ import messageStore from './MessageStore';
 import { getchat } from './ChatNames';
 import Avatar from '../components/chat/Avatar';
 import { syncChatsMapToDB } from '../service/db';
+import { useUsernameCheck } from '../hooks/useUsernameCheck';
+import { UsernameStatusIndicator } from '../components/common/UsernameStatusIndicator';
 
 const BASE_NICKNAMES = [
   "Thalapathy",
@@ -53,6 +55,13 @@ export default function Rooms({ isSidebar = false }) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => !localStorage.getItem('roomNickname'));
   const [nickname, setNickname] = useState(() => localStorage.getItem('roomNickname') || '');
+
+  const roomNicknameCheck = useUsernameCheck({
+    username: nickname,
+    originalName: localStorage.getItem('roomNickname') || '',
+    excludeUserId: userId,
+    debounceMs: 400
+  });
   const [suggestedNames, setSuggestedNames] = useState(generateShuffledSuggestions);
   const [showAllSuggestions, setShowAllSuggestions] = useState(false);
   const [isSettingNickname, setIsSettingNickname] = useState(false);
@@ -127,6 +136,14 @@ export default function Rooms({ isSidebar = false }) {
   const handleSetNickname = async (e) => {
     e.preventDefault();
     if (!nickname.trim()) return;
+    if (roomNicknameCheck.isBlocked) {
+      setError(roomNicknameCheck.message || 'Please choose an available nickname');
+      return;
+    }
+    if (roomNicknameCheck.isChecking) {
+      setError('Validating nickname availability, please wait...');
+      return;
+    }
     setIsSettingNickname(true);
     try {
       const res = await fetch(`${API}/room/set/name`, {
@@ -363,6 +380,21 @@ export default function Rooms({ isSidebar = false }) {
                 }}>
                   <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981' }}></span>
                   Acting as: <span style={{ color: '#60a5fa', fontWeight: '600' }}>{nickname}</span>
+                  <button
+                    onClick={() => setShowOnboarding(true)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#60a5fa',
+                      cursor: 'pointer',
+                      padding: '2px 4px',
+                      fontSize: '11px',
+                      textDecoration: 'underline'
+                    }}
+                    title="Change room nickname"
+                  >
+                    Change
+                  </button>
                 </div>
               )}
             </div>
@@ -525,7 +557,7 @@ export default function Rooms({ isSidebar = false }) {
             </p>
 
             <form onSubmit={handleSetNickname} style={formStyle}>
-              <div style={{ ...inputGroupStyle, marginBottom: '14px' }}>
+              <div style={{ ...inputGroupStyle, marginBottom: '6px', position: 'relative' }}>
                 <input
                   autoFocus
                   type="text"
@@ -533,10 +565,25 @@ export default function Rooms({ isSidebar = false }) {
                   required
                   className="premium-input"
                   value={nickname}
-                  onChange={e => setNickname(e.target.value)}
-                  style={{ textAlign: 'center', fontSize: '16px', fontWeight: '600', letterSpacing: '0.3px' }}
+                  onChange={e => {
+                    setNickname(e.target.value);
+                    setError(null);
+                  }}
+                  style={{
+                    textAlign: 'center',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    letterSpacing: '0.3px',
+                    paddingRight: '36px',
+                    borderColor: roomNicknameCheck.status === 'block' ? '#ef4444' : roomNicknameCheck.status === 'warn' ? '#f59e0b' : roomNicknameCheck.status === 'allow' ? '#10b981' : undefined
+                  }}
                 />
+                <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center' }}>
+                  <UsernameStatusIndicator checkResult={roomNicknameCheck} showInlineIcon={true} />
+                </div>
               </div>
+
+              <UsernameStatusIndicator checkResult={roomNicknameCheck} containerStyle={{ justifyContent: 'center', marginBottom: '14px' }} />
 
               {/* Random Nickname Suggestions */}
               <div style={{ marginBottom: '22px' }}>
@@ -593,7 +640,10 @@ export default function Rooms({ isSidebar = false }) {
                     <button
                       key={idx}
                       type="button"
-                      onClick={() => setNickname(item)}
+                      onClick={() => {
+                        setNickname(item);
+                        setError(null);
+                      }}
                       style={{
                         padding: '6px 12px',
                         borderRadius: '20px',
@@ -626,8 +676,19 @@ export default function Rooms({ isSidebar = false }) {
 
               {error && <p style={{ ...errorStyle, marginBottom: '12px' }}>{error}</p>}
 
-              <button type="submit" disabled={isSettingNickname} className="submit-btn" style={{ ...submitButtonStyle, width: '100%', marginTop: '4px' }}>
-                {isSettingNickname ? 'Saving...' : 'Start Exploring'}
+              <button
+                type="submit"
+                disabled={isSettingNickname || roomNicknameCheck.isBlocked || roomNicknameCheck.isChecking}
+                className="submit-btn"
+                style={{
+                  ...submitButtonStyle,
+                  width: '100%',
+                  marginTop: '4px',
+                  opacity: (isSettingNickname || roomNicknameCheck.isBlocked || roomNicknameCheck.isChecking) ? 0.6 : 1,
+                  cursor: (isSettingNickname || roomNicknameCheck.isBlocked || roomNicknameCheck.isChecking) ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {isSettingNickname ? 'Saving...' : roomNicknameCheck.isChecking ? 'Checking...' : 'Start Exploring'}
               </button>
             </form>
           </div>

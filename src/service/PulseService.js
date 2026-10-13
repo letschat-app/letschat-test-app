@@ -184,8 +184,12 @@ export const getPulseFeed = async () => {
   return feedList;
 };
 
-export const recordPulseView = async (pulseId) => {
+export const recordPulseView = async (pulseId, pulseOwnerUserId = null) => {
   if (!pulseId) return;
+  const myUserId = localStorage.getItem('userid');
+  if (pulseOwnerUserId && myUserId && String(pulseOwnerUserId) === String(myUserId)) {
+    return;
+  }
   try {
     const res = await fetch(`${getBaseUrl()}/view/${pulseId}`, {
       method: "POST",

@@ -11,7 +11,8 @@ import {
   CalendarDays,
   AlignLeft,
   Navigation,
-  Trash2
+  Trash2,
+  ArrowLeft
 } from 'lucide-react';
 import { getchat } from './ChatNames';
 import { getChatName } from '../service/ChatUtils';
@@ -376,9 +377,40 @@ const SmoothCalendar = () => {
       `}</style>
       <div style={{ width: '100%', maxWidth: isMobile ? 'none' : '1100px', margin: '0 auto' }}>
         {/* Header */}
-        <div className="text-center mb-6">
-          <h1 className="calendar-title mb-1">Schedule</h1>
-          <p style={{ color: '#64748b', fontSize: '13px', fontWeight: '500' }}>Manage your tasks and events</p>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '16px',
+          marginBottom: '20px',
+          padding: isMobile ? '0 12px' : '0'
+        }}>
+          <button
+            onClick={() => navigate(-1)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '40px',
+              height: '40px',
+              borderRadius: '12px',
+              backgroundColor: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
+              color: 'var(--text-primary)',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              flexShrink: 0
+            }}
+            title="Go back"
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--nav-active-bg)'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--bg-card)'}
+          >
+            <ArrowLeft size={20} />
+          </button>
+
+          <div style={{ flex: 1, textAlign: isMobile ? 'left' : 'center', paddingRight: isMobile ? '0' : '40px' }}>
+            <h1 className="calendar-title mb-1" style={{ margin: 0 }}>Schedule</h1>
+            <p style={{ color: '#64748b', fontSize: '13px', fontWeight: '500', margin: 0 }}>Manage your tasks and events</p>
+          </div>
         </div>
 
         {/* Month and Year Selectors */}

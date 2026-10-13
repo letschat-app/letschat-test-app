@@ -35,6 +35,11 @@ const MENU_OPTIONS = [
     icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M18 20V10" /><path d="M12 20V4" /><path d="M6 20v-6" /></svg>,
   },
   {
+    id: 'pulse', label: 'Attach/Tag Pulse', color: '#ec4899',
+    accept: undefined, capture: undefined,
+    icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>,
+  },
+  {
     id: 'schedule', label: 'Schedule Message', color: '#10b981',
     accept: undefined, capture: undefined,
     icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
@@ -74,6 +79,7 @@ export default function MediaUploadButton({
   onCameraClick,
   onScheduleClick,
   onPollClick,
+  onPulseClick,
   onFileSelect, 
   disabled = false, 
   style = {}, 
@@ -207,7 +213,7 @@ export default function MediaUploadButton({
             animation: 'muMenuUp 0.2s cubic-bezier(0.32,0.72,0,1)',
           }}
         >
-          {MENU_OPTIONS.filter(opt => (opt.id !== 'schedule' || onScheduleClick) && (opt.id !== 'poll' || onPollClick)).map((opt, i) => (
+          {MENU_OPTIONS.filter(opt => (opt.id !== 'schedule' || onScheduleClick) && (opt.id !== 'poll' || onPollClick) && (opt.id !== 'pulse' || onPulseClick)).map((opt, i) => (
             <button
               key={opt.id}
               onClick={() => {
@@ -218,6 +224,8 @@ export default function MediaUploadButton({
                   onScheduleClick();
                 } else if (opt.id === 'poll' && onPollClick) {
                   onPollClick();
+                } else if (opt.id === 'pulse' && onPulseClick) {
+                  onPulseClick();
                 } else {
                   inputRefs.current[opt.id]?.click();
                 }

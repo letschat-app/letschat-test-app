@@ -103,11 +103,16 @@ const PulsesTab = () => {
 
   const now = Date.now();
   const activeFeed = feed.map(item => {
-    const userIdVal = item.contactUserId || item.userId;
-    const userNameVal = item.contactName || item.userName || userIdVal;
-    const profileVal = item.contactProfile || item.profile;
-    const activePulses = (item.pulses || []).filter(p => p.status !== 'expired' && (!p.expiresAt || (parsePulseDate(p.expiresAt)?.getTime() || (now + 1)) > now));
+    const userIdVal = item.user_id || item.userId || item.contactUserId;
+    const isSysAdmin = userIdVal === 'SYSTEM_ADMIN';
+    const userNameVal = isSysAdmin ? 'Letschat' : (item.user_name || item.userName || item.contactName || userIdVal);
+    const profileVal = item.user_profile || item.profile || item.contactProfile;
+
+    // Handle single pulse DTO returned at root level
+    const rawPulses = item.pulses || (item.pulse_id || item.pulseId ? [item] : []);
+    const activePulses = rawPulses.filter(p => p.status !== 'expired' && (!p.expires_at && !p.expiresAt || (parsePulseDate(p.expires_at || p.expiresAt)?.getTime() || (now + 1)) > now));
     const allSeenNow = activePulses.length > 0 && activePulses.every(p => p.hasSeen || p.seen);
+
     return {
       ...item,
       userId: userIdVal,
@@ -115,9 +120,17 @@ const PulsesTab = () => {
       profile: profileVal,
       pulses: activePulses,
       hasActivePulse: activePulses.length > 0,
-      allSeen: item.allSeen !== undefined ? item.allSeen : allSeenNow
+      allSeen: item.allSeen !== undefined ? item.allSeen : allSeenNow,
+      isSystemAdmin: isSysAdmin
     };
   }).filter(item => item.hasActivePulse);
+
+  // Pin System Admin pulses (user_id === 'SYSTEM_ADMIN') at index 0
+  activeFeed.sort((a, b) => {
+    if (a.isSystemAdmin && !b.isSystemAdmin) return -1;
+    if (!a.isSystemAdmin && b.isSystemAdmin) return 1;
+    return 0;
+  });
 
   const unviewedList = activeFeed.filter(item => !item.allSeen);
   const viewedList = activeFeed.filter(item => item.allSeen);
@@ -361,8 +374,22 @@ const PulsesTab = () => {
                           />
 
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {item.userName || item.userId}
+                            <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span>{item.userName || item.userId}</span>
+                              {(item.isSystemAdmin || item.userId === 'SYSTEM_ADMIN') && (
+                                <span title="Official System Admin" style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: '16px',
+                                  height: '16px',
+                                  borderRadius: '50%',
+                                  backgroundColor: '#f59e0b',
+                                  color: '#ffffff',
+                                  fontSize: '10px',
+                                  fontWeight: 'bold'
+                                }}>✓</span>
+                              )}
                             </div>
                             <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {item.pulses?.[0]?.content || item.pulses?.[0]?.caption || (item.pulses?.[0]?.createdAt ? `Today at ${formatPulseTime(item.pulses[0].createdAt)}` : 'Recent update')}

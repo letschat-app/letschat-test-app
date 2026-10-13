@@ -4,6 +4,8 @@ import { signupInit, signupVerify } from "../service/UserAuth";
 import { initWebsocket } from "../service/Websocket";
 import { motion, AnimatePresence } from "framer-motion";
 import { Eye, EyeOff, Mail, User, Lock, KeyRound, ShieldCheck, Clock, RotateCcw, CheckCircle2, AlertCircle, Loader2, ArrowRight } from "lucide-react";
+import { useUsernameCheck } from "../hooks/useUsernameCheck";
+import { UsernameStatusIndicator } from "../components/common/UsernameStatusIndicator";
 
 /**
  * Stationary Cartoon Weightlifter Password Strength Component
@@ -210,6 +212,11 @@ function Signin() {
 
   const passwordStrength = getPasswordStrength(form.password);
 
+  const usernameCheck = useUsernameCheck({
+    username: form.username,
+    debounceMs: 400
+  });
+
   // Step 1: Submit & Send OTP (POST /api/user/signup/init)
   const handleInitSignup = async (e) => {
     e?.preventDefault();
@@ -223,6 +230,16 @@ function Signin() {
 
     if (!form.username.trim()) {
       setErrorMsg("Please enter your display name.");
+      return;
+    }
+
+    if (usernameCheck.isBlocked) {
+      setErrorMsg(usernameCheck.message || "Please choose a valid and available username.");
+      return;
+    }
+
+    if (usernameCheck.isChecking) {
+      setErrorMsg("Validating username availability, please wait a moment...");
       return;
     }
 
@@ -426,9 +443,17 @@ function Signin() {
                     value={form.username}
                     onChange={handleChange}
                     placeholder="e.g. John Doe"
-                    style={styles.input}
+                    style={{
+                      ...styles.input,
+                      paddingRight: "38px",
+                      borderColor: usernameCheck.status === 'block' ? '#ef4444' : usernameCheck.status === 'warn' ? '#f59e0b' : usernameCheck.status === 'allow' ? '#10b981' : undefined
+                    }}
                   />
+                  <div style={{ position: "absolute", right: "12px", display: "flex", alignItems: "center" }}>
+                    <UsernameStatusIndicator checkResult={usernameCheck} showInlineIcon={true} />
+                  </div>
                 </div>
+                <UsernameStatusIndicator checkResult={usernameCheck} />
               </div>
 
               {/* Password Input with Strength Checker */}
@@ -508,7 +533,8 @@ function Signin() {
               {/* Submit & Send OTP Button */}
               {(() => {
                 const isWeakPassword = Boolean(form.password && passwordStrength.score <= 1);
-                const isSubmitDisabled = Boolean(loading || isWeakPassword || !form.email || !form.username || !form.password || form.password !== form.confirmPassword);
+                const isUsernameInvalid = Boolean(!form.username || usernameCheck.isBlocked || usernameCheck.isChecking);
+                const isSubmitDisabled = Boolean(loading || isWeakPassword || !form.email || isUsernameInvalid || !form.password || form.password !== form.confirmPassword);
                 return (
                   <div>
                     <button
@@ -518,13 +544,23 @@ function Signin() {
                         ...styles.submitButton,
                         opacity: isSubmitDisabled ? 0.6 : 1,
                         cursor: isSubmitDisabled ? "not-allowed" : "pointer",
-                        backgroundColor: isWeakPassword ? "var(--bg-secondary, #334155)" : "var(--accent-color, #3b82f6)",
+                        backgroundColor: (isWeakPassword || usernameCheck.isBlocked) ? "var(--bg-secondary, #334155)" : "var(--accent-color, #3b82f6)",
                       }}
                     >
                       {loading ? (
                         <>
                           <Loader2 size={18} className="animate-spin" />
                           Sending OTP...
+                        </>
+                      ) : usernameCheck.isChecking ? (
+                        <>
+                          <Loader2 size={18} className="animate-spin" />
+                          Checking Username...
+                        </>
+                      ) : usernameCheck.isBlocked ? (
+                        <>
+                          Choose Another Username
+                          <AlertCircle size={16} />
                         </>
                       ) : isWeakPassword ? (
                         <>
@@ -538,6 +574,11 @@ function Signin() {
                         </>
                       )}
                     </button>
+                    {usernameCheck.isBlocked && (
+                      <span style={{ fontSize: "11px", color: "#ef4444", textAlign: "center", marginTop: "6px", display: "block", fontWeight: "600" }}>
+                        ⚠️ {usernameCheck.message || "Username is unavailable or blocked."}
+                      </span>
+                    )}
                     {isWeakPassword && (
                       <span style={{ fontSize: "11px", color: "#ef4444", textAlign: "center", marginTop: "6px", display: "block", fontWeight: "600" }}>
                         ⚠️ Password is too weak to submit. Add numbers or special characters.

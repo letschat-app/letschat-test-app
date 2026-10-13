@@ -489,7 +489,10 @@ const messageStore = {
   },
   setActivechatbox(chatid) {
     console.log("changing from", this.activeChat, "to", chatid)
-    this.activeChat = chatid
+    if (this.activeChat !== chatid) {
+      this.activeSpace = 0;
+    }
+    this.activeChat = chatid;
   },
   getActiveSpace() {
     return this.activeSpace !== undefined ? this.activeSpace : null;

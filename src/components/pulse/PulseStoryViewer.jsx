@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Volume2, VolumeX, Play, Pause, Eye } from 'lucide-react';
+import { X, Volume2, VolumeX, Play, Pause, Eye, Tag, Send } from 'lucide-react';
 import Avatar from '../chat/Avatar';
 import StreakBadge from './StreakBadge';
 import PulseViewersModal from './PulseViewersModal';
+import PulseTagModal from './PulseTagModal';
 import { recordPulseView, formatPulseTime } from '../../service/PulseService';
+import { sendSafe } from '../../service/Websocket';
+import messageStore from '../../pages/MessageStore';
+import { API } from '../../service/UserAuth';
 
 const DEFAULT_SLIDE_DURATION = 5000; // 5 seconds for text / image
 
@@ -17,6 +21,10 @@ const PulseStoryViewer = ({ contactsFeed = [], initialUserIndex = 0, onClose, on
   const [progress, setProgress] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [showViewersModal, setShowViewersModal] = useState(false);
+  const [showTagModal, setShowTagModal] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [isSendingReply, setIsSendingReply] = useState(false);
+  const [toastText, setToastText] = useState('');
 
   // Swipe Gesture Tracking
   const touchStartRef = useRef({ x: 0, y: 0, time: 0 });
@@ -26,6 +34,7 @@ const PulseStoryViewer = ({ contactsFeed = [], initialUserIndex = 0, onClose, on
   const pulses = currentUser?.pulses || [];
   const currentPulse = pulses[pulseIndex] || pulses[0];
   const isMine = currentUser?.isMine || String(currentUser?.userId || '') === String(myUserId || '');
+  const isSystemAdmin = currentUser?.userId === 'SYSTEM_ADMIN' || currentUser?.user_id === 'SYSTEM_ADMIN' || currentPulse?.userId === 'SYSTEM_ADMIN';
 
   const timerRef = useRef(null);
   const elapsedRef = useRef(0);
@@ -43,15 +52,21 @@ const PulseStoryViewer = ({ contactsFeed = [], initialUserIndex = 0, onClose, on
     }
   }, [isPaused, currentPulse]);
 
-  // Trigger view receipt whenever currentPulse changes
+  // Trigger view receipt whenever currentPulse changes (skip for own pulses)
   useEffect(() => {
     if (currentPulse && currentPulse.pulseId) {
-      recordPulseView(currentPulse.pulseId);
+      const isOwnPulse = isMine ||
+        (currentPulse.userId && String(currentPulse.userId) === String(myUserId)) ||
+        (currentUser?.userId && String(currentUser.userId) === String(myUserId));
+
+      if (!isOwnPulse) {
+        recordPulseView(currentPulse.pulseId, currentUser?.userId);
+      }
       if (onPulseViewed) {
         onPulseViewed(currentUser.userId, currentPulse.pulseId);
       }
     }
-  }, [currentPulse?.pulseId]);
+  }, [currentPulse?.pulseId, isMine, myUserId, currentUser?.userId]);
 
   // Reset slide progress when user or pulse changes
   useEffect(() => {
@@ -160,6 +175,79 @@ const PulseStoryViewer = ({ contactsFeed = [], initialUserIndex = 0, onClose, on
     }
   };
 
+  const handleSendReply = async (e) => {
+    if (e) e.preventDefault();
+    if (!replyText.trim() || isSendingReply || isSystemAdmin) return;
+    
+    const targetUserId = currentUser?.userId || currentPulse?.userId || currentPulse?.user_id;
+    if (!targetUserId) return;
+
+    setIsSendingReply(true);
+    try {
+      // Step A: Ensure 1-on-1 chat exists
+      let targetChatId = null;
+      const cachedMap = JSON.parse(localStorage.getItem('chatsMap') || '{}');
+      const existingChat = Object.values(cachedMap).find(c =>
+        c && (String(c.userId || c.chatId) === String(targetUserId)) && (c.type === 'private' || !c.type)
+      );
+
+      if (existingChat) {
+        targetChatId = existingChat.chatId;
+      } else {
+        // Execute POST /api/user/addtochat/{pulseOwnerUserId}
+        const res = await fetch(`${API}/user/addtochat/${targetUserId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Id': myUserId,
+            'ngrok-skip-browser-warning': 'true'
+          }
+        });
+        if (res.ok) {
+          const text = await res.text();
+          targetChatId = text;
+
+          cachedMap[targetChatId] = {
+            id: targetChatId,
+            chatId: targetChatId,
+            chatName: currentUser.userName || targetUserId,
+            userId: targetUserId,
+            type: 'private'
+          };
+          localStorage.setItem('chatsMap', JSON.stringify(cachedMap));
+        } else {
+          targetChatId = targetUserId;
+        }
+      }
+
+      // Step B: Send WebSocket Message Frame
+      const senderName = localStorage.getItem('username') || myUserId;
+      const frame = {
+        msgid: `MSG_PR_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        chatid: targetChatId,
+        senderid: myUserId,
+        sendername: senderName,
+        type: "text",
+        content: replyText.trim(),
+        repliedto: `PULSE_REPLY:${currentPulse.pulseId || currentPulse.pulse_id || currentPulse.id}`,
+        timestamp: new Date().toISOString(),
+        status: "sent",
+        spaceid: 0
+      };
+
+      sendSafe(frame);
+      messageStore.addMessage(frame);
+
+      setReplyText('');
+      setToastText('Reply sent!');
+      setTimeout(() => setToastText(''), 1500);
+    } catch (err) {
+      console.error('[PulseReply] Send failed:', err);
+    } finally {
+      setIsSendingReply(false);
+    }
+  };
+
   const handleMediaClick = (e) => {
     // Ignore clicks on top overlay controls or buttons
     if (e.target.closest('.story-viewer-top-bar') || e.target.closest('button')) return;
@@ -241,8 +329,22 @@ const PulseStoryViewer = ({ contactsFeed = [], initialUserIndex = 0, onClose, on
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ color: '#ffffff', fontWeight: '800', fontSize: '15px' }}>
-                    {currentUser.userName || currentUser.userId}
+                    {currentUser.userId === 'SYSTEM_ADMIN' || currentUser.user_id === 'SYSTEM_ADMIN' ? 'Letschat' : (currentUser.userName || currentUser.userId)}
                   </span>
+                  {(currentUser.userId === 'SYSTEM_ADMIN' || currentUser.user_id === 'SYSTEM_ADMIN') && (
+                    <span title="Official System Admin" style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '50%',
+                      backgroundColor: '#f59e0b',
+                      color: '#ffffff',
+                      fontSize: '10px',
+                      fontWeight: 'bold'
+                    }}>✓</span>
+                  )}
                   <StreakBadge streak={currentUser.pulseStreak} size="sm" />
                 </div>
                 <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '11px', marginTop: '2px' }}>
@@ -381,22 +483,95 @@ const PulseStoryViewer = ({ contactsFeed = [], initialUserIndex = 0, onClose, on
           )}
         </div>
 
-        {/* Bottom Overlay: Caption & Owner Eye Icon Button */}
-        {(currentPulse?.content || isMine) && (
-          <div style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0,
-            padding: '30px 16px 20px',
-            background: 'linear-gradient(0deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0) 100%)',
-            color: '#ffffff',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px',
-            zIndex: 20
-          }}>
-            {currentPulse?.content && currentPulse.type !== 'text' && (
-              <div style={{ fontSize: '15px', fontWeight: '600', textAlign: 'center', wordBreak: 'break-word', width: '100%' }}>
-                {currentPulse.content}
-              </div>
-            )}
+        {/* Bottom Overlay: Caption, Tag Button, Reply Bar & Owner Eye Icon */}
+        <div style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0,
+          padding: '30px 16px 20px',
+          background: 'linear-gradient(0deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0) 100%)',
+          color: '#ffffff',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px',
+          zIndex: 20
+        }}>
+          {toastText && (
+            <div style={{
+              backgroundColor: 'rgba(16, 185, 129, 0.9)', color: '#fff',
+              padding: '6px 14px', borderRadius: '16px', fontSize: '13px', fontWeight: '700'
+            }}>
+              {toastText}
+            </div>
+          )}
 
+          {currentPulse?.content && currentPulse.type !== 'text' && (
+            <div style={{ fontSize: '15px', fontWeight: '600', textAlign: 'center', wordBreak: 'break-word', width: '100%' }}>
+              {currentPulse.content}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+            {/* Tag / Share Button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsPaused(true);
+                setShowTagModal(true);
+              }}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: '42px', height: '42px', borderRadius: '50%',
+                backgroundColor: 'rgba(255, 255, 255, 0.2)', backdropFilter: 'blur(8px)',
+                border: '1px solid rgba(255, 255, 255, 0.3)', color: '#ffffff',
+                cursor: 'pointer', flexShrink: 0
+              }}
+              title="Tag / Share Pulse"
+            >
+              <Tag size={18} />
+            </button>
+
+            {/* Reply Input Bar */}
+            <form
+              onSubmit={handleSendReply}
+              onClick={(e) => e.stopPropagation()}
+              style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <input
+                type="text"
+                placeholder={isSystemAdmin ? "Replies disabled for official system admin updates" : "Send reply..."}
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                onFocus={() => setIsPaused(true)}
+                onBlur={() => setIsPaused(false)}
+                disabled={isSystemAdmin || isSendingReply}
+                style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  borderRadius: '24px',
+                  backgroundColor: isSystemAdmin ? 'rgba(255,255,255,0.08)' : 'rgba(255, 255, 255, 0.2)',
+                  backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  color: isSystemAdmin ? 'rgba(255,255,255,0.5)' : '#ffffff',
+                  fontSize: '14px',
+                  outline: 'none',
+                  cursor: isSystemAdmin ? 'not-allowed' : 'text'
+                }}
+              />
+              {!isSystemAdmin && replyText.trim() && (
+                <button
+                  type="submit"
+                  disabled={isSendingReply}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: '38px', height: '38px', borderRadius: '50%',
+                    backgroundColor: '#3b82f6', border: 'none', color: '#fff',
+                    cursor: 'pointer', flexShrink: 0
+                  }}
+                >
+                  <Send size={16} />
+                </button>
+              )}
+            </form>
+
+            {/* Owner Viewers Button */}
             {isMine && (
               <button
                 type="button"
@@ -407,19 +582,19 @@ const PulseStoryViewer = ({ contactsFeed = [], initialUserIndex = 0, onClose, on
                 }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '6px',
-                  padding: '8px 16px', borderRadius: '20px',
+                  padding: '8px 14px', borderRadius: '20px',
                   backgroundColor: 'rgba(255, 255, 255, 0.25)', backdropFilter: 'blur(8px)',
                   border: '1px solid rgba(255, 255, 255, 0.35)', color: '#ffffff',
                   fontSize: '13px', fontWeight: '700', cursor: 'pointer',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.4)', flexShrink: 0
                 }}
               >
                 <Eye size={16} color="#ffffff" />
-                <span>{currentPulse?.totalViews ?? currentPulse?.viewers?.length ?? 0} Views</span>
+                <span>{currentPulse?.totalViews ?? currentPulse?.viewers?.length ?? 0}</span>
               </button>
             )}
           </div>
-        )}
+        </div>
 
         {/* Viewers Modal */}
         <PulseViewersModal
@@ -430,6 +605,18 @@ const PulseStoryViewer = ({ contactsFeed = [], initialUserIndex = 0, onClose, on
           }}
           pulse={currentPulse}
         />
+
+        {/* Pulse Tag Modal */}
+        {showTagModal && (
+          <PulseTagModal
+            isOpen={showTagModal}
+            onClose={() => {
+              setShowTagModal(false);
+              setIsPaused(false);
+            }}
+            pulse={currentPulse}
+          />
+        )}
       </div>
     </div>
   );

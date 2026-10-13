@@ -11,15 +11,39 @@ class SimulationService {
     this.isWaiting = false;
   }
 
+  getSavedProgress() {
+    try {
+      const saved = localStorage.getItem('simulation_progress');
+      return saved ? JSON.parse(saved) : { stepIndex: 0, completed: false };
+    } catch {
+      return { stepIndex: 0, completed: false };
+    }
+  }
+
+  saveProgress(stepIndex, completed = false) {
+    try {
+      localStorage.setItem('simulation_progress', JSON.stringify({ stepIndex, completed }));
+    } catch (e) {
+      console.error("[SimulationService] Failed to save progress", e);
+    }
+  }
+
   start(onGuideUpdate) {
     if (this.isActive) return;
-    
-    console.log("[SimulationService] Starting walkthrough...");
+
+    const progress = this.getSavedProgress();
+    if (progress.completed) {
+      console.log("[SimulationService] Walkthrough already completed. Displaying history without restarting.");
+      this.isActive = false;
+      return;
+    }
+
+    console.log("[SimulationService] Starting/resuming walkthrough at step index:", progress.stepIndex);
     this.isActive = true;
     this.onGuideUpdate = onGuideUpdate;
-    this.currentStepIndex = 0;
+    this.currentStepIndex = progress.stepIndex || 0;
     this.isWaiting = false;
-    
+
     this.ensureSpaceExists(0, "Main");
     this.loadNextStep();
   }
@@ -35,7 +59,7 @@ class SimulationService {
     const sId = parseInt(spaceId);
     if (sId === 0) return;
     const name = spaceName || `Space ${sId}`;
-    
+
     // 1. Update SpaceStore
     if (!spaceStore.spaces[this.chatId]) spaceStore.spaces[this.chatId] = {};
     spaceStore.spaces[this.chatId][sId] = name;
@@ -49,7 +73,7 @@ class SimulationService {
         const updatedSpaces = [...chatSpaces, { id: sId, name: name, icon: "📌" }];
         cache[this.chatId] = updatedSpaces;
         localStorage.setItem('spacesCache', JSON.stringify(cache));
-        
+
         window.dispatchEvent(new CustomEvent('spaces_cache_updated', {
           detail: { chatId: this.chatId, spaces: updatedSpaces }
         }));
@@ -61,10 +85,12 @@ class SimulationService {
 
   async loadNextStep() {
     if (!this.isActive || this.currentStepIndex >= SIMULATION_SCRIPT.length) {
+      this.saveProgress(SIMULATION_SCRIPT.length, true);
       this.stop();
       return;
     }
 
+    this.saveProgress(this.currentStepIndex, false);
     const step = SIMULATION_SCRIPT[this.currentStepIndex];
     console.log("[SimulationService] Executing step:", step.step);
 
@@ -84,6 +110,7 @@ class SimulationService {
           this.isWaiting = true;
         } else {
           this.currentStepIndex++;
+          this.saveProgress(this.currentStepIndex, false);
           this.loadNextStep();
         }
       }, step.delay || 1000);
@@ -99,7 +126,7 @@ class SimulationService {
 
   injectMessage(step) {
     const targetSpaceId = step.spaceid || 0;
-    
+
     if (targetSpaceId > 0) {
       this.ensureSpaceExists(targetSpaceId);
     }
@@ -108,7 +135,7 @@ class SimulationService {
       msgid: `sim_${Date.now()}_${step.step}`,
       tempmsgid: `sim_temp_${Date.now()}_${step.step}`,
       chatid: this.chatId,
-      sendername: "LetsChat Guide",
+      sendername: "LetsChat",
       content: step.content,
       timestamp: new Date().toISOString(),
       type: "text",
@@ -120,8 +147,8 @@ class SimulationService {
     messageStore.addMessage(msg);
 
     if (step.isEvent && step.eventData) {
-      window.dispatchEvent(new CustomEvent('simulation_event_needed', { 
-        detail: { ...step.eventData, msgref: msg.msgid, chatid: this.chatId } 
+      window.dispatchEvent(new CustomEvent('simulation_event_needed', {
+        detail: { ...step.eventData, msgref: msg.msgid, chatid: this.chatId }
       }));
     }
   }
@@ -144,7 +171,8 @@ class SimulationService {
         console.log("[SimulationService] User completed action:", actionType, value);
         this.isWaiting = false;
         this.currentStepIndex++;
-        
+        this.saveProgress(this.currentStepIndex, false);
+
         if (this.onGuideUpdate) {
           this.onGuideUpdate(null);
         }

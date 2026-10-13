@@ -5,12 +5,14 @@ import { API, toggle2FA } from '../service/UserAuth';
 import { uploadMedia, STAGE_LABELS } from '../service/MediaUploader';
 import { getMediaInfo, getMediaBlob } from '../service/MediaCache';
 import MediaViewer from '../components/chat/MediaViewer';
-import { Camera, Loader2, LogOut, CheckCircle2, Bell, Moon, MessageCircle, ArrowLeft, ShieldCheck } from 'lucide-react';
+import { Camera, Loader2, LogOut, CheckCircle2, Bell, Moon, MessageCircle, ArrowLeft, ShieldCheck, Edit2 } from 'lucide-react';
 import Avatar from '../components/chat/Avatar';
 import StreakBadge from '../components/pulse/StreakBadge';
 import { useNotifications } from '../hooks/useNotifications';
 import { getGroupMembersFromDB, syncChatsMapToDB } from '../service/db';
 import { getchat } from './ChatNames';
+import { useUsernameCheck } from '../hooks/useUsernameCheck';
+import { UsernameStatusIndicator } from '../components/common/UsernameStatusIndicator';
 
 const ProfilePage = () => {
     const navigate = useNavigate();
@@ -34,6 +36,30 @@ const ProfilePage = () => {
     const [isSleepMode, setIsSleepMode] = useState(localStorage.getItem('sleepMode') === 'true');
     const [is2FAEnabled, setIs2FAEnabled] = useState(localStorage.getItem('is2FAEnabled') === 'true');
     const [toggling2FA, setToggling2FA] = useState(false);
+
+    // Profile & Room Nickname Edit States
+    const [roomNickname, setRoomNickname] = useState(() => localStorage.getItem('roomNickname') || '');
+    const [isEditingPublicName, setIsEditingPublicName] = useState(false);
+    const [newPublicName, setNewPublicName] = useState(username);
+    const [savingPublicName, setSavingPublicName] = useState(false);
+
+    const [isEditingRoomNickname, setIsEditingRoomNickname] = useState(false);
+    const [newRoomNickname, setNewRoomNickname] = useState(roomNickname);
+    const [savingRoomNickname, setSavingRoomNickname] = useState(false);
+
+    const publicNameCheck = useUsernameCheck({
+        username: newPublicName,
+        originalName: username,
+        excludeUserId: userId,
+        debounceMs: 400
+    });
+
+    const roomNicknameCheck = useUsernameCheck({
+        username: newRoomNickname,
+        originalName: roomNickname,
+        excludeUserId: userId,
+        debounceMs: 400
+    });
 
     useEffect(() => {
         if (isTargetUser) {
@@ -124,6 +150,84 @@ const ProfilePage = () => {
             fetchUserData();
         }
     }, [targetUserId, userId, isTargetUser]);
+
+    useEffect(() => {
+        if (!isTargetUser && userId) {
+            fetch(`${API}/room/get/name`, { headers: { 'User-Id': userId } })
+                .then(res => res.ok ? res.text() : '')
+                .then(name => {
+                    const cleanName = (name || '').trim();
+                    if (cleanName) {
+                        setRoomNickname(cleanName);
+                        localStorage.setItem('roomNickname', cleanName);
+                    }
+                })
+                .catch(err => console.error('[ProfilePage] Failed to fetch room nickname:', err));
+        }
+    }, [userId, isTargetUser]);
+
+    const handleSavePublicName = async () => {
+        if (publicNameCheck.isBlocked) {
+            alert(publicNameCheck.message || 'Please choose an available username');
+            return;
+        }
+        if (publicNameCheck.isChecking) {
+            alert('Validating username availability, please wait...');
+            return;
+        }
+        setSavingPublicName(true);
+        try {
+            const clean = newPublicName.trim();
+            try {
+                await fetch(`${API}/user/update`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'User-Id': userId },
+                    body: JSON.stringify({ userId, username: clean, publicName: clean, userName: clean })
+                });
+            } catch (e) {
+                console.warn('[ProfilePage] Server update warning:', e);
+            }
+            localStorage.setItem('username', clean);
+            setUsername(clean);
+            setIsEditingPublicName(false);
+        } catch (err) {
+            alert('Failed to update public name');
+        } finally {
+            setSavingPublicName(false);
+        }
+    };
+
+    const handleSaveRoomNickname = async () => {
+        if (roomNicknameCheck.isBlocked) {
+            alert(roomNicknameCheck.message || 'Please choose an available room nickname');
+            return;
+        }
+        if (roomNicknameCheck.isChecking) {
+            alert('Validating nickname availability, please wait...');
+            return;
+        }
+        setSavingRoomNickname(true);
+        try {
+            const clean = newRoomNickname.trim();
+            const res = await fetch(`${API}/room/set/name`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'User-Id': userId },
+                body: JSON.stringify({ name: clean })
+            });
+            if (res.ok) {
+                localStorage.setItem('roomNickname', clean);
+                setRoomNickname(clean);
+                setIsEditingRoomNickname(false);
+            } else {
+                const err = await res.text();
+                alert(err || 'Failed to update room nickname');
+            }
+        } catch (err) {
+            alert('Failed to update room nickname');
+        } finally {
+            setSavingRoomNickname(false);
+        }
+    };
 
     const handle2FAToggle = async () => {
         if (!userId) return;
@@ -476,9 +580,168 @@ const ProfilePage = () => {
                             <span style={labelStyle}>User ID</span>
                             <span style={valueStyle}>{userId}</span>
                         </div>
-                        <div style={{ ...infoItemStyle, borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                            <span style={labelStyle}>Username</span>
-                            <span style={valueStyle}>{username}</span>
+                        {/* Username / Public Name */}
+                        <div style={{ ...infoItemStyle, borderTop: '1px solid var(--border-color)', paddingTop: '12px', flexDirection: 'column', alignItems: 'stretch', gap: '8px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={labelStyle}>Username / Public Name</span>
+                                {!isEditingPublicName && (
+                                    <button
+                                        onClick={() => {
+                                            setNewPublicName(username);
+                                            setIsEditingPublicName(true);
+                                        }}
+                                        style={{ background: 'none', border: 'none', color: 'var(--accent-color)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '600' }}
+                                    >
+                                        <Edit2 size={13} /> Edit
+                                    </button>
+                                )}
+                            </div>
+                            {!isEditingPublicName ? (
+                                <span style={valueStyle}>{username}</span>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                        <input
+                                            type="text"
+                                            value={newPublicName}
+                                            onChange={e => setNewPublicName(e.target.value)}
+                                            placeholder="Enter public name..."
+                                            style={{
+                                                width: '100%',
+                                                padding: '8px 36px 8px 12px',
+                                                borderRadius: '10px',
+                                                border: `1px solid ${publicNameCheck.status === 'block' ? '#ef4444' : publicNameCheck.status === 'warn' ? '#f59e0b' : publicNameCheck.status === 'allow' ? '#10b981' : 'var(--border-color)'}`,
+                                                background: 'var(--bg-primary)',
+                                                color: 'var(--text-primary)',
+                                                fontSize: '13px'
+                                            }}
+                                        />
+                                        <div style={{ position: 'absolute', right: '10px', display: 'flex', alignItems: 'center' }}>
+                                            <UsernameStatusIndicator checkResult={publicNameCheck} showInlineIcon={true} />
+                                        </div>
+                                    </div>
+                                    <UsernameStatusIndicator checkResult={publicNameCheck} />
+                                    <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                                        <button
+                                            onClick={handleSavePublicName}
+                                            disabled={savingPublicName || publicNameCheck.isBlocked || publicNameCheck.isChecking}
+                                            style={{
+                                                padding: '6px 14px',
+                                                borderRadius: '8px',
+                                                background: 'var(--accent-color)',
+                                                color: 'white',
+                                                border: 'none',
+                                                fontSize: '12px',
+                                                fontWeight: '600',
+                                                cursor: (savingPublicName || publicNameCheck.isBlocked || publicNameCheck.isChecking) ? 'not-allowed' : 'pointer',
+                                                opacity: (savingPublicName || publicNameCheck.isBlocked || publicNameCheck.isChecking) ? 0.6 : 1
+                                            }}
+                                        >
+                                            {savingPublicName ? 'Saving...' : publicNameCheck.isChecking ? 'Checking...' : 'Save'}
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setNewPublicName(username);
+                                                setIsEditingPublicName(false);
+                                            }}
+                                            style={{
+                                                padding: '6px 14px',
+                                                borderRadius: '8px',
+                                                background: 'var(--bg-card-hover)',
+                                                color: 'var(--text-secondary)',
+                                                border: '1px solid var(--border-color)',
+                                                fontSize: '12px',
+                                                fontWeight: '600',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Room Nickname */}
+                        <div style={{ ...infoItemStyle, borderTop: '1px solid var(--border-color)', paddingTop: '12px', flexDirection: 'column', alignItems: 'stretch', gap: '8px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={labelStyle}>Room Nickname (Public Rooms)</span>
+                                {!isEditingRoomNickname && (
+                                    <button
+                                        onClick={() => {
+                                            setNewRoomNickname(roomNickname);
+                                            setIsEditingRoomNickname(true);
+                                        }}
+                                        style={{ background: 'none', border: 'none', color: 'var(--accent-color)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '600' }}
+                                    >
+                                        <Edit2 size={13} /> Edit
+                                    </button>
+                                )}
+                            </div>
+                            {!isEditingRoomNickname ? (
+                                <span style={valueStyle}>{roomNickname || 'None (Set anonymous handle)'}</span>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                        <input
+                                            type="text"
+                                            value={newRoomNickname}
+                                            onChange={e => setNewRoomNickname(e.target.value)}
+                                            placeholder="Enter room nickname..."
+                                            style={{
+                                                width: '100%',
+                                                padding: '8px 36px 8px 12px',
+                                                borderRadius: '10px',
+                                                border: `1px solid ${roomNicknameCheck.status === 'block' ? '#ef4444' : roomNicknameCheck.status === 'warn' ? '#f59e0b' : roomNicknameCheck.status === 'allow' ? '#10b981' : 'var(--border-color)'}`,
+                                                background: 'var(--bg-primary)',
+                                                color: 'var(--text-primary)',
+                                                fontSize: '13px'
+                                            }}
+                                        />
+                                        <div style={{ position: 'absolute', right: '10px', display: 'flex', alignItems: 'center' }}>
+                                            <UsernameStatusIndicator checkResult={roomNicknameCheck} showInlineIcon={true} />
+                                        </div>
+                                    </div>
+                                    <UsernameStatusIndicator checkResult={roomNicknameCheck} />
+                                    <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                                        <button
+                                            onClick={handleSaveRoomNickname}
+                                            disabled={savingRoomNickname || roomNicknameCheck.isBlocked || roomNicknameCheck.isChecking}
+                                            style={{
+                                                padding: '6px 14px',
+                                                borderRadius: '8px',
+                                                background: 'var(--accent-color)',
+                                                color: 'white',
+                                                border: 'none',
+                                                fontSize: '12px',
+                                                fontWeight: '600',
+                                                cursor: (savingRoomNickname || roomNicknameCheck.isBlocked || roomNicknameCheck.isChecking) ? 'not-allowed' : 'pointer',
+                                                opacity: (savingRoomNickname || roomNicknameCheck.isBlocked || roomNicknameCheck.isChecking) ? 0.6 : 1
+                                            }}
+                                        >
+                                            {savingRoomNickname ? 'Saving...' : roomNicknameCheck.isChecking ? 'Checking...' : 'Save'}
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setNewRoomNickname(roomNickname);
+                                                setIsEditingRoomNickname(false);
+                                            }}
+                                            style={{
+                                                padding: '6px 14px',
+                                                borderRadius: '8px',
+                                                background: 'var(--bg-card-hover)',
+                                                color: 'var(--text-secondary)',
+                                                border: '1px solid var(--border-color)',
+                                                fontSize: '12px',
+                                                fontWeight: '600',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                         <div style={{ ...infoItemStyle, borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
                             <span style={labelStyle}>Status</span>
