@@ -4,12 +4,20 @@ import { API } from '../service/UserAuth';
 
 /**
  * Validates username / nickname availability and similarity via GET /api/user/check-username
+ * 
+ * Features:
+ * 1. Debounced execution (default 400ms).
+ * 2. Minimum length check (>= 3 chars) before making network requests.
+ * 3. Client-side regex format validation (alphanumeric, dots, underscores).
+ * 4. In-flight request cancellation (AbortController) to avoid race conditions.
+ * 5. Stale response protection (ignores results for superseded text).
+ * 6. In-memory session cache so backspacing and retyping never re-fetches.
  *
  * @param {Object} options
  * @param {string} options.username - The username / nickname input
  * @param {string} [options.originalName] - Current saved name; if unchanged, check is skipped
  * @param {string} [options.excludeUserId] - Current user ID to prevent self-collisions
- * @param {number} [options.debounceMs=400] - Debounce delay in ms (default 400ms)
+ * @param {number} [options.debounceMs=400] - Debounce delay in ms
  */
 export const useUsernameCheck = ({
   username = '',
@@ -25,13 +33,32 @@ export const useUsernameCheck = ({
 
   const abortControllerRef = useRef(null);
   const timerRef = useRef(null);
+  const cacheRef = useRef(new Map()); // Session cache: Map<string, { status, decision, score, message }>
+  const currentInputRef = useRef('');
 
   const trimmed = (username || '').trim();
   const trimmedOriginal = (originalName || '').trim();
   const isUnchanged = Boolean(trimmedOriginal && trimmed.toLowerCase() === trimmedOriginal.toLowerCase());
 
-  // Direct helper to perform the check
+  currentInputRef.current = trimmed;
+
+  // Direct helper to perform the API check
   const checkApi = useCallback(async (nameToCheck, cancelSignal) => {
+    const cacheKey = `${nameToCheck.toLowerCase()}__${excludeUserId || ''}`;
+
+    // 1. Check in-memory cache first
+    if (cacheRef.current.has(cacheKey)) {
+      const cached = cacheRef.current.get(cacheKey);
+      if (currentInputRef.current.toLowerCase() === nameToCheck.toLowerCase()) {
+        setStatus(cached.status);
+        setDecision(cached.decision);
+        setScore(cached.score);
+        setMessage(cached.message);
+        setIsChecking(false);
+      }
+      return;
+    }
+
     try {
       setIsChecking(true);
       setStatus('checking');
@@ -46,45 +73,80 @@ export const useUsernameCheck = ({
         signal: cancelSignal
       });
 
+      // Ignore stale response if user has typed something else
+      if (currentInputRef.current.toLowerCase() !== nameToCheck.toLowerCase()) {
+        return;
+      }
+
       const data = res.data || {};
       const returnedDecision = (data.decision || '').toUpperCase();
       const returnedScore = typeof data.score === 'number' ? data.score : null;
       const returnedMsg = data.message || '';
 
-      setScore(returnedScore);
-      setDecision(returnedDecision);
+      let nextStatus = 'allow';
+      let nextMsg = returnedMsg || 'Username is available';
 
       if (returnedDecision === 'ALLOW' || (returnedScore !== null && returnedScore < 6.0)) {
-        setStatus('allow');
-        setMessage(returnedMsg || 'Username is available');
+        nextStatus = 'allow';
+        nextMsg = returnedMsg || 'Username is available';
       } else if (returnedDecision === 'WARN' || (returnedScore !== null && returnedScore >= 6.0 && returnedScore < 8.0)) {
-        setStatus('warn');
-        setMessage(returnedMsg || 'Username is somewhat similar to an existing username. You can proceed if this is intended.');
+        nextStatus = 'warn';
+        nextMsg = returnedMsg || 'Available but similar to existing username';
       } else {
-        // BLOCK (>= 8.0)
-        setStatus('block');
-        setMessage(returnedMsg || 'Too similar to an existing username. Please choose another username.');
+        // BLOCK (>= 8.0 or taken)
+        nextStatus = 'block';
+        nextMsg = returnedMsg || 'Username is already taken';
       }
+
+      // Store in session cache
+      const cacheValue = {
+        status: nextStatus,
+        decision: returnedDecision,
+        score: returnedScore,
+        message: nextMsg
+      };
+      cacheRef.current.set(cacheKey, cacheValue);
+
+      setStatus(nextStatus);
+      setDecision(returnedDecision);
+      setScore(returnedScore);
+      setMessage(nextMsg);
     } catch (err) {
       if (axios.isCancel(err) || err.name === 'CanceledError') {
         return; // Request was aborted due to new keystroke
       }
+
+      // Ignore stale errors
+      if (currentInputRef.current.toLowerCase() !== nameToCheck.toLowerCase()) {
+        return;
+      }
+
       console.error('[useUsernameCheck] Validation error:', err);
 
       const errData = err.response?.data;
       if (errData && errData.decision) {
         const returnedDecision = (errData.decision || '').toUpperCase();
+        const returnedStatus = returnedDecision.toLowerCase();
+        const errVal = {
+          status: returnedStatus,
+          decision: returnedDecision,
+          score: errData.score || null,
+          message: errData.message || 'Username check failed.'
+        };
+        cacheRef.current.set(cacheKey, errVal);
         setDecision(returnedDecision);
         setScore(errData.score || null);
-        setMessage(errData.message || 'Username check failed.');
-        setStatus(returnedDecision.toLowerCase());
+        setMessage(errVal.message);
+        setStatus(returnedStatus);
       } else {
-        // Fallback network/server failure - do not permanently block, but report warning
+        // Fallback network/server failure - do not permanently block
         setStatus('idle');
         setMessage('');
       }
     } finally {
-      setIsChecking(false);
+      if (currentInputRef.current.toLowerCase() === nameToCheck.toLowerCase()) {
+        setIsChecking(false);
+      }
     }
   }, [excludeUserId]);
 
@@ -117,7 +179,7 @@ export const useUsernameCheck = ({
       return;
     }
 
-    // 3. Minimum length check (< 3 characters)
+    // 3. Client-side length rule (< 3 characters)
     if (trimmed.length < 3) {
       setStatus('block');
       setDecision('BLOCK');
@@ -127,7 +189,40 @@ export const useUsernameCheck = ({
       return;
     }
 
-    // 4. Debounce API call (400ms)
+    // 4. Client-side length rule (> 30 characters)
+    if (trimmed.length > 30) {
+      setStatus('block');
+      setDecision('BLOCK');
+      setScore(null);
+      setMessage('Username cannot exceed 30 characters');
+      setIsChecking(false);
+      return;
+    }
+
+    // 5. Client-side valid character rule (alphanumeric, underscore, dot)
+    const validPattern = /^[a-zA-Z0-9_.]+$/;
+    if (!validPattern.test(trimmed)) {
+      setStatus('block');
+      setDecision('BLOCK');
+      setScore(10.0);
+      setMessage('Only letters, numbers, dots, and underscores allowed');
+      setIsChecking(false);
+      return;
+    }
+
+    // 6. Fast session cache check before waiting for debounce
+    const cacheKey = `${trimmed.toLowerCase()}__${excludeUserId || ''}`;
+    if (cacheRef.current.has(cacheKey)) {
+      const cached = cacheRef.current.get(cacheKey);
+      setStatus(cached.status);
+      setDecision(cached.decision);
+      setScore(cached.score);
+      setMessage(cached.message);
+      setIsChecking(false);
+      return;
+    }
+
+    // 7. Debounce API call (default 400ms)
     setIsChecking(true);
     setStatus('checking');
 
@@ -140,7 +235,7 @@ export const useUsernameCheck = ({
       if (timerRef.current) clearTimeout(timerRef.current);
       if (abortControllerRef.current) abortControllerRef.current.abort();
     };
-  }, [trimmed, isUnchanged, debounceMs, checkApi]);
+  }, [trimmed, isUnchanged, debounceMs, checkApi, excludeUserId]);
 
   // Can the user proceed?
   const canProceed = Boolean(
@@ -156,7 +251,7 @@ export const useUsernameCheck = ({
     decision,      // 'ALLOW' | 'WARN' | 'BLOCK' | null
     score,         // number | null
     message,       // display message
-    isChecking,    // boolean loader state
+    isChecking,    // boolean loader state (spinner)
     canProceed,    // boolean: safe to submit
     isBlocked,     // boolean: must block submission
     isUnchanged    // boolean: matches original name

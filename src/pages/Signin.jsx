@@ -3,33 +3,28 @@ import { Link, useNavigate } from "react-router-dom";
 import { signupInit, signupVerify } from "../service/UserAuth";
 import { initWebsocket } from "../service/Websocket";
 import { motion, AnimatePresence } from "framer-motion";
-import { Eye, EyeOff, Mail, User, Lock, KeyRound, ShieldCheck, Clock, RotateCcw, CheckCircle2, AlertCircle, Loader2, ArrowRight } from "lucide-react";
+import { Eye, EyeOff, Lock, KeyRound, ShieldCheck, Clock, RotateCcw, CheckCircle2, AlertCircle, Loader2, ArrowRight } from "lucide-react";
 import { useUsernameCheck } from "../hooks/useUsernameCheck";
-import { UsernameStatusIndicator } from "../components/common/UsernameStatusIndicator";
+import { UsernameStatusIndicator, UsernameStatusBadge } from "../components/common/UsernameStatusIndicator";
 
 /**
- * Stationary Cartoon Weightlifter Password Strength Component
- * SVG + CSS keyframes micro-animation in a SINGLE FIXED CENTER POSITION (x=150):
- * - Level 1 (Weak): Character bending over on ground in center, struggling non-stop (wobble + sweat drops)
- * - Level 2 (Fair): Character lifting barbell up to knees/waist level in center
- * - Level 3 (Good): Character cleaning barbell up to chest/shoulder level in center
- * - Level 4 (Strong): Character triumphantly locking arms overhead with stars/sparkles in center!
+ * Compact Cartoon Weightlifter Avatar Component
+ * Placed directly alongside the password input box.
+ * - Initial (score 0): Standing calmly beside weights, resting posture, no struggling, no track line underneath.
+ * - Basic (score 1): Ready stance gripping barbell.
+ * - Fair (score 2): Lifting barbell up to waist level.
+ * - Good (score 3): Cleaning barbell up to chest/shoulder level.
+ * - Strong (score 4): Overhead triumph with sparkles!
  */
-const WeightlifterStrength = ({ score, label }) => {
-  if (!score || score <= 0) return null;
-
-  const posXMap = [30, 90, 150, 210, 270];
-  const targetX = posXMap[score] || 30;
-
-  const colorMap = ["#94a3b8", "#ef4444", "#f59e0b", "#3b82f6", "#10b981"];
-  const currentColor = colorMap[score] || "#94a3b8";
+const WeightlifterAvatar = ({ score }) => {
+  const safeScore = score || 0;
 
   return (
-    <div style={{ width: "100%", marginTop: "6px", position: "relative" }}>
+    <div style={{ width: "64px", height: "40px", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <style>{`
-        @keyframes struggleShake {
-          0%, 100% { transform: translateY(0px) rotate(-3deg); }
-          50% { transform: translateY(-2px) rotate(3deg); }
+        @keyframes idleBreath {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-1.5px); }
         }
         @keyframes waistHold {
           0%, 100% { transform: translateY(0px); }
@@ -41,102 +36,89 @@ const WeightlifterStrength = ({ score, label }) => {
         }
         @keyframes overheadTriumph {
           0%, 100% { transform: translateY(0px) scale(1); }
-          50% { transform: translateY(-3px) scale(1.03); }
-        }
-        @keyframes sweatDrop {
-          0%, 100% { opacity: 0.2; transform: translateY(0); }
-          50% { opacity: 1; transform: translateY(3px); }
+          50% { transform: translateY(-2px) scale(1.02); }
         }
         @keyframes sparkleGlow {
-          0%, 100% { opacity: 0.4; transform: scale(0.9); }
-          50% { opacity: 1; transform: scale(1.2); }
+          0%, 100% { opacity: 0.3; transform: scale(0.85); }
+          50% { opacity: 1; transform: scale(1.25); }
         }
       `}</style>
 
-      {/* Strength Label & Hint */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "2px" }}>
-        <span style={{ fontSize: "11px", fontWeight: "700", color: currentColor }}>
-          Strength: {label}
-        </span>
-        <span style={{ fontSize: "10px", color: score === 1 ? "#ef4444" : "var(--text-secondary, #94a3b8)", fontStyle: "italic", fontWeight: score === 1 ? "700" : "normal" }}>
-          {score === 1 && "Too Weak - Cannot Submit 💦"}
-          {score === 2 && "Fair - Lifting to waist... 🏋️"}
-          {score === 3 && "Good - Clearing to chest! 💪"}
-          {score === 4 && "Strong - Lifting Overhead! 🏆✨"}
-        </span>
-      </div>
+      <svg width="64" height="40" viewBox="0 0 64 40" style={{ overflow: "visible" }}>
+        {/* LEVEL 0: Initial Standing Pose (calm beside weights, no struggle, no line underneath) */}
+        {safeScore === 0 && (
+          <g style={{ animation: "idleBreath 2s ease-in-out infinite" }}>
+            {/* Barbell resting peacefully on floor */}
+            <line x1="8" y1="36" x2="30" y2="36" stroke="#64748b" strokeWidth="2" />
+            <rect x="5" y="31" width="3.5" height="10" rx="1.5" fill="#475569" />
+            <rect x="29.5" y="31" width="3.5" height="10" rx="1.5" fill="#475569" />
 
-      <svg width="100%" height="46" viewBox="0 0 300 46" style={{ overflow: "visible" }}>
-        {/* Track Line */}
-        <line x1="30" y1="40" x2="270" y2="40" stroke="rgba(255,255,255,0.15)" strokeWidth="3" strokeLinecap="round" />
-        
-        {/* Active Filled Progress Track */}
-        <line x1="30" y1="40" x2={targetX} y2="40" stroke={currentColor} strokeWidth="3" strokeLinecap="round" style={{ transition: "x2 0.4s ease" }} />
+            {/* Character standing casually beside weights */}
+            <circle cx="44" cy="11" r="5" fill="#93c5fd" stroke="#3b82f6" strokeWidth="1.5" />
+            <line x1="39.5" y1="10" x2="48.5" y2="10" stroke="#f43f5e" strokeWidth="1.8" />
+            <circle cx="42.5" cy="11" r="0.8" fill="#1e293b" />
+            <circle cx="45.5" cy="11" r="0.8" fill="#1e293b" />
+            <line x1="44" y1="16" x2="44" y2="27" stroke="#60a5fa" strokeWidth="3" strokeLinecap="round" />
+            <path d="M 44 18 L 39 22 L 42 26" stroke="#93c5fd" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            <path d="M 44 18 L 49 22 L 46 26" stroke="#93c5fd" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            <path d="M 44 27 L 41 37 M 44 27 L 47 37" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" />
+          </g>
+        )}
 
-        {/* Milestone Nodes */}
-        {[90, 150, 210, 270].map((nodeX, idx) => (
-          <circle key={idx} cx={nodeX} cy="40" r="3" fill={score >= idx + 1 ? currentColor : "#334155"} />
-        ))}
+        {/* LEVEL 1: Basic / Ready Stance */}
+        {safeScore === 1 && (
+          <g style={{ animation: "idleBreath 1.5s ease-in-out infinite" }}>
+            <line x1="16" y1="34" x2="48" y2="34" stroke="#cbd5e1" strokeWidth="2" />
+            <rect x="12" y="29" width="4" height="10" rx="1.5" fill="#f59e0b" />
+            <rect x="48" y="29" width="4" height="10" rx="1.5" fill="#f59e0b" />
+            <circle cx="32" cy="15" r="5" fill="#fde047" stroke="#f59e0b" strokeWidth="1.5" />
+            <line x1="28" y1="14" x2="36" y2="14" stroke="#f43f5e" strokeWidth="1.8" />
+            <line x1="32" y1="20" x2="32" y2="28" stroke="#fbbf24" strokeWidth="3" strokeLinecap="round" />
+            <path d="M 32 21 L 22 34 M 32 21 L 42 34" stroke="#fde047" strokeWidth="2" strokeLinecap="round" />
+            <path d="M 32 28 L 26 36 M 32 28 L 38 36" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" />
+          </g>
+        )}
 
-        {/* STATIONARY Cartoon Lifter Group fixed at center (x=150) */}
-        <g style={{ transform: "translateX(150px)" }}>
-          
-          {/* LEVEL 1: Weak (Struggling on ground in single fixed place) */}
-          {score === 1 && (
-            <g style={{ animation: "struggleShake 0.35s ease-in-out infinite" }}>
-              <text x="8" y="14" fontSize="9" style={{ animation: "sweatDrop 0.5s infinite" }}>💦</text>
-              <circle cx="0" cy="20" r="5" fill="#fca5a5" stroke="#ef4444" strokeWidth="1.5" />
-              <line x1="-2" y1="19" x2="0" y2="21" stroke="#991b1b" strokeWidth="1" />
-              <line x1="2" y1="19" x2="0" y2="21" stroke="#991b1b" strokeWidth="1" />
-              <path d="M 0 25 L -4 34 M 0 25 L 4 34" stroke="#f87171" strokeWidth="2.5" strokeLinecap="round" />
-              <path d="M 0 25 L -8 37 M 0 25 L 8 37" stroke="#fca5a5" strokeWidth="2" strokeLinecap="round" />
-              <line x1="-16" y1="38" x2="16" y2="38" stroke="#cbd5e1" strokeWidth="2" />
-              <rect x="-20" y="32" width="4" height="12" rx="1.5" fill="#ef4444" />
-              <rect x="16" y="32" width="4" height="12" rx="1.5" fill="#ef4444" />
-            </g>
-          )}
+        {/* LEVEL 2: Fair (Lifting to waist) */}
+        {safeScore === 2 && (
+          <g style={{ animation: "waistHold 1s ease-in-out infinite" }}>
+            <line x1="16" y1="26" x2="48" y2="26" stroke="#cbd5e1" strokeWidth="2" />
+            <rect x="12" y="21" width="4" height="10" rx="1.5" fill="#eab308" />
+            <rect x="48" y="21" width="4" height="10" rx="1.5" fill="#eab308" />
+            <circle cx="32" cy="13" r="5" fill="#fde047" stroke="#eab308" strokeWidth="1.5" />
+            <line x1="32" y1="18" x2="32" y2="28" stroke="#fbbf24" strokeWidth="3" strokeLinecap="round" />
+            <path d="M 32 20 L 22 26 M 32 20 L 42 26" stroke="#fde047" strokeWidth="2.2" strokeLinecap="round" />
+            <path d="M 32 28 L 27 36 M 32 28 L 37 36" stroke="#ca8a04" strokeWidth="2.5" strokeLinecap="round" />
+          </g>
+        )}
 
-          {/* LEVEL 2: Fair (Lifting to waist in single fixed place) */}
-          {score === 2 && (
-            <g style={{ animation: "waistHold 0.8s ease-in-out infinite" }}>
-              <circle cx="0" cy="14" r="5" fill="#fde047" stroke="#f59e0b" strokeWidth="1.5" />
-              <line x1="0" y1="19" x2="0" y2="30" stroke="#fbbf24" strokeWidth="3" strokeLinecap="round" />
-              <path d="M 0 30 L -5 38 M 0 30 L 5 38" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" />
-              <path d="M 0 21 L -8 27 M 0 21 L 8 27" stroke="#fde047" strokeWidth="2" strokeLinecap="round" />
-              <line x1="-16" y1="27" x2="16" y2="27" stroke="#cbd5e1" strokeWidth="2" />
-              <rect x="-20" y="21" width="4" height="12" rx="1.5" fill="#f59e0b" />
-              <rect x="16" y="21" width="4" height="12" rx="1.5" fill="#f59e0b" />
-            </g>
-          )}
+        {/* LEVEL 3: Good (Cleans bar to chest) */}
+        {safeScore === 3 && (
+          <g style={{ animation: "chestHold 0.9s ease-in-out infinite" }}>
+            <line x1="16" y1="18" x2="48" y2="18" stroke="#ffffff" strokeWidth="2" />
+            <rect x="12" y="13" width="4" height="10" rx="1.5" fill="#3b82f6" />
+            <rect x="48" y="13" width="4" height="10" rx="1.5" fill="#3b82f6" />
+            <circle cx="32" cy="12" r="5" fill="#93c5fd" stroke="#3b82f6" strokeWidth="1.5" />
+            <line x1="32" y1="17" x2="32" y2="28" stroke="#60a5fa" strokeWidth="3" strokeLinecap="round" />
+            <path d="M 32 19 L 24 18 M 32 19 L 40 18" stroke="#93c5fd" strokeWidth="2.5" strokeLinecap="round" />
+            <path d="M 32 28 L 27 36 M 32 28 L 37 36" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" />
+          </g>
+        )}
 
-          {/* LEVEL 3: Good (Cleans bar to chest in single fixed place) */}
-          {score === 3 && (
-            <g style={{ animation: "chestHold 1s ease-in-out infinite" }}>
-              <circle cx="0" cy="14" r="5" fill="#93c5fd" stroke="#3b82f6" strokeWidth="1.5" />
-              <line x1="0" y1="19" x2="0" y2="31" stroke="#60a5fa" strokeWidth="3" strokeLinecap="round" />
-              <path d="M 0 31 L -6 38 M 0 31 L 6 38" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" />
-              <path d="M 0 20 L -6 19 M 0 20 L 6 19" stroke="#93c5fd" strokeWidth="2.5" strokeLinecap="round" />
-              <line x1="-16" y1="18" x2="16" y2="18" stroke="#ffffff" strokeWidth="2" />
-              <rect x="-20" y="12" width="4" height="12" rx="1.5" fill="#3b82f6" />
-              <rect x="16" y="12" width="4" height="12" rx="1.5" fill="#3b82f6" />
-            </g>
-          )}
-
-          {/* LEVEL 4: Strong (Overhead Triumph in single fixed place!) */}
-          {score === 4 && (
-            <g style={{ animation: "overheadTriumph 1.2s ease-in-out infinite" }}>
-              <text x="-14" y="2" fontSize="9" style={{ animation: "sparkleGlow 0.8s infinite" }}>✨</text>
-              <text x="7" y="2" fontSize="9" style={{ animation: "sparkleGlow 0.8s infinite 0.4s" }}>✨</text>
-              <line x1="-18" y1="6" x2="18" y2="6" stroke="#ffffff" strokeWidth="2.5" />
-              <rect x="-22" y="0" width="5" height="12" rx="1.5" fill="#10b981" />
-              <rect x="17" y="0" width="5" height="12" rx="1.5" fill="#10b981" />
-              <path d="M 0 19 L -9 7 M 0 19 L 9 7" stroke="#6ee7b7" strokeWidth="2.5" strokeLinecap="round" />
-              <circle cx="0" cy="17" r="5" fill="#6ee7b7" stroke="#10b981" strokeWidth="1.5" />
-              <line x1="0" y1="22" x2="0" y2="32" stroke="#34d399" strokeWidth="3" strokeLinecap="round" />
-              <path d="M 0 32 L -7 38 M 0 32 L 7 38" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" />
-            </g>
-          )}
-        </g>
+        {/* LEVEL 4: Strong (Overhead Triumph!) */}
+        {safeScore === 4 && (
+          <g style={{ animation: "overheadTriumph 1.1s ease-in-out infinite" }}>
+            <text x="6" y="8" fontSize="8" style={{ animation: "sparkleGlow 0.8s infinite" }}>✨</text>
+            <text x="50" y="8" fontSize="8" style={{ animation: "sparkleGlow 0.8s infinite 0.4s" }}>✨</text>
+            <line x1="14" y1="8" x2="50" y2="8" stroke="#ffffff" strokeWidth="2.5" />
+            <rect x="10" y="3" width="4" height="10" rx="1.5" fill="#10b981" />
+            <rect x="50" y="3" width="4" height="10" rx="1.5" fill="#10b981" />
+            <path d="M 32 18 L 22 9 M 32 18 L 42 9" stroke="#6ee7b7" strokeWidth="2.5" strokeLinecap="round" />
+            <circle cx="32" cy="16" r="5" fill="#6ee7b7" stroke="#10b981" strokeWidth="1.5" />
+            <line x1="32" y1="21" x2="32" y2="30" stroke="#34d399" strokeWidth="3" strokeLinecap="round" />
+            <path d="M 32 30 L 26 37 M 32 30 L 38 37" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" />
+          </g>
+        )}
       </svg>
     </div>
   );
@@ -204,8 +186,8 @@ function Signin() {
     if (/[A-Z]/.test(pwd) && /[a-z]/.test(pwd)) score += 1;
     if (/[0-9]/.test(pwd) || /[^A-Za-z0-9]/.test(pwd)) score += 1;
 
-    if (score <= 1) return { score: 1, label: "Weak", color: "#ef4444", percent: 25 };
-    if (score === 2) return { score: 2, label: "Fair", color: "#f59e0b", percent: 50 };
+    if (score <= 1) return { score: 1, label: "", color: "#f59e0b", percent: 25 };
+    if (score === 2) return { score: 2, label: "Fair", color: "#eab308", percent: 50 };
     if (score === 3) return { score: 3, label: "Good", color: "#3b82f6", percent: 75 };
     return { score: 4, label: "Strong", color: "#10b981", percent: 100 };
   };
@@ -394,7 +376,7 @@ function Signin() {
       <div style={{ textAlign: "center", marginBottom: "24px" }}>
         <h1 style={styles.brandName}>LetsChat</h1>
         <p style={{ margin: 0, fontSize: "14px", color: "var(--text-secondary, #94a3b8)" }}>
-          {step === 1 ? "Create your account & get started" : "Verify your email to complete registration"}
+          {step === 1 ? "Create your secure account" : "Verify your email to complete registration"}
         </p>
       </div>
 
@@ -413,91 +395,129 @@ function Signin() {
             >
               {/* Email Input */}
               <div style={styles.fieldGroup}>
-                <label style={styles.label}>Email Address</label>
+                <label style={styles.label}>EMAIL ADDRESS</label>
                 <div style={styles.inputWrapper}>
-                  <Mail size={18} color="var(--text-secondary, #94a3b8)" style={styles.inputIcon} />
                   <input
                     type="email"
                     name="email"
                     required
                     value={form.email}
                     onChange={handleChange}
-                    placeholder="name@example.com"
+                    placeholder="alex@example.com"
                     style={styles.input}
                   />
                 </div>
               </div>
 
-              {/* Username Input with Subtle Tip */}
+              {/* Username Input with Live Availability / Similarity Indicator */}
               <div style={styles.fieldGroup}>
-                <p style={styles.subtleNote}>
-                  💡 This name is your default display name, but you can customize how you appear to specific contacts when chatting.
-                </p>
-                <label style={styles.label}>Display Name / Username</label>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <label style={styles.label}>USERNAME</label>
+                  <UsernameStatusBadge checkResult={usernameCheck} />
+                </div>
                 <div style={styles.inputWrapper}>
-                  <User size={18} color="var(--text-secondary, #94a3b8)" style={styles.inputIcon} />
                   <input
                     type="text"
                     name="username"
                     required
                     value={form.username}
                     onChange={handleChange}
-                    placeholder="e.g. John Doe"
+                    placeholder="alex_dev"
                     style={{
                       ...styles.input,
-                      paddingRight: "38px",
-                      borderColor: usernameCheck.status === 'block' ? '#ef4444' : usernameCheck.status === 'warn' ? '#f59e0b' : usernameCheck.status === 'allow' ? '#10b981' : undefined
+                      borderColor: (usernameCheck.status === 'block' && form.username.trim().length >= 3) ? '#ef4444' 
+                        : usernameCheck.status === 'warn' ? '#f59e0b' 
+                        : usernameCheck.status === 'allow' ? '#10b981' 
+                        : undefined,
+                      boxShadow: usernameCheck.status === 'allow' ? '0 0 0 1px rgba(16, 185, 129, 0.2)' 
+                        : usernameCheck.status === 'warn' ? '0 0 0 1px rgba(245, 158, 11, 0.2)' 
+                        : (usernameCheck.status === 'block' && form.username.trim().length >= 3) ? '0 0 0 1px rgba(239, 68, 68, 0.2)' 
+                        : undefined
                     }}
                   />
-                  <div style={{ position: "absolute", right: "12px", display: "flex", alignItems: "center" }}>
-                    <UsernameStatusIndicator checkResult={usernameCheck} showInlineIcon={true} />
-                  </div>
                 </div>
-                <UsernameStatusIndicator checkResult={usernameCheck} />
+                {usernameCheck.status === 'block' && form.username.trim().length >= 3 && (
+                  <span style={{ fontSize: "12px", color: "#ef4444", marginTop: "4px", display: "block", fontWeight: "500" }}>
+                    {usernameCheck.message || "Username is already taken"}
+                  </span>
+                )}
+                {usernameCheck.status === 'warn' && (
+                  <span style={{ fontSize: "12px", color: "#f59e0b", marginTop: "4px", display: "block", fontWeight: "500" }}>
+                    Available but similar to existing username
+                  </span>
+                )}
               </div>
 
-              {/* Password Input with Strength Checker */}
+              {/* Password Input with Strength Checker & Side-by-Side Weightlifter */}
               <div style={styles.fieldGroup}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <label style={styles.label}>Password</label>
-                  {form.password && (
-                    <span style={{ fontSize: "12px", fontWeight: "700", color: passwordStrength.color }}>
-                      {passwordStrength.label}
-                    </span>
-                  )}
+                  <label style={styles.label}>PASSWORD</label>
+                  <span style={{ fontSize: "12px", fontWeight: "600", color: form.password && passwordStrength.color ? passwordStrength.color : "var(--text-secondary, #94a3b8)" }}>
+                    {form.password && passwordStrength.label ? passwordStrength.label : "Ready"}
+                  </span>
                 </div>
 
-                <div style={styles.inputWrapper}>
-                  <Lock size={18} color="var(--text-secondary, #94a3b8)" style={styles.inputIcon} />
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    name="password"
-                    required
-                    value={form.password}
-                    onChange={handleChange}
-                    placeholder="At least 6 characters"
-                    style={{ ...styles.input, paddingRight: "40px" }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    style={styles.eyeBtn}
+                {/* Side-by-Side: Password Input Field + Weightlifter Companion */}
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <div style={{ ...styles.inputWrapper, flex: 1 }}>
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      name="password"
+                      required
+                      value={form.password}
+                      onChange={handleChange}
+                      placeholder="Enter password"
+                      style={{ ...styles.input, paddingRight: "40px" }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      style={styles.eyeBtn}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+
+                  {/* Weightlifter Companion Box alongside the inputbox */}
+                  <div
+                    style={{
+                      width: "72px",
+                      height: "44px",
+                      flexShrink: 0,
+                      backgroundColor: "var(--bg-secondary, #090f1d)",
+                      border: "1px solid var(--border-color, #1e293b)",
+                      borderRadius: "12px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      overflow: "hidden"
+                    }}
+                    title="Password strength companion"
                   >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
+                    <WeightlifterAvatar score={passwordStrength.score} />
+                  </div>
                 </div>
 
-                {/* Animated Cartoon Weightlifter Password Strength Indicator */}
-                {form.password && (
-                  <WeightlifterStrength score={passwordStrength.score} label={passwordStrength.label} />
-                )}
+                {/* Clean subtle 4-segment strength indicator */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", marginTop: "6px" }}>
+                  {[1, 2, 3, 4].map((seg) => (
+                    <div
+                      key={seg}
+                      style={{
+                        height: "3px",
+                        borderRadius: "2px",
+                        backgroundColor: (form.password && passwordStrength.score >= seg) ? passwordStrength.color : "rgba(255,255,255,0.08)",
+                        transition: "background-color 0.3s ease"
+                      }}
+                    />
+                  ))}
+                </div>
               </div>
 
               {/* Confirm Password Input */}
               <div style={styles.fieldGroup}>
-                <label style={styles.label}>Confirm Password</label>
+                <label style={styles.label}>CONFIRM PASSWORD</label>
                 <div style={styles.inputWrapper}>
-                  <Lock size={18} color="var(--text-secondary, #94a3b8)" style={styles.inputIcon} />
                   <input
                     type={showConfirmPassword ? "text" : "password"}
                     name="confirmPassword"
@@ -517,7 +537,7 @@ function Signin() {
                 </div>
                 {form.confirmPassword && form.password !== form.confirmPassword && (
                   <span style={{ fontSize: "12px", color: "var(--danger-color, #ef4444)", marginTop: "4px", display: "block" }}>
-                    ⚠️ Passwords do not match
+                    Passwords do not match
                   </span>
                 )}
               </div>
@@ -533,8 +553,19 @@ function Signin() {
               {/* Submit & Send OTP Button */}
               {(() => {
                 const isWeakPassword = Boolean(form.password && passwordStrength.score <= 1);
-                const isUsernameInvalid = Boolean(!form.username || usernameCheck.isBlocked || usernameCheck.isChecking);
-                const isSubmitDisabled = Boolean(loading || isWeakPassword || !form.email || isUsernameInvalid || !form.password || form.password !== form.confirmPassword);
+                const isUsernameBlocked = Boolean(form.username && usernameCheck.isBlocked);
+                const isCheckingUsername = Boolean(usernameCheck.isChecking);
+                const isSubmitDisabled = Boolean(
+                  loading || 
+                  isCheckingUsername || 
+                  isUsernameBlocked || 
+                  isWeakPassword || 
+                  !form.email || 
+                  !form.username || 
+                  !form.password || 
+                  form.password !== form.confirmPassword
+                );
+
                 return (
                   <div>
                     <button
@@ -542,9 +573,15 @@ function Signin() {
                       disabled={isSubmitDisabled}
                       style={{
                         ...styles.submitButton,
-                        opacity: isSubmitDisabled ? 0.6 : 1,
+                        opacity: isSubmitDisabled ? (isUsernameBlocked ? 0.8 : 0.6) : 1,
                         cursor: isSubmitDisabled ? "not-allowed" : "pointer",
-                        backgroundColor: (isWeakPassword || usernameCheck.isBlocked) ? "var(--bg-secondary, #334155)" : "var(--accent-color, #3b82f6)",
+                        backgroundColor: isUsernameBlocked 
+                          ? "#172339" 
+                          : isWeakPassword 
+                          ? "var(--bg-secondary, #334155)" 
+                          : "var(--accent-color, #2563eb)",
+                        color: isUsernameBlocked ? "#64748b" : "#ffffff",
+                        boxShadow: (!isSubmitDisabled && !isUsernameBlocked) ? "0 4px 15px rgba(37, 99, 235, 0.4)" : "none",
                       }}
                     >
                       {loading ? (
@@ -552,36 +589,24 @@ function Signin() {
                           <Loader2 size={18} className="animate-spin" />
                           Sending OTP...
                         </>
-                      ) : usernameCheck.isChecking ? (
+                      ) : (isUsernameBlocked && !isCheckingUsername) ? (
                         <>
-                          <Loader2 size={18} className="animate-spin" />
-                          Checking Username...
-                        </>
-                      ) : usernameCheck.isBlocked ? (
-                        <>
-                          Choose Another Username
-                          <AlertCircle size={16} />
+                          Choose Another Username →
                         </>
                       ) : isWeakPassword ? (
                         <>
-                          Password Too Weak to Submit
+                          Enter Stronger Password
                           <Lock size={16} />
                         </>
                       ) : (
                         <>
-                          Submit & Send OTP
-                          <ArrowRight size={18} />
+                          Submit & Send OTP →
                         </>
                       )}
                     </button>
-                    {usernameCheck.isBlocked && (
-                      <span style={{ fontSize: "11px", color: "#ef4444", textAlign: "center", marginTop: "6px", display: "block", fontWeight: "600" }}>
-                        ⚠️ {usernameCheck.message || "Username is unavailable or blocked."}
-                      </span>
-                    )}
                     {isWeakPassword && (
-                      <span style={{ fontSize: "11px", color: "#ef4444", textAlign: "center", marginTop: "6px", display: "block", fontWeight: "600" }}>
-                        ⚠️ Password is too weak to submit. Add numbers or special characters.
+                      <span style={{ fontSize: "11px", color: "var(--text-secondary, #94a3b8)", textAlign: "center", marginTop: "6px", display: "block", fontWeight: "500" }}>
+                        Password should be at least 6 characters with mixed characters.
                       </span>
                     )}
                   </div>
@@ -732,31 +757,37 @@ const styles = {
   wrapper: {
     display: "flex",
     flexDirection: "column",
-    justifyContent: "center",
+    justifyContent: "flex-start",
     alignItems: "center",
-    minHeight: "100vh",
+    height: "100%",
+    minHeight: "100%",
+    maxHeight: "100dvh",
     width: "100%",
     background: "var(--bg-gradient, #0f172a)",
     color: "var(--text-primary, #f8fafc)",
     fontFamily: "Inter, system-ui, sans-serif",
-    padding: "20px",
+    padding: "24px 16px 48px 16px",
     boxSizing: "border-box",
+    overflowY: "auto",
+    WebkitOverflowScrolling: "touch",
   },
   brandName: {
-    fontSize: "32px",
+    fontSize: "30px",
     fontWeight: "800",
     color: "var(--text-primary, #f8fafc)",
     margin: "0 0 4px 0",
-    letterSpacing: "1px",
+    letterSpacing: "0.5px",
   },
   container: {
     width: "100%",
-    maxWidth: "440px",
+    maxWidth: "420px",
+    margin: "auto 0",
+    flexShrink: 0,
     padding: "28px 24px",
-    backgroundColor: "var(--bg-card, #1e293b)",
-    border: "1px solid var(--border-color, rgba(255,255,255,0.1))",
+    backgroundColor: "var(--bg-card, #0d1527)",
+    border: "1px solid var(--border-color, rgba(255,255,255,0.06))",
     borderRadius: "20px",
-    boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.4)",
+    boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
     boxSizing: "border-box",
   },
   stepForm: {
@@ -781,9 +812,11 @@ const styles = {
     lineHeight: "1.4",
   },
   label: {
-    fontSize: "13px",
-    fontWeight: "600",
+    fontSize: "12px",
+    fontWeight: "700",
+    letterSpacing: "0.04em",
     color: "var(--text-secondary, #94a3b8)",
+    textTransform: "uppercase",
   },
   inputWrapper: {
     position: "relative",
@@ -798,10 +831,10 @@ const styles = {
   },
   input: {
     width: "100%",
-    padding: "11px 14px 11px 40px",
+    padding: "11px 14px",
     fontSize: "14px",
-    backgroundColor: "var(--bg-secondary, #0f172a)",
-    border: "1px solid var(--border-color, #334155)",
+    backgroundColor: "var(--bg-secondary, #090f1d)",
+    border: "1px solid var(--border-color, #1e293b)",
     borderRadius: "10px",
     color: "var(--text-primary, #f8fafc)",
     outline: "none",
@@ -858,7 +891,7 @@ const styles = {
   submitButton: {
     width: "100%",
     padding: "12px 20px",
-    backgroundColor: "var(--accent-color, #3b82f6)",
+    backgroundColor: "var(--accent-color, #2563eb)",
     color: "#ffffff",
     border: "none",
     borderRadius: "12px",
@@ -869,7 +902,7 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     gap: "8px",
-    boxShadow: "0 4px 15px rgba(59, 130, 246, 0.3)",
+    boxShadow: "0 4px 15px rgba(37, 99, 235, 0.35)",
     transition: "all 0.2s ease",
   },
   resendBtn: {
