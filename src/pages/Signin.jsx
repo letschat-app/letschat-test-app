@@ -807,13 +807,14 @@ const styles = {
     gap: "6px",
   },
   subtleNote: {
-    fontSize: "12.5px",
+    fontSize: "11px",
     color: "#60a5fa",
     backgroundColor: "rgba(59, 130, 246, 0.08)",
     border: "1px solid rgba(59, 130, 246, 0.22)",
-    padding: "10px 14px",
-    borderRadius: "10px",
-    lineHeight: "1.45",
+    padding: "7px 12px",
+    borderRadius: "8px",
+    lineHeight: "1.38",
+    margin: "-4px 0 -4px 0",
   },
   label: {
     fontSize: "12px",
