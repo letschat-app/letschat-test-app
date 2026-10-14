@@ -409,10 +409,15 @@ function Signin() {
                 </div>
               </div>
 
+              {/* Default Display Name Callout Note */}
+              <div style={styles.subtleNote}>
+                💡 This name is your default display name, but you can customize how you appear to specific contacts when chatting.
+              </div>
+
               {/* Username Input with Live Availability / Similarity Indicator */}
               <div style={styles.fieldGroup}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <label style={styles.label}>USERNAME</label>
+                  <label style={styles.label}>Display Name / Username</label>
                   <UsernameStatusBadge checkResult={usernameCheck} />
                 </div>
                 <div style={styles.inputWrapper}>
@@ -802,14 +807,13 @@ const styles = {
     gap: "6px",
   },
   subtleNote: {
-    fontSize: "12px",
+    fontSize: "12.5px",
     color: "#60a5fa",
-    backgroundColor: "rgba(59, 130, 246, 0.1)",
-    border: "1px solid rgba(59, 130, 246, 0.2)",
-    padding: "8px 12px",
-    borderRadius: "8px",
-    margin: "0 0 6px 0",
-    lineHeight: "1.4",
+    backgroundColor: "rgba(59, 130, 246, 0.08)",
+    border: "1px solid rgba(59, 130, 246, 0.22)",
+    padding: "10px 14px",
+    borderRadius: "10px",
+    lineHeight: "1.45",
   },
   label: {
     fontSize: "12px",
