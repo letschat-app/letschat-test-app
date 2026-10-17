@@ -18,6 +18,7 @@ function getHigherStatus(currentStatus, incomingStatus) {
 }
 
 import { openDB } from 'idb';
+import { API } from './UserAuth';
 
 const DB_NAME = 'LetsChatDB';
 const DB_VERSION = 16;
@@ -151,6 +152,23 @@ export const toggleMuteChat = async (chatId, isMuted) => {
   } else {
     await db.delete('mutedStore', String(chatId));
   }
+
+  // Global server-side mute sync
+  try {
+    const userId = localStorage.getItem('userid');
+    if (userId) {
+      await fetch(`${API}/user/chat/mute?chatId=${encodeURIComponent(chatId)}&isMuted=${isMuted}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Id': userId,
+          'ngrok-skip-browser-warning': 'true'
+        }
+      });
+    }
+  } catch (err) {
+    console.warn('[toggleMuteChat] Global mute sync failed:', err);
+  }
 };
 
 export const isChatMuted = async (chatId) => {
@@ -238,6 +256,22 @@ export const syncChatsMapToDB = async (chatsMap) => {
       }
     }
     await tx.done;
+
+    // Also sync mute states to mutedStore if present
+    if (db.objectStoreNames.contains('mutedStore')) {
+      const txMute = db.transaction('mutedStore', 'readwrite');
+      for (const chatId in chatsMap) {
+        const item = chatsMap[chatId];
+        if (item && item.isMuted !== undefined) {
+          if (item.isMuted) {
+            await txMute.store.put(true, String(chatId));
+          } else {
+            await txMute.store.delete(String(chatId));
+          }
+        }
+      }
+      await txMute.done;
+    }
   } catch (err) {
     console.error("[DB] Failed to sync chatsMap:", err);
   }

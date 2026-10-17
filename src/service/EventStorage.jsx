@@ -82,6 +82,49 @@ export const EventStorage = ({ children }) => {
 
     loadLocalEvents().then(fetchevent);
 
+    // Listen for WebSocket event sync frames (group events created/updated/cancelled by others)
+    const handleEventSync = async (e) => {
+      const msg = e.detail;
+      if (!msg) return;
+
+      console.log("[EventStorage] Received real-time event sync:", msg);
+      fetchevent();
+
+      // If created/updated by someone else, check collision on recipient's calendar
+      if (msg.updatedBy && msg.updatedBy !== userId && msg.startTime && msg.action !== 'cancelled') {
+        const syncStart = new Date(msg.startTime).getTime();
+        const syncEnd = msg.endTime ? new Date(msg.endTime).getTime() : (syncStart + 60 * 60 * 1000);
+
+        try {
+          const localEvents = await getEventsFromDB();
+          if (localEvents && localEvents.length > 0) {
+            const colliding = localEvents.find((existing) => {
+              if (existing.groupEventId === msg.groupEventId || existing.id === msg.eventId || existing.action === 'cancelled') return false;
+              const exStart = existing.date ? new Date(existing.date).getTime() : 0;
+              const exEnd = exStart + 60 * 60 * 1000;
+              return syncStart < exEnd && syncEnd > exStart;
+            });
+
+            if (colliding) {
+              const timeRange = `${new Date(msg.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${msg.endTime ? new Date(msg.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}`;
+              window.dispatchEvent(new CustomEvent('letschat_collision_alert', {
+                detail: {
+                  title: msg.eventTitle || 'Incoming Event',
+                  collidingTitle: colliding.title || 'Existing Event',
+                  timeRange
+                }
+              }));
+            }
+          }
+        } catch (err) {
+          console.error("Collision check error:", err);
+        }
+      }
+    };
+
+    window.addEventListener('letschat_event_sync', handleEventSync);
+    window.addEventListener('letschat_refresh_events', fetchevent);
+
     // Listen for simulation events (walkthrough)
     const handleSimEvent = (e) => {
       const { title, startTime, description, msgref, chatid } = e.detail;
@@ -96,7 +139,11 @@ export const EventStorage = ({ children }) => {
       });
     };
     window.addEventListener('simulation_event_needed', handleSimEvent);
-    return () => window.removeEventListener('simulation_event_needed', handleSimEvent);
+    return () => {
+      window.removeEventListener('simulation_event_needed', handleSimEvent);
+      window.removeEventListener('letschat_event_sync', handleEventSync);
+      window.removeEventListener('letschat_refresh_events', fetchevent);
+    };
   },[userId])
 
   const eventapi=async(events,date)=>{

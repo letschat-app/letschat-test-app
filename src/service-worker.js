@@ -27,7 +27,7 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 const API = "https://letschat-backend-69jf.onrender.com/api"; 
-const DB_VERSION = 15;
+const DB_VERSION = 16;
 
 // ─── Message Handler: User-Controlled Activation ─────────────────────────────
 self.addEventListener('message', (event) => {
@@ -94,15 +94,19 @@ messaging.onBackgroundMessage((payload) => {
   console.log('[SW] FCM background message received:', payload);
 
   const data = payload.data || {};
-  const { type, chatId, title, unread, msgs } = data;
+  const { type, chatId, title, unread, msgs, chatType, repliedTo } = data;
 
   if (type === 'EVENT') {
+    let bodyText = data.chatName ? `Group: ${data.chatName}` : 'Event Reminder';
+    if (data.startTime) {
+      bodyText += ` • Starts at ${data.startTime}`;
+    }
     return self.registration.showNotification(title || 'Upcoming Event', {
-      body: data.chatName || 'Event Reminder',
+      body: bodyText,
       icon: 'icon.png',
       badge: 'icon.png',
       tag: data.eventId || 'event',
-      data: { chatId: data.chatId }
+      data: { type: 'EVENT', chatId: data.chatId, eventId: data.eventId }
     });
   }
 
@@ -127,7 +131,8 @@ messaging.onBackgroundMessage((payload) => {
       body: eventCount > 0 ? `You have ${eventCount} events scheduled for today.` : 'Check your schedule for today.',
       icon: 'icon.png',
       badge: 'icon.png',
-      tag: 'daily-summary'
+      tag: 'daily-summary',
+      data: { type: 'DAILY' }
     });
   }
 
@@ -146,27 +151,64 @@ messaging.onBackgroundMessage((payload) => {
           assignmentIds = assignmentsData || [];
         }
 
-        const db = await new Promise((resolve, reject) => {
-          const req = indexedDB.open('LetsChatDB', DB_VERSION);
-          req.onsuccess = () => resolve(req.result);
-          req.onerror = () => reject(req.error);
-        });
-
-        const tx = db.transaction('assignmentsCache', 'readonly');
-        const store = tx.objectStore('assignmentsCache');
-
-        const details = await Promise.all(assignmentIds.map(id => {
-          return new Promise(res => {
-            const req = store.get(String(id));
-            req.onsuccess = () => res(req.result);
-            req.onerror = () => res(null);
+        let db = null;
+        try {
+          db = await new Promise((resolve, reject) => {
+            const req = indexedDB.open('LetsChatDB', DB_VERSION);
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
           });
-        }));
+        } catch (dbErr) {
+          console.warn('[SW] IndexedDB open failed:', dbErr);
+        }
 
-        const valid = details.filter(d => !!d);
-        if (valid.length === 0) return;
+        let details = [];
+        if (db && db.objectStoreNames.contains('assignmentsCache')) {
+          const tx = db.transaction('assignmentsCache', 'readonly');
+          const store = tx.objectStore('assignmentsCache');
+
+          details = await Promise.all(assignmentIds.map(id => {
+            return new Promise(res => {
+              const req = store.get(String(id));
+              req.onsuccess = () => res(req.result);
+              req.onerror = () => res(null);
+            });
+          }));
+        }
+
+        let valid = details.filter(d => !!d);
+
+        // Network fallback: If some assignments are not cached, fetch them from backend API
+        const missingIds = assignmentIds.filter((id, idx) => !details[idx]);
+        if (missingIds.length > 0) {
+          const fetchedDetails = await Promise.all(
+            missingIds.map(async (id) => {
+              try {
+                const res = await fetch(`${API}/classroom/assignment/get/${id}`, {
+                  headers: { 'ngrok-skip-browser-warning': 'true' }
+                });
+                if (res.ok) {
+                  const fetchedData = await res.json();
+                  if (fetchedData.deadline && typeof fetchedData.deadline === 'number') {
+                    fetchedData.deadline = new Date(fetchedData.deadline * 1000).toISOString();
+                  }
+                  if (db && db.objectStoreNames.contains('assignmentsCache')) {
+                    try {
+                      const txWrite = db.transaction('assignmentsCache', 'readwrite');
+                      txWrite.objectStore('assignmentsCache').put({ ...fetchedData, id: String(id) });
+                    } catch (e) {}
+                  }
+                  return fetchedData;
+                }
+              } catch (e) {}
+              return null;
+            })
+          );
+          fetchedDetails.filter(Boolean).forEach(item => valid.push(item));
+        }
 
         const getRelative = (deadline) => {
+          if (!deadline) return '';
           const now = Date.now();
           const target = new Date(deadline).getTime();
           const diffMins = Math.floor((target - now) / (1000 * 60));
@@ -177,16 +219,33 @@ messaging.onBackgroundMessage((payload) => {
           return `due on ${new Date(deadline).toLocaleDateString()}`;
         };
 
-        const notificationBody = valid.map(a => `${a.title} (${getRelative(a.deadline)})`).join('\n');
+        let notificationBody = '';
+        if (valid.length > 0) {
+          notificationBody = valid.map(a => `${a.title || 'Assignment'} (${getRelative(a.deadline)})`).join('\n');
+          if (assignmentIds.length > valid.length) {
+            notificationBody += `\n+${assignmentIds.length - valid.length} more assignment(s)`;
+          }
+        } else {
+          const count = assignmentIds.length || 1;
+          notificationBody = `You have ${count} pending assignment(s) due.`;
+        }
 
         return self.registration.showNotification('Pending Assignments', {
           body: notificationBody,
           icon: 'icon.png',
           badge: 'icon.png',
-          tag: 'assignments-missing'
+          tag: 'assignments-missing',
+          data: { type: 'ASSIGNMENT_MISSING' }
         });
       } catch (err) {
         console.error('[SW] Assignment resolution failed:', err);
+        return self.registration.showNotification('Pending Assignments', {
+          body: 'You have pending assignments due.',
+          icon: 'icon.png',
+          badge: 'icon.png',
+          tag: 'assignments-missing',
+          data: { type: 'ASSIGNMENT_MISSING' }
+        });
       }
     };
     return resolveAssignments();
@@ -194,6 +253,8 @@ messaging.onBackgroundMessage((payload) => {
 
   // 2. Default CHAT Logic
   if (!chatId) return;
+
+  const isRoom = chatType === 'room' || (chatId && String(chatId).startsWith('room_'));
 
   let messageList = [];
   try {
@@ -213,11 +274,11 @@ messaging.onBackgroundMessage((payload) => {
 
   const last5 = formattedMessages.slice(-5);
   const unreadCount = parseInt(unread) || 1;
-  let notificationBody = unreadCount > 1 ? `${unreadCount} new messages:\n` : '';
+  let notificationBody = (!isRoom && unreadCount > 1) ? `${unreadCount} new messages:\n` : '';
   notificationBody += last5.join('\n');
 
   const resolveAndShow = async () => {
-    let dynamicTitle = title || 'New Message';
+    let dynamicTitle = title || (isRoom ? 'New messages' : 'New Message');
 
     try {
       const db = await new Promise((resolve, reject) => {
@@ -226,31 +287,7 @@ messaging.onBackgroundMessage((payload) => {
         req.onerror = () => reject(req.error);
       });
 
-      if (db.objectStoreNames.contains('mutedStore')) {
-        const txMute = db.transaction('mutedStore', 'readonly');
-        const isMuted = await new Promise((resolve) => {
-          const req = txMute.objectStore('mutedStore').get(chatId);
-          req.onsuccess = () => resolve(req.result);
-          req.onerror = () => resolve(false);
-        });
-        if (isMuted) return;
-      }
-
-      if (db.objectStoreNames.contains('chatsStore')) {
-        const tx = db.transaction('chatsStore', 'readonly');
-        const res = await new Promise((resolve) => {
-          const req = tx.objectStore('chatsStore').get(chatId);
-          req.onsuccess = () => resolve(req.result);
-          req.onerror = () => resolve(null);
-        });
-
-        if (res?.chatName) {
-          dynamicTitle = res.chatName;
-          showNotification(dynamicTitle, notificationBody);
-          return;
-        }
-      }
-
+      // Get current user id from metaStore
       let currentUserId = null;
       if (db.objectStoreNames.contains('metaStore')) {
         const txMeta = db.transaction('metaStore', 'readonly');
@@ -260,8 +297,24 @@ messaging.onBackgroundMessage((payload) => {
           req.onerror = () => resolve(null);
         });
         currentUserId = userIdRes?.value;
+      }
 
-        if (currentUserId) {
+      // Resolve chat name from chatsStore if available
+      let chatName = null;
+      if (db.objectStoreNames.contains('chatsStore')) {
+        const tx = db.transaction('chatsStore', 'readonly');
+        const res = await new Promise((resolve) => {
+          const req = tx.objectStore('chatsStore').get(chatId);
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => resolve(null);
+        });
+        if (res?.chatName) {
+          chatName = res.chatName;
+        }
+      }
+
+      if (!chatName && currentUserId) {
+        try {
           const apiRes = await fetch(`${API}/user/chatbox/${currentUserId}`, {
             headers: { 'ngrok-skip-browser-warning': 'true' }
           });
@@ -269,11 +322,80 @@ messaging.onBackgroundMessage((payload) => {
             const chatData = await apiRes.json();
             const matchedChat = chatData.find(c => String(c.chatId) === String(chatId));
             if (matchedChat?.chatName) {
-              dynamicTitle = matchedChat.chatName;
-              const txUpdate = db.transaction('chatsStore', 'readwrite');
-              txUpdate.objectStore('chatsStore').put(matchedChat);
+              chatName = matchedChat.chatName;
+              if (db.objectStoreNames.contains('chatsStore')) {
+                const txUpdate = db.transaction('chatsStore', 'readwrite');
+                txUpdate.objectStore('chatsStore').put(matchedChat);
+              }
             }
           }
+        } catch (e) {}
+      }
+
+      if (chatName) {
+        dynamicTitle = isRoom ? `New messages in ${chatName}` : chatName;
+      }
+
+      // Universal Reply Resolution (UserA replied to UserB / UserA replied to You)
+      if (repliedTo) {
+        let repliedSenderId = null;
+        let repliedSenderName = null;
+
+        // Step 1: Check local IndexedDB cache
+        if (db.objectStoreNames.contains('messages')) {
+          try {
+            const txMsg = db.transaction('messages', 'readonly');
+            const cachedMsg = await new Promise(res => {
+              const req = txMsg.objectStore('messages').get(repliedTo);
+              req.onsuccess = () => res(req.result);
+              req.onerror = () => res(null);
+            });
+            if (cachedMsg) {
+              repliedSenderId = cachedMsg.userid || cachedMsg.senderid || cachedMsg.SenderId;
+              repliedSenderName = cachedMsg.sendername || cachedMsg.UserName || cachedMsg.senderName;
+            }
+          } catch (e) {}
+        }
+
+        // Step 2: Cache miss fallback - fetch strictly chat-specific nickname from backend
+        if (!repliedSenderName) {
+          try {
+            const res = await fetch(`${API}/user/message/sender-info?msgId=${encodeURIComponent(repliedTo)}`, {
+              headers: { 'ngrok-skip-browser-warning': 'true' }
+            });
+            if (res.ok) {
+              const info = await res.json();
+              repliedSenderId = info.senderId;
+              repliedSenderName = info.senderName || 'Member';
+            }
+          } catch (e) {}
+        }
+
+        // Extract latest sender and preview from payload
+        const latestRaw = messageList[messageList.length - 1];
+        let latestSender = 'Someone';
+        let latestPreview = 'replied';
+        if (typeof latestRaw === 'string') {
+          const parts = latestRaw.split('/%20/');
+          if (parts.length >= 4) {
+            latestSender = parts[2] || latestSender;
+            const msgType = parts[1];
+            const displayMap = { image: '📷 Image', video: '🎥 Video', audio: '🎤 Voice Message', voice: '🎤 Voice Message', file: '📁 File' };
+            latestPreview = displayMap[msgType] || parts[3];
+          } else {
+            latestPreview = latestRaw;
+          }
+        }
+
+        const isReplyToCurrentUser = currentUserId && repliedSenderId === currentUserId;
+        const targetChatDisplayName = chatName || 'Chat';
+
+        if (isReplyToCurrentUser) {
+          dynamicTitle = isRoom ? `You got a reply in ${targetChatDisplayName}` : 'You got a reply';
+          notificationBody = `${latestSender} replied to You: ${latestPreview}`;
+        } else if (repliedSenderName) {
+          dynamicTitle = targetChatDisplayName;
+          notificationBody = `${latestSender} replied to ${repliedSenderName}: ${latestPreview}`;
         }
       }
 
@@ -305,8 +427,9 @@ messaging.onBackgroundMessage((payload) => {
       body: finalBody,
       icon: 'icon.png',
       badge: 'icon.png',
-      tag: chatId,
-      data: { chatId },
+      tag: isRoom ? `room-${chatId}` : chatId,
+      renotify: true,
+      data: { chatId, type: chatType || 'CHAT' },
       vibrate: [200, 100, 200],
     });
   }
@@ -315,17 +438,42 @@ messaging.onBackgroundMessage((payload) => {
 // ─── Notification Click ───────────────────────────────────────────────────────
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const chatId = event.notification.data?.chatId;
+  const data = event.notification.data || {};
+  const tag = event.notification.tag;
   const baseUrl = self.registration.scope;
-  const relativePath = chatId ? `#/chats?showSpacesForChat=${chatId}` : `#/chats`;
+
+  let relativePath = '#/chats';
+  if (tag === 'daily-summary' || data.type === 'DAILY' || data.type === 'EVENT') {
+    relativePath = '#/calendar';
+  } else if (tag === 'assignments-missing' || data.type === 'ASSIGNMENT_MISSING') {
+    relativePath = '#/communities';
+  } else if (data.chatId) {
+    relativePath = `#/chats?showSpacesForChat=${data.chatId}`;
+  }
+
   const urlToOpen = new URL(relativePath, baseUrl).href;
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (windowClients) => {
       for (const client of windowClients) {
-        if (client.url === urlToOpen && 'focus' in client) return client.focus();
+        try {
+          const clientOrigin = new URL(client.url).origin;
+          if (clientOrigin === location.origin) {
+            if ('focus' in client) {
+              await client.focus();
+            }
+            if ('navigate' in client) {
+              await client.navigate(urlToOpen);
+            }
+            return;
+          }
+        } catch (e) {
+          // ignore URL parsing error
+        }
       }
-      if (self.clients.openWindow) return self.clients.openWindow(urlToOpen);
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(urlToOpen);
+      }
     })
   );
 });

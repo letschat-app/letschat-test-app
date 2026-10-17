@@ -2,6 +2,7 @@ import React, { Suspense, lazy , useEffect , useState} from "react";
 import { Routes, Route, Navigate,useLocation, useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
 import { purgeExpiredMessages } from "./service/db";
+import { purgeExpiredPulseMedia } from "./service/PulseMediaCache";
 import messageStore from "./pages/MessageStore";
 import EventPanel from "./service/EventPanel";
 import { EventStorage } from "./service/EventStorage";
@@ -14,6 +15,7 @@ import InAppToast from "./components/chat/InAppToast";
 import { useNotifications } from "./hooks/useNotifications";
 import { WifiOff } from "lucide-react";
 import ErrorBoundary from "./components/ErrorBoundary";
+import PendingOtpModal from "./components/modals/PendingOtpModal";
 
 // Custom lazy wrapper to remove splash screen ONLY when the first dynamic chunk resolves
 const lazyWithSplash = (importFunc) => {
@@ -49,6 +51,10 @@ const LandingPage = lazyWithSplash(() => import("./pages/LandingPage"));
 const Signin = lazyWithSplash(() => import("./pages/Signin"));
 const Login = lazyWithSplash(() => import("./pages/Login"));
 
+import CollisionAlertToast from "./components/chat/CollisionAlertToast";
+import BookingRequestModal from "./components/modals/BookingRequestModal";
+
+const PublicBookingPage = lazyWithSplash(() => import("./pages/PublicBookingPage"));
 import { initSystemBroadcastSync } from "./service/SystemBroadcastService";
 
 function App() {
@@ -68,12 +74,14 @@ function App() {
   }, []);
 
   useEffect(() => {
-    // Initial cleanup
+    // Initial cleanup of expired messages & pulses
     purgeExpiredMessages();
+    purgeExpiredPulseMedia();
 
     // Periodic cleanup every 5 minutes
     const interval = setInterval(() => {
       purgeExpiredMessages();
+      purgeExpiredPulseMedia();
     }, 5 * 60 * 1000);
 
     return () => clearInterval(interval);
@@ -82,7 +90,8 @@ function App() {
   const location = useLocation();
   const navigate=useNavigate();
   useNotifications(); // Initialize push notification logic
-  const showNavbar = localStorage.getItem("userid") && location.pathname !== "/signin" && location.pathname !== "/login" && location.pathname !== "/welcome";
+  const isBookingPage = location.pathname.startsWith("/book");
+  const showNavbar = localStorage.getItem("userid") && location.pathname !== "/signin" && location.pathname !== "/login" && location.pathname !== "/welcome" && !isBookingPage;
 
   useEffect(() => {
     // System Broadcast Sync
@@ -99,13 +108,13 @@ function App() {
     const isAuthPage = location.pathname === "/login" || location.pathname === "/signin" || location.pathname === "/welcome";
     
     if (id) {
-      // If logged in, don't allow visiting auth/landing pages
-      if (isAuthPage || location.pathname === "/") {
+      // If logged in, don't allow visiting auth/landing pages (except public booking)
+      if ((isAuthPage) || location.pathname === "/") {
         navigate("/chats", { replace: true });
       }
     } else {
-      // If not logged in, allow landing, login, and signup pages
-      if (!isAuthPage) {
+      // If not logged in, allow landing, login, signup, and public booking page
+      if (!isAuthPage && !isBookingPage) {
         navigate("/welcome", { replace: true });
       }
     }
@@ -155,6 +164,9 @@ function App() {
     <EventStorage>
     <EventPanel>
     <InAppToast />
+    <PendingOtpModal />
+    <CollisionAlertToast />
+    <BookingRequestModal />
     
     <div style={{
       width:"100%",
@@ -176,6 +188,7 @@ function App() {
             <Route path="/welcome" element={<LandingPage />} />
             <Route path="/signin" element={<Signin />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/book/:userIdentifier" element={<PublicBookingPage />} />
             {/* New Desktop Layout Routing */}
             <Route element={<ChatLayout />}>
               <Route path="/chats" element={<ChatNames/>}/>

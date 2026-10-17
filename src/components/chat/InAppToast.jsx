@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import messageStore from '../../pages/MessageStore';
 import { useEventMediator } from '../../service/EventStorage';
 import { Calendar, MessageSquare, Clock, ChevronDown, ChevronUp, ClipboardList } from 'lucide-react';
-import { getAssignmentFromDB } from '../../service/db';
+import { getAssignmentFromDB, saveAssignmentToDB, isChatMuted } from '../../service/db';
+import { API } from '../../service/UserAuth';
 
 const InAppToast = () => {
   const [notification, setNotification] = useState(null);
@@ -20,7 +21,9 @@ const InAppToast = () => {
   }, []);
 
   useEffect(() => {
-    const handleNewMessage = (payload) => {
+    let hideTimer = null;
+
+    const handleNewMessage = async (payload) => {
       // payload can be a direct message object or an FCM data payload
       if (!payload) return;
 
@@ -29,31 +32,117 @@ const InAppToast = () => {
       // 1. Handle standard CHAT messages
       if (type === 'CHAT') {
         if (payload.bulkLoad || payload.type === 'indicator') return;
-        
-        // Content check (might be in payload.content or payload.message)
-        const content = payload.content || payload.message;
+
+        let content = payload.content || payload.message;
+        let senderName = payload.sendername || payload.senderName || payload.title || 'New Message';
+        let msgType = payload.msgType || payload.type;
+
+        // Unpack FCM foreground message payload if content is in msgs array
+        if (!content && payload.msgs) {
+          try {
+            const list = typeof payload.msgs === 'string' ? JSON.parse(payload.msgs) : payload.msgs;
+            if (Array.isArray(list) && list.length > 0) {
+              const last = list[list.length - 1];
+              if (typeof last === 'string') {
+                const parts = last.split('/%20/');
+                if (parts.length >= 4) {
+                  msgType = parts[1];
+                  senderName = parts[2] || senderName;
+                  content = parts[3];
+                } else {
+                  content = last;
+                }
+              }
+            }
+          } catch (e) {
+            console.error("Failed to parse FCM msgs in InAppToast:", e);
+          }
+        }
+
         if (!content) return;
 
         const targetChatId = payload.chatid || payload.chatId;
         const senderId = payload.userid || payload.senderId || payload.senderid;
 
-        if (senderId === userId) return;
+        if (senderId && senderId === userId) return;
         if (messageStore.getActivechatbox() && String(targetChatId) === String(messageStore.getActivechatbox())) return;
 
         let preview = '';
-        switch (payload.msgType || payload.type) {
+        switch (msgType) {
           case 'image': preview = '📷 Photo'; break;
           case 'video': preview = '🎥 Video'; break;
           case 'audio': preview = '🎤 Audio'; break;
+          case 'voice': preview = '🎤 Voice Message'; break;
           case 'file': preview = '📄 Document'; break;
           default: preview = content;
+        }
+
+        const repliedTo = payload.repliedto || payload.repliedTo;
+        let toastTitle = senderName;
+        let toastContent = preview;
+        let isReplyToUser = false;
+
+        if (repliedTo) {
+          let repliedSenderId = null;
+          let repliedSenderName = null;
+
+          // 1. Check local IndexedDB cache
+          try {
+            const db = await new Promise((resolve, reject) => {
+              const req = indexedDB.open('LetsChatDB', 16);
+              req.onsuccess = () => resolve(req.result);
+              req.onerror = () => reject(req.error);
+            });
+            if (db && db.objectStoreNames.contains('messages')) {
+              const tx = db.transaction('messages', 'readonly');
+              const cached = await new Promise(res => {
+                const req = tx.objectStore('messages').get(repliedTo);
+                req.onsuccess = () => res(req.result);
+                req.onerror = () => res(null);
+              });
+              if (cached) {
+                repliedSenderId = cached.userid || cached.senderid || cached.SenderId;
+                repliedSenderName = cached.sendername || cached.UserName || cached.senderName;
+              }
+            }
+          } catch (e) {}
+
+          // 2. Cache miss fallback: Call backend strictly returning chat-specific nickname
+          if (!repliedSenderName) {
+            try {
+              const res = await fetch(`${API}/user/message/sender-info?msgId=${encodeURIComponent(repliedTo)}`, {
+                headers: { 'ngrok-skip-browser-warning': 'true' }
+              });
+              if (res.ok) {
+                const info = await res.json();
+                repliedSenderId = info.senderId;
+                repliedSenderName = info.senderName || 'Member';
+              }
+            } catch (e) {}
+          }
+
+          if (userId && repliedSenderId === userId) {
+            isReplyToUser = true;
+            toastTitle = payload.chatType === 'room' ? `You got a reply in ${payload.chatName || 'Room'}` : 'You got a reply';
+            toastContent = `${senderName} replied to You: ${preview}`;
+          } else if (repliedSenderName) {
+            toastContent = `${senderName} replied to ${repliedSenderName}: ${preview}`;
+          }
+        }
+
+        // Mute check: suppress toast if conversation is muted, UNLESS direct reply (Reply Override)
+        if (targetChatId) {
+          try {
+            const muted = await isChatMuted(targetChatId);
+            if (muted && !isReplyToUser) return;
+          } catch (e) {}
         }
 
         setNotification({
           type: 'CHAT',
           chatid: targetChatId,
-          title: payload.sendername || 'New Message',
-          content: preview
+          title: toastTitle,
+          content: toastContent
         });
       } 
       // 2. Handle EVENT reminders
@@ -98,26 +187,71 @@ const InAppToast = () => {
           console.error("Failed to parse ASSIGNMENT_MISSING ids:", e);
         }
 
-        Promise.all(assignmentIds.map(id => getAssignmentFromDB(id))).then(details => {
-          const valid = details.filter(d => !!d);
-          if (valid.length > 0) {
-            setNotification({
-              type: 'ASSIGNMENT_MISSING',
-              title: 'Pending Assignments',
-              assignments: valid
-            });
-          }
-        });
+        let details = [];
+        try {
+          details = await Promise.all(assignmentIds.map(id => getAssignmentFromDB(id)));
+        } catch (e) {
+          details = [];
+        }
+
+        let valid = details.filter(d => !!d);
+
+        // Network fallback: fetch missing assignments from backend if not yet in IndexedDB
+        const missingIds = assignmentIds.filter((id, idx) => !details[idx]);
+        if (missingIds.length > 0) {
+          try {
+            const fetched = await Promise.all(
+              missingIds.map(async (id) => {
+                try {
+                  const res = await fetch(`${API}/classroom/assignment/get/${id}`, {
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'User-Id': localStorage.getItem('userid'),
+                      'ngrok-skip-browser-warning': 'true'
+                    }
+                  });
+                  if (res.ok) {
+                    const data = await res.json();
+                    if (data.deadline && typeof data.deadline === 'number') {
+                      data.deadline = new Date(data.deadline * 1000).toISOString();
+                    }
+                    await saveAssignmentToDB({ ...data, id: String(id) });
+                    return data;
+                  }
+                } catch (err) {}
+                return null;
+              })
+            );
+            fetched.filter(Boolean).forEach(f => valid.push(f));
+          } catch (err) {}
+        }
+
+        if (valid.length > 0) {
+          setNotification({
+            type: 'ASSIGNMENT_MISSING',
+            title: 'Pending Assignments',
+            assignments: valid
+          });
+        } else if (assignmentIds.length > 0) {
+          setNotification({
+            type: 'ASSIGNMENT_MISSING',
+            title: 'Pending Assignments',
+            assignments: [],
+            fallbackCount: assignmentIds.length
+          });
+        }
       }
 
       setIsMaximized(false);
-      // Auto-hide after 8 seconds (longer for events)
-      const timer = setTimeout(() => setNotification(null), 8000);
-      return () => clearTimeout(timer);
+      if (hideTimer) clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => setNotification(null), 8000);
     };
 
     messageStore.addListener(handleNewMessage);
-    return () => messageStore.removeListener(handleNewMessage);
+    return () => {
+      messageStore.removeListener(handleNewMessage);
+      if (hideTimer) clearTimeout(hideTimer);
+    };
   }, [userId]);
 
   const getRelativeTimeText = (event, isAssignment = false) => {
@@ -159,7 +293,12 @@ const InAppToast = () => {
           navigate(`/chat/${notification.chatid}`);
           setNotification(null);
         } else if (isDaily || isAssignment) {
-          setIsMaximized(!isMaximized);
+          if (isAssignment && (!notification.assignments || notification.assignments.length === 0)) {
+            navigate('/communities');
+            setNotification(null);
+          } else {
+            setIsMaximized(!isMaximized);
+          }
         }
       }}
       style={{
@@ -239,11 +378,15 @@ const InAppToast = () => {
 
           {isAssignment && !isMaximized && (
             <div style={{ fontSize: '13px', color: 'var(--text-secondary)', display: 'flex', gap: '4px', overflow: 'hidden' }}>
-              {notification.assignments.map((ass, i) => (
-                <span key={ass.id} style={{ whiteSpace: 'nowrap' }}>
-                  {ass.title}{i < notification.assignments.length - 1 ? ' • ' : ''}
-                </span>
-              ))}
+              {notification.assignments?.length > 0 ? (
+                notification.assignments.map((ass, i) => (
+                  <span key={ass.id} style={{ whiteSpace: 'nowrap' }}>
+                    {ass.title}{i < notification.assignments.length - 1 ? ' • ' : ''}
+                  </span>
+                ))
+              ) : (
+                <span>You have {notification.fallbackCount} pending assignment(s) due.</span>
+              )}
             </div>
           )}
 
@@ -301,13 +444,22 @@ const InAppToast = () => {
                 <span style={{ fontSize: '12px', color: '#fbbf24', fontWeight: '600' }}>{ev.startTime}</span>
               </div>
             );
-          }) : notification.assignments.map(ass => (
-            <div key={ass.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '14px', color: 'var(--text-primary)', fontWeight: '500' }}>{ass.title}</span>
-                <span style={{ fontSize: '12px', color: '#fbbf24', fontWeight: '600' }}>{getRelativeTimeText(ass, true)}</span>
+          }) : (notification.assignments?.length > 0 ? (
+            notification.assignments.map(ass => (
+              <div key={ass.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '14px', color: 'var(--text-primary)', fontWeight: '500' }}>{ass.title}</span>
+                  <span style={{ fontSize: '12px', color: '#fbbf24', fontWeight: '600' }}>{getRelativeTimeText(ass, true)}</span>
+                </div>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{ass.chatName}</span>
               </div>
-              <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{ass.chatName}</span>
+            ))
+          ) : (
+            <div 
+              onClick={(e) => { e.stopPropagation(); navigate('/communities'); setNotification(null); }}
+              style={{ fontSize: '13px', color: 'var(--accent-color)', cursor: 'pointer', textAlign: 'center', padding: '6px' }}
+            >
+              You have {notification.fallbackCount} pending assignment(s) due. Tap here to open Classroom.
             </div>
           ))}
         </div>

@@ -122,6 +122,23 @@ export function initWebsocket() {
       return;
     }
 
+    // 3.6 Real-Time Event Sync, RSVP Updates, and Booking Requests
+    if (msg.type === 'event_sync') {
+      console.log("[Websocket] Event Sync received:", msg);
+      window.dispatchEvent(new CustomEvent('letschat_event_sync', { detail: msg }));
+      return;
+    }
+    if (msg.type === 'event_rsvp_update') {
+      console.log("[Websocket] Event RSVP update received:", msg);
+      window.dispatchEvent(new CustomEvent('letschat_rsvp_update', { detail: msg }));
+      return;
+    }
+    if (msg.type === 'booking_request') {
+      console.log("[Websocket] Booking request received:", msg);
+      window.dispatchEvent(new CustomEvent('letschat_booking_request', { detail: msg }));
+      return;
+    }
+
     // 4. Single Message ACK Response (onrecieve ACK payload)
     if (('tempmsgid' in msg || 'msgid' in msg) && 'status' in msg && !('sendername' in msg) && !('content' in msg)) {
       console.log("[Websocket] Single ACK received:", msg);

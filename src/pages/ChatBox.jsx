@@ -9,10 +9,12 @@ import { getsocket, initWebsocket, sendSafe, sendMediaOpenedEvent } from "../ser
 import messageStore from "./MessageStore";
 import StreakBadge from "../components/pulse/StreakBadge";
 import { getPulseFromStore, pulsePreviewCache } from '../service/PulseMediaCache';
-import { initDB, saveUsersBatchToDB, saveGroupMembersToDB, markMessagesAsOldInDB, getGroupMembersFromDB } from '../service/db';
+import { initDB, saveUsersBatchToDB, saveGroupMembersToDB, markMessagesAsOldInDB, getGroupMembersFromDB, isChatMuted, toggleMuteChat } from '../service/db';
 import { useNotifications } from '../hooks/useNotifications';
 import { useTheme } from '../context/ThemeContext';
 import {
+  Bell,
+  BellOff,
   ArrowUp,
   Plus,
   Smile,
@@ -53,6 +55,7 @@ import { useEventMediator } from "../service/EventStorage";
 import AssignmentMessage from "./AssignmentMessage";
 import EyeIcon from "../components/chat/EyeIcon";
 import EventModal from "../components/modals/EventModal";
+import GroupCalendarPanel from "../components/chat/GroupCalendarPanel";
 import InfoModal from "../components/modals/InfoModal";
 import MessageStatusInfoModal from "../components/modals/MessageStatusInfoModal";
 import AssignmentPostModal from "../components/modals/AssignmentPostModal";
@@ -1378,6 +1381,13 @@ const ChatBox = () => {
   useEffect(() => {
     const pinned = JSON.parse(localStorage.getItem('pinnedChats') || '[]');
     setIsCurrentChatPinned(pinned.includes(chatid));
+  }, [chatid]);
+
+  const [isMuted, setIsMuted] = useState(false);
+  useEffect(() => {
+    if (chatid) {
+      isChatMuted(chatid).then(muted => setIsMuted(!!muted));
+    }
   }, [chatid]);
 
   const togglePin = (e) => {
@@ -3363,6 +3373,76 @@ const ChatBox = () => {
     }
   };
 
+  // --- 24-Hour Active Pinned Banner System (Name Changes) ---
+  const [isBannerPinsExpanded, setIsBannerPinsExpanded] = useState(false);
+  const [highlightedPinId, setHighlightedPinId] = useState(null);
+
+  const isWithin24Hours = useCallback((timestamp) => {
+    if (!timestamp) return false;
+    const msgTime = new Date(timestamp).getTime();
+    if (isNaN(msgTime)) return false;
+    const elapsed = Date.now() - msgTime;
+    return elapsed >= 0 && elapsed < 24 * 60 * 60 * 1000;
+  }, []);
+
+  const formatTimeRemaining = useCallback((timestamp) => {
+    if (!timestamp) return "";
+    const msgTime = new Date(timestamp).getTime();
+    if (isNaN(msgTime)) return "";
+    const remainingMs = (24 * 60 * 60 * 1000) - (Date.now() - msgTime);
+    if (remainingMs <= 0) return "Expired";
+    const hours = Math.floor(remainingMs / (1000 * 60 * 60));
+    const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
+    if (hours > 0) return `${hours}h left`;
+    return `${minutes}m left`;
+  }, []);
+
+  const formatBannerText = useCallback((msg) => {
+    if (!msg) return "";
+    const myId = localStorage.getItem('userid');
+    const isMe = String(msg.userid || msg.senderid) === String(myId);
+
+    if (typeof msg.content === 'string' && msg.content.includes('/')) {
+      const parts = msg.content.split('/');
+      const othersText = parts[0]?.trim();
+      const myText = parts[1]?.trim();
+      return isMe ? (myText || othersText) : othersText;
+    }
+
+    if (isMe && msg.sendername && typeof msg.content === 'string') {
+      return msg.content.replace(new RegExp(`^${msg.sendername}`, 'i'), 'You');
+    }
+
+    return msg.content || "";
+  }, []);
+
+  const activeBannerPins = useMemo(() => {
+    if (!messages || messages.length === 0) return [];
+    return messages
+      .filter((m) => m && m.type === "banner-pin" && isWithin24Hours(m.timestamp))
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }, [messages, isWithin24Hours]);
+
+  // Member Entrance Highlight: When entering chat, highlight unread banner-pin
+  useEffect(() => {
+    if (!chatid || activeBannerPins.length === 0) return;
+    const myId = localStorage.getItem('userid');
+    const latestPin = activeBannerPins[0];
+    if (!latestPin) return;
+
+    const storageKey = `last_seen_pin_${chatid}`;
+    const lastSeenPinId = localStorage.getItem(storageKey);
+
+    if (lastSeenPinId !== (latestPin.msgid || latestPin.timestamp) && String(latestPin.userid || latestPin.senderid) !== String(myId)) {
+      setHighlightedPinId(latestPin.msgid);
+      const timer = setTimeout(() => {
+        setHighlightedPinId(null);
+        localStorage.setItem(storageKey, latestPin.msgid || latestPin.timestamp);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [chatid, activeBannerPins]);
+
   const firstUnreadMentionId = useMemo(() => {
     if (!unreadMarker.firstId) return null;
     const startIndex = filteredMessages.findIndex(m => (m.msgid || m.tempmsgid) === unreadMarker.firstId);
@@ -3487,6 +3567,7 @@ const ChatBox = () => {
   };
 
   const [showInfo, setShowInfo] = useState(false);
+  const [showGroupCalendar, setShowGroupCalendar] = useState(false);
   const clickInfo = () => {
     setShowInfo(true);
   }
@@ -3722,7 +3803,7 @@ const ChatBox = () => {
 
 
 
-  const isSidePanelOpen = !isMobile && (showInfo || ShowEventModal || showpost || showadd || showAssignmentDetail);
+  const isSidePanelOpen = !isMobile && (showInfo || ShowEventModal || showpost || showadd || showAssignmentDetail || showGroupCalendar);
 
   return (
     <div className="chat-layout-wrapper" style={{ display: 'flex', width: '100%', height: '100%', overflow: 'hidden', backgroundColor: 'var(--bg-primary)' }}>
@@ -4287,6 +4368,27 @@ const ChatBox = () => {
             )}
 
             <button
+              onClick={() => setShowGroupCalendar(!showGroupCalendar)}
+              title="Group Calendar"
+              style={{
+                background: showGroupCalendar ? 'rgba(59, 130, 246, 0.2)' : 'none',
+                border: showGroupCalendar ? '1px solid rgba(59, 130, 246, 0.4)' : 'none',
+                color: showGroupCalendar ? '#60a5fa' : 'var(--text-secondary)',
+                cursor: 'pointer',
+                padding: '8px',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.15)'}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = showGroupCalendar ? 'rgba(59, 130, 246, 0.2)' : 'transparent'}
+            >
+              <Calendar size={20} />
+            </button>
+
+            <button
               onClick={() => setShowHeaderMenu(!showHeaderMenu)}
               style={{
                 background: 'none',
@@ -4374,6 +4476,35 @@ const ChatBox = () => {
                   </button>
 
                   <button
+                    onClick={async () => {
+                      setShowHeaderMenu(false);
+                      const nextMuted = !isMuted;
+                      setIsMuted(nextMuted);
+                      await toggleMuteChat(chatid, nextMuted);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      textAlign: 'left',
+                      background: 'transparent',
+                      border: 'none',
+                      color: isMuted ? '#ef4444' : 'var(--text-primary)',
+                      cursor: 'pointer',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    {isMuted ? <BellOff size={16} color="#ef4444" /> : <Bell size={16} />}
+                    {isMuted ? 'Unmute Notifications' : 'Mute Notifications'}
+                  </button>
+
+                  <button
                     onClick={() => {
                       setShowHeaderMenu(false);
                       setShowFilterModal(true);
@@ -4452,6 +4583,31 @@ const ChatBox = () => {
                   </button>
                   <div style={{ height: '1px', backgroundColor: 'var(--border-color)', margin: '4px 0' }} />
                   <button
+                    onClick={() => {
+                      setShowHeaderMenu(false);
+                      setShowGroupCalendar(true);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      textAlign: 'left',
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <Calendar size={16} /> Group Calendar
+                  </button>
+                  <button
                     onClick={() => { setShowHeaderMenu(false); clickInfo(); }}
                     style={{
                       width: '100%',
@@ -4492,6 +4648,169 @@ const ChatBox = () => {
           >
             <Clock size={16} />
             View {scheduledMessages.length} Upcoming Scheduled Message{scheduledMessages.length > 1 ? 's' : ''}
+          </div>
+        )}
+
+        {/* Sticky Pinned Name Change Banners (Last 24 Hours) - Shown to every member */}
+        {activeBannerPins.length > 0 && (
+          <div
+            style={{
+              width: "100%",
+              backgroundColor: "rgba(10, 17, 32, 0.96)",
+              backdropFilter: "blur(10px)",
+              WebkitBackdropFilter: "blur(10px)",
+              borderBottom: "1px solid rgba(59, 130, 246, 0.3)",
+              boxShadow: "0 4px 16px rgba(0, 0, 0, 0.35)",
+              zIndex: 15,
+              position: "relative",
+              transition: "all 0.25s ease",
+            }}
+          >
+            {!isBannerPinsExpanded ? (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: isMobile ? "7px 12px" : "8px 16px",
+                  gap: "10px",
+                  cursor: "pointer",
+                }}
+                onClick={() => {
+                  if (activeBannerPins.length > 1) {
+                    setIsBannerPinsExpanded(true);
+                  } else {
+                    scrollToMessage(activeBannerPins[0].msgid);
+                  }
+                }}
+                title={activeBannerPins.length > 1 ? "Click to view all pinned name changes" : "Click to jump to message"}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, flex: 1 }}>
+                  <span style={{ fontSize: "14px", flexShrink: 0 }}>📌</span>
+                  <span style={{
+                    fontSize: isMobile ? "12px" : "13px",
+                    fontWeight: "600",
+                    color: "var(--text-primary, #f8fafc)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}>
+                    {formatBannerText(activeBannerPins[0])}
+                  </span>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                  {activeBannerPins.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsBannerPinsExpanded(true);
+                      }}
+                      style={{
+                        background: "rgba(59, 130, 246, 0.2)",
+                        border: "1px solid rgba(59, 130, 246, 0.4)",
+                        color: "#93c5fd",
+                        fontSize: "11px",
+                        fontWeight: "700",
+                        padding: "2px 8px",
+                        borderRadius: "12px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "3px",
+                      }}
+                    >
+                      +{activeBannerPins.length - 1} more ▾
+                    </button>
+                  )}
+
+                  <span style={{
+                    fontSize: "11px",
+                    color: "#94a3b8",
+                    background: "rgba(255, 255, 255, 0.06)",
+                    padding: "2px 6px",
+                    borderRadius: "6px",
+                    fontWeight: "500",
+                  }}>
+                    {formatTimeRemaining(activeBannerPins[0].timestamp)}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: isMobile ? "10px 12px" : "12px 16px" }}>
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: "8px",
+                  paddingBottom: "6px",
+                  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ fontSize: "14px" }}>📌</span>
+                    <span style={{ fontSize: "12px", fontWeight: "700", color: "#93c5fd", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                      Pinned Name Changes ({activeBannerPins.length})
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsBannerPinsExpanded(false)}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      color: "#60a5fa",
+                      fontSize: "11px",
+                      fontWeight: "600",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "2px",
+                    }}
+                  >
+                    Show less ▴
+                  </button>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px", maxHeight: "180px", overflowY: "auto" }} className="hide-scrollbar">
+                  {activeBannerPins.map((pin) => (
+                    <div
+                      key={pin.msgid || pin.tempmsgid || pin.timestamp}
+                      onClick={() => scrollToMessage(pin.msgid)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "6px 10px",
+                        backgroundColor: "rgba(255, 255, 255, 0.04)",
+                        borderRadius: "8px",
+                        cursor: "pointer",
+                        transition: "background 0.15s ease",
+                        gap: "10px",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.12)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.04)")}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, flex: 1 }}>
+                        <span style={{ fontSize: "12px", color: "#60a5fa" }}>•</span>
+                        <span style={{
+                          fontSize: "12px",
+                          color: "var(--text-primary, #f8fafc)",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}>
+                          {formatBannerText(pin)}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: "10px", color: "#94a3b8", flexShrink: 0 }}>
+                        {formatTimeRemaining(pin.timestamp)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -4778,26 +5097,51 @@ const ChatBox = () => {
                         </span>
                       </div>
                     )}
-                    {msg.sendername === "server" || msg.type === "banner" ? (
-                      <div style={{
-                        alignSelf: "center",
-                        backgroundColor: "var(--bg-card)",
-                        color: "var(--text-secondary)",
-                        padding: isMobile ? '6px 12px' : '8px 16px',
-                        borderRadius: '16px',
-                        fontSize: isMobile ? '12px' : '13px',
-                        border: "1px solid var(--border-color)",
-                      }}>
-                        {/* {msg.content} */}
-                        {
-                          msg.userid
-                            ? (
-                              msg.userid === localStorage.getItem('userid')
-                                ? msg.content.split('/')[1]
-                                : msg.content.split('/')[0]
-                            )
-                            : msg.content
-                        }
+                    {msg.sendername === "server" || msg.type === "banner" || msg.type === "banner-pin" ? (
+                      <div
+                        ref={(el) => (messageRefs.current[msg.msgid] = el)}
+                        className={highlightedPinId === msg.msgid ? "banner-pin-entrance-pulse" : undefined}
+                        style={{
+                          alignSelf: "center",
+                          backgroundColor: (msg.type === "banner-pin" && isWithin24Hours(msg.timestamp))
+                            ? "rgba(30, 58, 95, 0.4)"
+                            : "var(--bg-card)",
+                          color: (msg.type === "banner-pin" && isWithin24Hours(msg.timestamp))
+                            ? "var(--text-primary, #f8fafc)"
+                            : "var(--text-secondary)",
+                          padding: isMobile ? '6px 12px' : '8px 16px',
+                          borderRadius: '16px',
+                          fontSize: isMobile ? '12px' : '13px',
+                          border: (msg.type === "banner-pin" && isWithin24Hours(msg.timestamp))
+                            ? "1px solid rgba(59, 130, 246, 0.4)"
+                            : "1px solid var(--border-color)",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          boxShadow: (msg.type === "banner-pin" && isWithin24Hours(msg.timestamp))
+                            ? "0 4px 12px rgba(59, 130, 246, 0.15)"
+                            : undefined,
+                          transition: "all 0.3s ease",
+                        }}
+                      >
+                        {msg.type === "banner-pin" && isWithin24Hours(msg.timestamp) && (
+                          <span style={{ fontSize: "13px" }}>📌</span>
+                        )}
+                        <span>{formatBannerText(msg)}</span>
+                        {msg.type === "banner-pin" && isWithin24Hours(msg.timestamp) && (
+                          <span style={{
+                            fontSize: "10px",
+                            fontWeight: "700",
+                            color: "#60a5fa",
+                            backgroundColor: "rgba(59, 130, 246, 0.18)",
+                            border: "1px solid rgba(59, 130, 246, 0.3)",
+                            padding: "1px 6px",
+                            borderRadius: "6px",
+                            letterSpacing: "0.02em"
+                          }}>
+                            Pinned
+                          </span>
+                        )}
                       </div>
                     ) : (
                       <div style={{
@@ -6884,6 +7228,17 @@ const ChatBox = () => {
             zIndex: 50,
             boxShadow: '-4px 0 15px rgba(0,0,0,0.5)'
           }}>
+            {showGroupCalendar && (
+              <GroupCalendarPanel
+                chatId={chatid}
+                groupName={chat?.chatname || 'Group Calendar'}
+                onClose={() => setShowGroupCalendar(false)}
+                onOpenCreateEvent={(params) => {
+                  setSelectedEvent({ chatid, isGroup: true, title: '', description: '', ...params });
+                  setShowEventModal(true);
+                }}
+              />
+            )}
             {showInfo && (
               <InfoModal
                 chat={chat}
@@ -7007,6 +7362,26 @@ const ChatBox = () => {
             onCancelEvent={() => setShowCancelDialog(true)}
             updateEventApi={update}
           />
+        )}
+
+        {isMobile && showGroupCalendar && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 10000,
+            backgroundColor: '#111827'
+          }}>
+            <GroupCalendarPanel
+              chatId={chatid}
+              groupName={chat?.chatname || 'Group Calendar'}
+              onClose={() => setShowGroupCalendar(false)}
+              onOpenCreateEvent={(params) => {
+                setSelectedEvent({ chatid, isGroup: true, title: '', description: '', ...params });
+                setShowGroupCalendar(false);
+                setShowEventModal(true);
+              }}
+            />
+          </div>
         )}
 
         {isMobile && showInfo && (
@@ -7161,6 +7536,15 @@ const ChatBox = () => {
           chatMembers={chatMembers}
           chatType={chat?.type}
           currentActiveSpace={activeSpace}
+        />
+
+        {/* Create Poll Modal */}
+        <CreatePollModal
+          isOpen={showPollModal}
+          onClose={() => setShowPollModal(false)}
+          chatId={chatid}
+          currentUserId={currentUserId}
+          onPollCreated={handlePollCreated}
         />
       </div>
       );

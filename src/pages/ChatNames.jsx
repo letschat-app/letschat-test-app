@@ -12,6 +12,7 @@ import StreakBadge from "../components/pulse/StreakBadge";
 import userDiscoveryStore from "../service/UserDiscoveryStore";
 import { MoreVertical, Pin, Plus, Users, RefreshCcw, Check, X, Pencil } from "lucide-react";
 import { SIMULATION_ID } from "../service/SimulationScript";
+import simulationService from "../service/SimulationService";
 import { usePWA } from "../context/PWAContext";
 import { useEventMediator } from "../service/EventStorage";
 import spaceStore from "../service/SpaceStore";
@@ -470,10 +471,15 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
   const location = useLocation();
 
   // Walkthrough flag — read once per session, never changes mid-session
-  const walkthroughCompleted = useMemo(
-    () => localStorage.getItem("walkthrough_completed") === "true",
-    []
-  );
+  const walkthroughCompleted = useMemo(() => {
+    try {
+      if (localStorage.getItem("walkthrough_completed") === "true") return true;
+      const sim = JSON.parse(localStorage.getItem('simulation_progress') || '{}');
+      return !!sim?.completed;
+    } catch {
+      return false;
+    }
+  }, []);
 
   // userId cached in a ref — avoids repeated localStorage.getItem('userid') calls
   const userIdRef = useRef(localStorage.getItem('userid'));
@@ -526,6 +532,11 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
     const readLS = (key) => {
       try { return JSON.parse(localStorage.getItem(key) || '{}'); } catch { return {}; }
     };
+
+    // Ensure initial simulation welcome greeting is injected if walkthrough is not completed
+    if (!walkthroughCompleted) {
+      simulationService.ensureInitialWelcome();
+    }
 
     // ── Hydrate state from messageStore + localStorage on mount ───────────
     const storeLastMsgs = messageStore.getLastMessage() || {};
@@ -1086,6 +1097,18 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
 
   const handleChatClick = useCallback(async (chat, shouldNavigate = true) => {
     userClosedSpacesRef.current = null;
+
+    if (chat.chatId === SIMULATION_ID || chat.isSimulation) {
+      messageStore.setCount(SIMULATION_ID, 0);
+      setCount(messageStore.getCount());
+      if (isDesktop && shouldNavigate) {
+        navigate(`/chat/${chat.chatId}?space=0`);
+      } else {
+        const simSpaces = spacesCache[chat.chatId] || [{ id: 0, name: "Main", icon: "💬" }];
+        setSelectedChatForSpaces({ ...chat, spaces: simSpaces });
+      }
+      return;
+    }
 
     // Auto-navigate to space 0 on desktop immediately (synchronously)
     if (isDesktop && shouldNavigate) {

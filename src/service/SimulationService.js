@@ -23,9 +23,74 @@ class SimulationService {
   saveProgress(stepIndex, completed = false) {
     try {
       localStorage.setItem('simulation_progress', JSON.stringify({ stepIndex, completed }));
+      if (completed) {
+        localStorage.setItem('walkthrough_completed', 'true');
+      }
     } catch (e) {
       console.error("[SimulationService] Failed to save progress", e);
     }
+  }
+
+  ensureInitialWelcome() {
+    const progress = this.getSavedProgress();
+    if (progress.completed) return;
+
+    this.ensureSpaceExists(0, "Main");
+
+    const existingMsgs = messageStore.getMessages(this.chatId) || [];
+    const alreadyInStore = existingMsgs.some(
+      m => m.msgid === "sim_welcome_1" || m.content === "Welcome to LetsChat 🚀"
+    );
+
+    const firstStep = SIMULATION_SCRIPT[0];
+    const welcomeContent = firstStep?.content || "Welcome to LetsChat 🚀";
+
+    const welcomeMsg = {
+      msgid: "sim_welcome_1",
+      tempmsgid: "sim_temp_welcome_1",
+      chatid: this.chatId,
+      sendername: "LetsChat",
+      content: welcomeContent,
+      timestamp: new Date().toISOString(),
+      type: "text",
+      spaceid: 0,
+      status: null,
+      isSimulation: true
+    };
+
+    if (!alreadyInStore) {
+      messageStore.addMessage(welcomeMsg);
+    }
+
+    // If user hasn't visited this simulation chat yet, ensure unread badge and preview are active
+    if (!progress.stepIndex || progress.stepIndex <= 1) {
+      const storedCounts = JSON.parse(localStorage.getItem('messageCounts') || '{}');
+      const chatCount = storedCounts[this.chatId];
+      const hasBeenRead = chatCount === 0 || (typeof chatCount === 'object' && chatCount[0] === 0);
+
+      if (!hasBeenRead) {
+        if (!messageStore.new) messageStore.new = {};
+        if (!messageStore.new[this.chatId]) messageStore.new[this.chatId] = {};
+        messageStore.new[this.chatId][0] = 1;
+
+        storedCounts[this.chatId] = { 0: 1 };
+        localStorage.setItem('messageCounts', JSON.stringify(storedCounts));
+      }
+
+      try {
+        const lastMsgs = JSON.parse(localStorage.getItem('lastMessages') || '{}');
+        if (!lastMsgs[this.chatId]) {
+          lastMsgs[this.chatId] = { ...welcomeMsg, _ts: Date.now() };
+          localStorage.setItem('lastMessages', JSON.stringify(lastMsgs));
+        }
+      } catch (e) {}
+
+      if (!progress.stepIndex || progress.stepIndex === 0) {
+        this.saveProgress(1, false);
+      }
+    }
+
+    messageStore.notifyListeners(welcomeMsg);
   }
 
   start(onGuideUpdate) {
@@ -38,10 +103,15 @@ class SimulationService {
       return;
     }
 
-    console.log("[SimulationService] Starting/resuming walkthrough at step index:", progress.stepIndex);
+    // Ensure welcome message is in place if user directly jumped to chatbox
+    this.ensureInitialWelcome();
+
+    const currentProgress = this.getSavedProgress();
+    this.currentStepIndex = Math.max(1, currentProgress.stepIndex || 1);
+
+    console.log("[SimulationService] Starting/resuming walkthrough at step index:", this.currentStepIndex);
     this.isActive = true;
     this.onGuideUpdate = onGuideUpdate;
-    this.currentStepIndex = progress.stepIndex || 0;
     this.isWaiting = false;
 
     this.ensureSpaceExists(0, "Main");

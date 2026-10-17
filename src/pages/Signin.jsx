@@ -6,6 +6,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Eye, EyeOff, Lock, KeyRound, ShieldCheck, Clock, RotateCcw, CheckCircle2, AlertCircle, Loader2, ArrowRight } from "lucide-react";
 import { useUsernameCheck } from "../hooks/useUsernameCheck";
 import { UsernameStatusIndicator, UsernameStatusBadge } from "../components/common/UsernameStatusIndicator";
+import { DisplayNamePolicyModal } from "../components/common/DisplayNamePolicyModal";
+import { savePendingOtpSession, getPendingOtpSession, clearPendingOtpSession } from "../service/otpSessionManager";
 
 /**
  * Compact Cartoon Weightlifter Avatar Component
@@ -133,6 +135,7 @@ function Signin() {
   const [resending, setResending] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
   const [timer, setTimer] = useState(600); // 10 minutes in seconds
 
   const [form, setForm] = useState({
@@ -149,6 +152,18 @@ function Signin() {
 
   const [otp, setOtp] = useState("");
   const otpInputRef = useRef(null);
+
+  // Resume active Signup OTP session if page was reloaded
+  useEffect(() => {
+    const session = getPendingOtpSession();
+    if (session && session.flow === 'SIGNUP' && session.payload?.email) {
+      setForm(prev => ({ ...prev, ...session.payload }));
+      setStep(2);
+      const remainingSeconds = Math.max(0, Math.floor((session.expiresAt - Date.now()) / 1000));
+      setTimer(remainingSeconds > 0 ? remainingSeconds : 600);
+      setInfoMsg(session.promptMessage || `6-digit verification code sent to ${session.payload.email}`);
+    }
+  }, []);
 
   // 10-Minute Countdown Timer for OTP Step
   useEffect(() => {
@@ -260,6 +275,11 @@ function Signin() {
       const data = res.data;
 
       if (data?.status === "success" || res.status === 200 || res.status === 201) {
+        savePendingOtpSession({
+          flow: 'SIGNUP',
+          payload: { email: form.email.trim(), ...payload },
+          promptMessage: `Enter the 6-digit verification code sent to ${form.email}`
+        });
         setStep(2);
         setTimer(600); // 10 minutes timer
         setInfoMsg(data?.message || `6-digit verification code sent to ${form.email}`);
@@ -340,6 +360,7 @@ function Signin() {
           : responseData?.userId || responseData?.userid || responseData?.id || responseData?.data?.userId;
 
       if (createdUserId) {
+        clearPendingOtpSession();
         localStorage.setItem("userid", createdUserId);
         localStorage.setItem("email", form.email.trim());
         localStorage.setItem("username", form.username.trim());
@@ -411,7 +432,14 @@ function Signin() {
 
               {/* Default Display Name Callout Note */}
               <div style={styles.subtleNote}>
-                💡 This name is your default display name, but you can customize how you appear to specific contacts when chatting.
+                💡 This name is your default display name, but you can customize how you appear to specific contacts when chatting.{" "}
+                <button
+                  type="button"
+                  onClick={() => setShowPolicyModal(true)}
+                  style={styles.learnMoreLink}
+                >
+                  Learn more
+                </button>
               </div>
 
               {/* Username Input with Live Availability / Similarity Indicator */}
@@ -737,6 +765,7 @@ function Signin() {
                 <button
                   type="button"
                   onClick={() => {
+                    clearPendingOtpSession();
                     setStep(1);
                     setErrorMsg("");
                     setInfoMsg("");
@@ -754,6 +783,12 @@ function Signin() {
           Already have an account? <Link to="/login" style={styles.link}>Login here</Link>
         </p>
       </div>
+
+      {/* Name Protection & Anti-Impersonation Policy Modal */}
+      <DisplayNamePolicyModal
+        isOpen={showPolicyModal}
+        onClose={() => setShowPolicyModal(false)}
+      />
     </div>
   );
 }
@@ -815,6 +850,17 @@ const styles = {
     borderRadius: "8px",
     lineHeight: "1.38",
     margin: "-4px 0 -4px 0",
+  },
+  learnMoreLink: {
+    color: "#60a5fa",
+    textDecoration: "underline",
+    background: "none",
+    border: "none",
+    padding: 0,
+    fontSize: "inherit",
+    fontWeight: "600",
+    cursor: "pointer",
+    display: "inline",
   },
   label: {
     fontSize: "12px",

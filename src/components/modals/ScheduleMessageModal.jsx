@@ -58,7 +58,10 @@ const ScheduleMessageModal = ({ isOpen, onClose, onSubmit, initialData }) => {
         setMediaData(null);
         setTimeMode('datetime');
         const now = new Date();
-        now.setMinutes(now.getMinutes() + 15);
+        const rem = now.getMinutes() % 15;
+        now.setMinutes(now.getMinutes() + (15 - rem));
+        now.setSeconds(0);
+        now.setMilliseconds(0);
         const tzOffset = now.getTimezoneOffset() * 60000;
         const localISOTime = (new Date(now - tzOffset)).toISOString().slice(0, 16);
         setDatetime(localISOTime);
@@ -178,23 +181,31 @@ const ScheduleMessageModal = ({ isOpen, onClose, onSubmit, initialData }) => {
     if (!finalMessage.trim() && !mediaData) return;
 
     let finalTimeStr = '';
+    let targetDate;
     if (timeMode === 'datetime') {
       if (!datetime) return;
-      finalTimeStr = `${datetime}:00`;
+      targetDate = new Date(datetime);
     } else {
-      const now = new Date();
-      now.setHours(now.getHours() + (parseInt(timerValues.hours) || 0));
-      now.setMinutes(now.getMinutes() + (parseInt(timerValues.minutes) || 0));
-      
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const day = String(now.getDate()).padStart(2, '0');
-      const hours = String(now.getHours()).padStart(2, '0');
-      const minutes = String(now.getMinutes()).padStart(2, '0');
-      const seconds = String(now.getSeconds()).padStart(2, '0');
-      
-      finalTimeStr = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+      targetDate = new Date();
+      targetDate.setHours(targetDate.getHours() + (parseInt(timerValues.hours) || 0));
+      targetDate.setMinutes(targetDate.getMinutes() + (parseInt(timerValues.minutes) || 15));
     }
+
+    // Align strictly to 15-minute interval (:00, :15, :30, :45)
+    const remMinutes = targetDate.getMinutes() % 15;
+    if (remMinutes !== 0 || targetDate.getSeconds() !== 0) {
+      targetDate.setMinutes(targetDate.getMinutes() + (15 - remMinutes));
+    }
+    targetDate.setSeconds(0);
+    targetDate.setMilliseconds(0);
+
+    const year = targetDate.getFullYear();
+    const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const day = String(targetDate.getDate()).padStart(2, '0');
+    const hours = String(targetDate.getHours()).padStart(2, '0');
+    const minutes = String(targetDate.getMinutes()).padStart(2, '0');
+
+    finalTimeStr = `${year}-${month}-${day}T${hours}:${minutes}:00`;
 
     onSubmit({
       message: finalMessage,
@@ -289,9 +300,13 @@ const ScheduleMessageModal = ({ isOpen, onClose, onSubmit, initialData }) => {
           <div style={{ background: '#2c2c2c', border: '1px solid #444', borderRadius: '8px', padding: '16px' }}>
             {timeMode === 'datetime' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ color: '#9ca3af', fontSize: '13px' }}>Select Exact Time</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label style={{ color: '#9ca3af', fontSize: '13px' }}>Select Exact Time</label>
+                  <span style={{ fontSize: '11px', color: '#10b981' }}>15-min intervals (:00, :15, :30, :45)</span>
+                </div>
                 <input 
                   type="datetime-local" 
+                  step="900"
                   value={datetime}
                   onChange={(e) => setDatetime(e.target.value)}
                   style={{
@@ -303,7 +318,10 @@ const ScheduleMessageModal = ({ isOpen, onClose, onSubmit, initialData }) => {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <label style={{ color: '#9ca3af', fontSize: '13px' }}>Send in...</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label style={{ color: '#9ca3af', fontSize: '13px' }}>Send in...</label>
+                  <span style={{ fontSize: '11px', color: '#10b981' }}>15, 30, 45, or 60 mins</span>
+                </div>
                 <div style={{ display: 'flex', gap: '12px' }}>
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <input 
@@ -314,11 +332,16 @@ const ScheduleMessageModal = ({ isOpen, onClose, onSubmit, initialData }) => {
                     <span style={{ fontSize: '11px', color: '#6b7280', textAlign: 'center' }}>Hours</span>
                   </div>
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <input 
-                      type="number" min="0" max="59" value={timerValues.minutes}
-                      onChange={(e) => setTimerValues({...timerValues, minutes: e.target.value})}
-                      style={{ background: '#1a1a1a', border: '1px solid #444', color: '#fff', padding: '10px', borderRadius: '6px', textAlign: 'center' }}
-                    />
+                    <select 
+                      value={timerValues.minutes}
+                      onChange={(e) => setTimerValues({...timerValues, minutes: parseInt(e.target.value) || 15})}
+                      style={{ background: '#1a1a1a', border: '1px solid #444', color: '#fff', padding: '10px', borderRadius: '6px', textAlign: 'center', fontSize: '14px' }}
+                    >
+                      <option value={15}>15 Minutes</option>
+                      <option value={30}>30 Minutes</option>
+                      <option value={45}>45 Minutes</option>
+                      <option value={60}>60 Minutes (1 Hr)</option>
+                    </select>
                     <span style={{ fontSize: '11px', color: '#6b7280', textAlign: 'center' }}>Minutes</span>
                   </div>
                 </div>

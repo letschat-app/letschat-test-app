@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Users, Hash, ArrowLeft, Loader2, Sparkles, Pin, PinOff, RefreshCcw } from 'lucide-react';
+import { Search, Plus, Users, Hash, ArrowLeft, Loader2, Sparkles, Pin, PinOff, RefreshCcw, CheckCircle2, AlertCircle } from 'lucide-react';
 import { API } from '../service/UserAuth';
 import messageStore from './MessageStore';
 import { getchat } from './ChatNames';
@@ -75,6 +75,59 @@ export default function Rooms({ isSidebar = false }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [counts, setCounts] = useState(() => messageStore.getRoomCounts() || {});
+
+  // Virtual Room Soft Duplicate Check (Debounced ~300ms)
+  const [roomNameCheck, setRoomNameCheck] = useState({
+    isChecking: false,
+    available: null,
+    message: '',
+    normalized: ''
+  });
+
+  useEffect(() => {
+    if (!isCreateModalOpen) {
+      setRoomNameCheck({ isChecking: false, available: null, message: '', normalized: '' });
+      return;
+    }
+
+    const trimmed = (newRoom.name || '').trim();
+    if (!trimmed) {
+      setRoomNameCheck({ isChecking: false, available: null, message: '', normalized: '' });
+      return;
+    }
+
+    setRoomNameCheck(prev => ({ ...prev, isChecking: true }));
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`${API}/room/check-name?roomName=${encodeURIComponent(trimmed)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setRoomNameCheck({
+            isChecking: false,
+            available: Boolean(data?.available),
+            message: data?.message || (data?.available ? 'Room name is available' : 'Room name already exists'),
+            normalized: data?.normalized || trimmed
+          });
+        } else {
+          setRoomNameCheck({
+            isChecking: false,
+            available: false,
+            message: 'Unable to verify room name availability',
+            normalized: trimmed
+          });
+        }
+      } catch (e) {
+        setRoomNameCheck({
+          isChecking: false,
+          available: null,
+          message: '',
+          normalized: trimmed
+        });
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [newRoom.name, isCreateModalOpen]);
 
   useEffect(() => {
     const checkNickname = async () => {
@@ -193,7 +246,13 @@ export default function Rooms({ isSidebar = false }) {
 
   const handleCreateRoom = async (e) => {
     e.preventDefault();
-    if (!newRoom.name.trim()) return;
+    const cleanRoomName = (newRoom.name || '').trim();
+    if (!cleanRoomName) return;
+
+    if (roomNameCheck.available === false) {
+      setError(roomNameCheck.message || "Room name is already taken. Please choose another name.");
+      return;
+    }
 
     setIsSubmitting(true);
     setError(null);
@@ -204,20 +263,24 @@ export default function Rooms({ isSidebar = false }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId,
-          roomName: newRoom.name,
-          motto: newRoom.motto,
-          // If we had a roomId here, it would be an update
+          roomName: cleanRoomName,
+          motto: (newRoom.motto || '').trim(),
           roomId: newRoom.roomId || undefined
         })
       });
 
-      if (res.ok) {
+      if (res.status === 409) {
+        setError("Room name is already taken. Please choose another name.");
+        setRoomNameCheck(prev => ({ ...prev, available: false, message: "Room name already exists" }));
+        return;
+      }
+
+      if (res.ok || res.status === 201) {
         const createdRoom = await res.json();
         setIsCreateModalOpen(false);
         setNewRoom({ name: '', motto: '' });
+        setRoomNameCheck({ isChecking: false, available: null, message: '', normalized: '' });
         fetchData(); // Refresh list
-        // In handleCreateRoom, we might not have the full room object yet
-        // but the server returns the room info
         handleJoinRoom(createdRoom);
       } else {
         const errText = await res.text();
@@ -232,7 +295,7 @@ export default function Rooms({ isSidebar = false }) {
 
   const handleJoinRoom = async (room) => {
     // Determine the roomId using robust property mapping
-    const roomId = room.Id || room.id;
+    const roomId = room.Id || room.id || room.roomId;
     if (!roomId) {
       console.error('No roomId found for room:', room);
       return;
@@ -263,14 +326,20 @@ export default function Rooms({ isSidebar = false }) {
           // CRITICAL: Mark as volatile BEFORE loading messages to ensure 30-min TTL
           messageStore.markAsVolatile(finalChatId);
 
+          const isCreator = (room.creator && room.creator === userId) || room.Role === 'admin';
+          // Creators unmuted by default; room members/viewers muted by default
+          const defaultMuted = !isCreator;
+          const currentMuted = room.isMuted !== undefined && isCreator ? room.isMuted : defaultMuted;
+
           const chatsMap = JSON.parse(localStorage.getItem("chatsMap") || "{}");
           chatsMap[finalChatId] = {
             ...room,
             chatId: finalChatId,
-            chatName: room.ChatName || room.chatName,
-            id: room.Id || room.id,
+            chatName: room.ChatName || room.chatName || room.roomName,
+            id: roomId,
             type: 'room',
-            status: 'allowed'
+            status: 'allowed',
+            isMuted: currentMuted
           };
           localStorage.setItem("chatsMap", JSON.stringify(chatsMap));
           syncChatsMapToDB(chatsMap);
@@ -705,16 +774,52 @@ export default function Rooms({ isSidebar = false }) {
             </div>
             <form onSubmit={handleCreateRoom} style={formStyle}>
               <div style={inputGroupStyle}>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Room Name</label>
-                <input
-                  autoFocus
-                  type="text"
-                  placeholder="e.g. JavaScript Enthusiasts"
-                  required
-                  className="premium-input"
-                  value={newRoom.name}
-                  onChange={e => setNewRoom({ ...newRoom, name: e.target.value })}
-                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Room Name</label>
+                  {roomNameCheck.isChecking && (
+                    <span style={{ fontSize: '11px', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Loader2 size={12} className="animate-spin" /> Checking...
+                    </span>
+                  )}
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    autoFocus
+                    type="text"
+                    placeholder="e.g. JavaScript Enthusiasts"
+                    required
+                    className="premium-input"
+                    style={{
+                      borderColor: roomNameCheck.available === false ? '#ef4444' : roomNameCheck.available === true ? '#10b981' : undefined,
+                      paddingRight: '36px'
+                    }}
+                    value={newRoom.name}
+                    onChange={e => {
+                      setNewRoom({ ...newRoom, name: e.target.value });
+                      setError(null);
+                    }}
+                  />
+                  <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center' }}>
+                    {roomNameCheck.available === true && !roomNameCheck.isChecking && (
+                      <CheckCircle2 size={18} color="#10b981" />
+                    )}
+                    {roomNameCheck.available === false && !roomNameCheck.isChecking && (
+                      <AlertCircle size={18} color="#ef4444" />
+                    )}
+                  </div>
+                </div>
+                {roomNameCheck.message && !roomNameCheck.isChecking && (
+                  <span style={{
+                    fontSize: '12px',
+                    color: roomNameCheck.available ? '#10b981' : '#ef4444',
+                    marginTop: '2px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    {roomNameCheck.message}
+                  </span>
+                )}
               </div>
               <div style={inputGroupStyle}>
                 <label style={{ fontSize: '13px', fontWeight: '600', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Motto / Topic</label>
@@ -727,8 +832,17 @@ export default function Rooms({ isSidebar = false }) {
                 />
               </div>
               {error && <p style={errorStyle}>{error}</p>}
-              <button type="submit" disabled={isSubmitting} className="submit-btn" style={submitButtonStyle}>
-                {isSubmitting ? 'Creating...' : 'Launch Room'}
+              <button
+                type="submit"
+                disabled={isSubmitting || roomNameCheck.available === false || roomNameCheck.isChecking || !newRoom.name.trim()}
+                className="submit-btn"
+                style={{
+                  ...submitButtonStyle,
+                  opacity: (isSubmitting || roomNameCheck.available === false || roomNameCheck.isChecking || !newRoom.name.trim()) ? 0.6 : 1,
+                  cursor: (isSubmitting || roomNameCheck.available === false || roomNameCheck.isChecking || !newRoom.name.trim()) ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {isSubmitting ? 'Creating...' : roomNameCheck.isChecking ? 'Checking availability...' : 'Launch Room'}
               </button>
             </form>
           </div>

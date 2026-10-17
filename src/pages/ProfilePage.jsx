@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getsocket, toggleSleepMode } from '../service/Websocket';
-import { API, toggle2FA } from '../service/UserAuth';
+import { API, toggle2FA, send2FAOtp, changePassword, changePasswordSendOtp } from '../service/UserAuth';
+import { savePendingOtpSession } from '../service/otpSessionManager';
 import { uploadMedia, STAGE_LABELS } from '../service/MediaUploader';
 import { getMediaInfo, getMediaBlob } from '../service/MediaCache';
 import MediaViewer from '../components/chat/MediaViewer';
-import { Camera, Loader2, LogOut, CheckCircle2, Bell, Moon, MessageCircle, ArrowLeft, ShieldCheck, Edit2 } from 'lucide-react';
+import { Camera, Loader2, LogOut, CheckCircle2, Bell, Moon, MessageCircle, ArrowLeft, ShieldCheck, Edit2, Lock, KeyRound, Eye, EyeOff, X } from 'lucide-react';
 import Avatar from '../components/chat/Avatar';
 import StreakBadge from '../components/pulse/StreakBadge';
 import { useNotifications } from '../hooks/useNotifications';
@@ -13,6 +14,7 @@ import { getGroupMembersFromDB, syncChatsMapToDB } from '../service/db';
 import { getchat } from './ChatNames';
 import { useUsernameCheck } from '../hooks/useUsernameCheck';
 import { UsernameStatusIndicator } from '../components/common/UsernameStatusIndicator';
+import { DisplayNamePolicyModal } from '../components/common/DisplayNamePolicyModal';
 
 const ProfilePage = () => {
     const navigate = useNavigate();
@@ -37,6 +39,29 @@ const ProfilePage = () => {
     const [is2FAEnabled, setIs2FAEnabled] = useState(localStorage.getItem('is2FAEnabled') === 'true');
     const [toggling2FA, setToggling2FA] = useState(false);
 
+    // Change Password States
+    const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [showCurrentPw, setShowCurrentPw] = useState(false);
+    const [showNewPw, setShowNewPw] = useState(false);
+    const [showConfirmPw, setShowConfirmPw] = useState(false);
+    const [passwordError, setPasswordError] = useState('');
+    const [passwordSuccessMsg, setPasswordSuccessMsg] = useState('');
+    const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
+
+    // Keep 2FA state updated if verified/toggled from OTP modal
+    useEffect(() => {
+        const handle2FAChange = (e) => {
+            if (e?.detail?.is2FAEnabled !== undefined) {
+                setIs2FAEnabled(Boolean(e.detail.is2FAEnabled));
+            }
+        };
+        window.addEventListener('2fa_status_changed', handle2FAChange);
+        return () => window.removeEventListener('2fa_status_changed', handle2FAChange);
+    }, []);
+
     // Profile & Room Nickname Edit States
     const [roomNickname, setRoomNickname] = useState(() => localStorage.getItem('roomNickname') || '');
     const [isEditingPublicName, setIsEditingPublicName] = useState(false);
@@ -46,6 +71,7 @@ const ProfilePage = () => {
     const [isEditingRoomNickname, setIsEditingRoomNickname] = useState(false);
     const [newRoomNickname, setNewRoomNickname] = useState(roomNickname);
     const [savingRoomNickname, setSavingRoomNickname] = useState(false);
+    const [showPolicyModal, setShowPolicyModal] = useState(false);
 
     const publicNameCheck = useUsernameCheck({
         username: newPublicName,
@@ -233,21 +259,83 @@ const ProfilePage = () => {
         if (!userId) return;
         setToggling2FA(true);
         try {
-            const nextState = !is2FAEnabled;
-            const res = await toggle2FA(nextState, userId);
+            const nextEnable = !is2FAEnabled;
+            const res = await send2FAOtp(nextEnable, userId);
             const data = res.data;
-            if (data && (data.status === 'SUCCESS' || data.success || res.status === 200)) {
-                setIs2FAEnabled(nextState);
-                alert(data.message || `2FA ${nextState ? 'enabled' : 'disabled'} successfully!`);
+            if (data?.status === 'SUCCESS' || res.status === 200) {
+                savePendingOtpSession({
+                    flow: '2FA_TOGGLE',
+                    payload: { enable: nextEnable },
+                    promptMessage: nextEnable
+                        ? 'Enter the 6-digit code sent to your email to turn ON Two-Factor Authentication.'
+                        : 'Enter the 6-digit code sent to your email to turn OFF Two-Factor Authentication.'
+                });
             } else {
-                alert(data?.message || 'Failed to update 2FA setting.');
+                alert(data?.message || 'Failed to send verification code for 2FA');
             }
         } catch (err) {
             console.error('Failed to toggle 2FA:', err);
-            const errMsg = err.response?.data?.message || err.message || 'Error toggling 2FA';
+            const errMsg = err.response?.data?.message || err.message || 'Error requesting 2FA verification code';
             alert(errMsg);
         } finally {
             setToggling2FA(false);
+        }
+    };
+
+    const handleChangePassword = async (e) => {
+        if (e) e.preventDefault();
+        setPasswordError('');
+        setPasswordSuccessMsg('');
+
+        if (!currentPassword) {
+            setPasswordError('Please enter your current password.');
+            return;
+        }
+        if (!newPassword || newPassword.length < 6) {
+            setPasswordError('New password must be at least 6 characters long.');
+            return;
+        }
+        if (newPassword !== confirmPassword) {
+            setPasswordError('New passwords do not match.');
+            return;
+        }
+
+        setIsSubmittingPassword(true);
+        try {
+            const res = await changePassword({
+                currentPassword,
+                newPassword
+            }, userId);
+
+            const data = res.data;
+            if (data?.status === '2FA_REQUIRED') {
+                savePendingOtpSession({
+                    flow: 'CHANGE_PASSWORD',
+                    payload: { currentPassword, newPassword },
+                    promptMessage: data.message || '2FA is enabled. Enter the verification code sent to your email to confirm password change.'
+                });
+                setIsChangePasswordOpen(false);
+                setCurrentPassword('');
+                setNewPassword('');
+                setConfirmPassword('');
+            } else if (data?.status === 'SUCCESS' || res.status === 200) {
+                setPasswordSuccessMsg('Password updated successfully!');
+                setTimeout(() => {
+                    setIsChangePasswordOpen(false);
+                    setCurrentPassword('');
+                    setNewPassword('');
+                    setConfirmPassword('');
+                    setPasswordSuccessMsg('');
+                }, 1500);
+            } else {
+                setPasswordError(data?.message || 'Failed to update password.');
+            }
+        } catch (err) {
+            console.error('Change password failed:', err);
+            const errMsg = err.response?.data?.message || err.message || 'Error changing password';
+            setPasswordError(errMsg);
+        } finally {
+            setIsSubmittingPassword(false);
         }
     };
 
@@ -621,6 +709,27 @@ const ProfilePage = () => {
                                         </div>
                                     </div>
                                     <UsernameStatusIndicator checkResult={publicNameCheck} />
+                                    <div style={{ display: 'flex', alignItems: 'center', marginTop: '2px', marginBottom: '4px' }}>
+                                        <span style={{ fontSize: '11px', color: 'var(--text-secondary, #94a3b8)' }}>
+                                            Names are checked to prevent impersonation.{' '}
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPolicyModal(true)}
+                                                style={{
+                                                    color: '#60a5fa',
+                                                    textDecoration: 'underline',
+                                                    background: 'none',
+                                                    border: 'none',
+                                                    padding: 0,
+                                                    fontSize: '11px',
+                                                    fontWeight: '600',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                Learn more
+                                            </button>
+                                        </span>
+                                    </div>
                                     <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
                                         <button
                                             onClick={handleSavePublicName}
@@ -703,6 +812,27 @@ const ProfilePage = () => {
                                         </div>
                                     </div>
                                     <UsernameStatusIndicator checkResult={roomNicknameCheck} />
+                                    <div style={{ display: 'flex', alignItems: 'center', marginTop: '2px', marginBottom: '4px' }}>
+                                        <span style={{ fontSize: '11px', color: 'var(--text-secondary, #94a3b8)' }}>
+                                            Nicknames are checked to prevent impersonation.{' '}
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPolicyModal(true)}
+                                                style={{
+                                                    color: '#60a5fa',
+                                                    textDecoration: 'underline',
+                                                    background: 'none',
+                                                    border: 'none',
+                                                    padding: 0,
+                                                    fontSize: '11px',
+                                                    fontWeight: '600',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                Learn more
+                                            </button>
+                                        </span>
+                                    </div>
                                     <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
                                         <button
                                             onClick={handleSaveRoomNickname}
@@ -854,7 +984,7 @@ const ProfilePage = () => {
 
                         <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0 0 4px 0', lineHeight: '1.5' }}>
                             {is2FAEnabled
-                                ? "An OTP email code will be required whenever you sign in."
+                                ? "An OTP email code will be required whenever you sign in or modify sensitive settings."
                                 : "Add an extra layer of security to your account with email OTP verification."}
                         </p>
 
@@ -870,7 +1000,35 @@ const ProfilePage = () => {
                                 cursor: toggling2FA ? 'not-allowed' : 'pointer'
                             }}
                         >
-                            {toggling2FA ? 'Updating...' : is2FAEnabled ? 'Disable 2FA' : 'Enable 2-Factor Authentication'}
+                            {toggling2FA ? 'Sending Verification Code...' : is2FAEnabled ? 'Disable 2FA' : 'Enable 2-Factor Authentication'}
+                        </button>
+
+                        {/* Password Management */}
+                        <div style={{ ...infoItemStyle, borderTop: '1px solid var(--border-color)', paddingTop: '14px', marginTop: '6px', marginBottom: '4px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Lock size={16} color="var(--accent-color)" />
+                                <span style={{ ...labelStyle, color: 'var(--text-primary)', fontWeight: '600' }}>Account Password</span>
+                            </div>
+                        </div>
+
+                        <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0 0 4px 0', lineHeight: '1.5' }}>
+                            Update your login password regularly to protect your account.
+                        </p>
+
+                        <button
+                            onClick={() => {
+                                setPasswordError('');
+                                setPasswordSuccessMsg('');
+                                setIsChangePasswordOpen(true);
+                            }}
+                            style={{
+                                ...notificationEnableButtonStyle,
+                                background: 'var(--bg-card-hover)',
+                                color: 'var(--text-primary)',
+                                border: '1px solid var(--border-color)'
+                            }}
+                        >
+                            Change Password
                         </button>
                     </div>
                 </div>
@@ -892,6 +1050,283 @@ const ProfilePage = () => {
                     media={viewingMedia}
                     onClose={() => setViewingMedia(null)}
                 />
+            )}
+
+            {/* Name Protection & Anti-Impersonation Explanation Modal */}
+            <DisplayNamePolicyModal
+                isOpen={showPolicyModal}
+                onClose={() => setShowPolicyModal(false)}
+            />
+
+            {/* Change Password Modal */}
+            {isChangePasswordOpen && (
+                <div style={{
+                    position: 'fixed',
+                    inset: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+                    backdropFilter: 'blur(6px)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '16px',
+                    zIndex: 1000
+                }}>
+                    <div style={{
+                        width: '100%',
+                        maxWidth: '440px',
+                        backgroundColor: 'var(--bg-secondary)',
+                        borderRadius: '20px',
+                        border: '1px solid var(--border-color)',
+                        padding: '24px',
+                        boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '16px'
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{
+                                    width: '36px',
+                                    height: '36px',
+                                    borderRadius: '10px',
+                                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}>
+                                    <Lock size={20} color="#3b82f6" />
+                                </div>
+                                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                                    Change Password
+                                </h3>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setIsChangePasswordOpen(false);
+                                    setPasswordError('');
+                                    setPasswordSuccessMsg('');
+                                }}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: 'var(--text-secondary)',
+                                    cursor: 'pointer',
+                                    padding: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                            Enter your current password and choose a secure new password. If 2FA is enabled, you will be prompted for an email verification code.
+                        </p>
+
+                        <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                            <div>
+                                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                                    Current Password
+                                </label>
+                                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                    <input
+                                        type={showCurrentPw ? 'text' : 'password'}
+                                        value={currentPassword}
+                                        onChange={(e) => setCurrentPassword(e.target.value)}
+                                        placeholder="Enter current password"
+                                        style={{
+                                            width: '100%',
+                                            padding: '11px 40px 11px 14px',
+                                            borderRadius: '10px',
+                                            backgroundColor: 'var(--bg-primary)',
+                                            border: '1px solid var(--border-color)',
+                                            color: 'var(--text-primary)',
+                                            fontSize: '14px',
+                                            outline: 'none',
+                                            boxSizing: 'border-box'
+                                        }}
+                                        required
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowCurrentPw(!showCurrentPw)}
+                                        style={{
+                                            position: 'absolute',
+                                            right: '12px',
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'var(--text-secondary)',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center'
+                                        }}
+                                    >
+                                        {showCurrentPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                                    New Password (min. 6 characters)
+                                </label>
+                                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                    <input
+                                        type={showNewPw ? 'text' : 'password'}
+                                        value={newPassword}
+                                        onChange={(e) => setNewPassword(e.target.value)}
+                                        placeholder="Enter new password"
+                                        style={{
+                                            width: '100%',
+                                            padding: '11px 40px 11px 14px',
+                                            borderRadius: '10px',
+                                            backgroundColor: 'var(--bg-primary)',
+                                            border: '1px solid var(--border-color)',
+                                            color: 'var(--text-primary)',
+                                            fontSize: '14px',
+                                            outline: 'none',
+                                            boxSizing: 'border-box'
+                                        }}
+                                        required
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowNewPw(!showNewPw)}
+                                        style={{
+                                            position: 'absolute',
+                                            right: '12px',
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'var(--text-secondary)',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center'
+                                        }}
+                                    >
+                                        {showNewPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                                    Confirm New Password
+                                </label>
+                                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                    <input
+                                        type={showConfirmPw ? 'text' : 'password'}
+                                        value={confirmPassword}
+                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                        placeholder="Re-type new password"
+                                        style={{
+                                            width: '100%',
+                                            padding: '11px 40px 11px 14px',
+                                            borderRadius: '10px',
+                                            backgroundColor: 'var(--bg-primary)',
+                                            border: '1px solid var(--border-color)',
+                                            color: 'var(--text-primary)',
+                                            fontSize: '14px',
+                                            outline: 'none',
+                                            boxSizing: 'border-box'
+                                        }}
+                                        required
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowConfirmPw(!showConfirmPw)}
+                                        style={{
+                                            position: 'absolute',
+                                            right: '12px',
+                                            background: 'none',
+                                            border: 'none',
+                                            color: 'var(--text-secondary)',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center'
+                                        }}
+                                    >
+                                        {showConfirmPw ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {passwordError && (
+                                <div style={{
+                                    padding: '10px 12px',
+                                    borderRadius: '8px',
+                                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                    border: '1px solid rgba(239, 68, 68, 0.2)',
+                                    color: '#ef4444',
+                                    fontSize: '13px'
+                                }}>
+                                    {passwordError}
+                                </div>
+                            )}
+
+                            {passwordSuccessMsg && (
+                                <div style={{
+                                    padding: '10px 12px',
+                                    borderRadius: '8px',
+                                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                    border: '1px solid rgba(16, 185, 129, 0.2)',
+                                    color: '#10b981',
+                                    fontSize: '13px'
+                                }}>
+                                    {passwordSuccessMsg}
+                                </div>
+                            )}
+
+                            <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsChangePasswordOpen(false);
+                                        setPasswordError('');
+                                        setPasswordSuccessMsg('');
+                                    }}
+                                    style={{
+                                        flex: 1,
+                                        padding: '11px',
+                                        borderRadius: '10px',
+                                        backgroundColor: 'var(--bg-card-hover)',
+                                        border: '1px solid var(--border-color)',
+                                        color: 'var(--text-secondary)',
+                                        fontSize: '14px',
+                                        fontWeight: '600',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSubmittingPassword}
+                                    style={{
+                                        flex: 2,
+                                        padding: '11px',
+                                        borderRadius: '10px',
+                                        backgroundColor: 'var(--accent-color)',
+                                        border: 'none',
+                                        color: 'white',
+                                        fontSize: '14px',
+                                        fontWeight: '700',
+                                        cursor: isSubmittingPassword ? 'not-allowed' : 'pointer',
+                                        opacity: isSubmittingPassword ? 0.7 : 1,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '8px'
+                                    }}
+                                >
+                                    {isSubmittingPassword && <Loader2 size={16} className="animate-spin" />}
+                                    {isSubmittingPassword ? 'Updating...' : 'Update Password'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             )}
         </div>
     );

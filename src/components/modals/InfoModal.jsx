@@ -10,6 +10,7 @@ import MediaViewer from '../chat/MediaViewer';
 import { toggleMuteChat, isChatMuted, saveChatInfoToDB, getChatInfoFromDB, saveGroupMembersToDB, saveUsersBatchToDB, getGroupMembersFromDB } from '../../service/db';
 import { useUsernameCheck } from '../../hooks/useUsernameCheck';
 import { UsernameStatusIndicator } from '../common/UsernameStatusIndicator';
+import { DisplayNamePolicyModal } from '../common/DisplayNamePolicyModal';
 
 const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) => {
   const [members, setMembers] = useState([]);
@@ -19,6 +20,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
   const [myDisplayName, setMyDisplayName] = useState('');
   const [initialDisplayName, setInitialDisplayName] = useState('');
   const [myProfile, setMyProfile] = useState('');
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
 
   const usernameCheck = useUsernameCheck({
     username: myDisplayName,
@@ -696,7 +698,29 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
                 </div>
               </div>
               
-              <UsernameStatusIndicator checkResult={usernameCheck} containerStyle={{ marginBottom: '8px' }} />
+              <UsernameStatusIndicator checkResult={usernameCheck} containerStyle={{ marginBottom: '6px' }} />
+              
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <span style={{ fontSize: '11px', color: '#9ca3af' }}>
+                  Names are checked to prevent impersonation.{" "}
+                  <button
+                    type="button"
+                    onClick={() => setShowPolicyModal(true)}
+                    style={{
+                      color: '#60a5fa',
+                      textDecoration: 'underline',
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Learn more
+                  </button>
+                </span>
+              </div>
               
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button 
@@ -996,6 +1020,12 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
           onClose={() => setViewingMedia(null)} 
         />
       )}
+
+      {/* Name Protection & Anti-Impersonation Explanation Modal */}
+      <DisplayNamePolicyModal
+        isOpen={showPolicyModal}
+        onClose={() => setShowPolicyModal(false)}
+      />
     </div>
   );
 

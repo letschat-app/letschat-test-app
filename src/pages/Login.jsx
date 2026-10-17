@@ -6,6 +6,8 @@ import { Eye, EyeOff, ShieldCheck, Lock, Mail, ArrowRight, Loader2, CheckCircle2
 import { motion, AnimatePresence } from "framer-motion";
 
 import { normalizeIdentifier } from "../service/ChatUtils";
+import ForgotPasswordModal from "../components/modals/ForgotPasswordModal";
+import { savePendingOtpSession, getPendingOtpSession, clearPendingOtpSession } from "../service/otpSessionManager";
 
 /**
  * Login Component
@@ -22,8 +24,19 @@ function Login() {
   const [step, setStep] = useState("login"); // 'login' | '2fa'
   const [tempIdentifier, setTempIdentifier] = useState("");
   const [otp, setOtp] = useState("");
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const otpInputRef = useRef(null);
   const navigate = useNavigate();
+
+  // Resume active 2FA Login session if page was reloaded
+  useEffect(() => {
+    const session = getPendingOtpSession();
+    if (session && session.flow === '2FA_LOGIN' && session.payload?.identifier) {
+      setTempIdentifier(session.payload.identifier);
+      setStep("2fa");
+      setInfoMsg(session.promptMessage || "Enter the 6-digit code sent to your registered email.");
+    }
+  }, []);
 
   useEffect(() => {
     if (step === "2fa" && otpInputRef.current) {
@@ -66,6 +79,11 @@ function Login() {
         data === "2FA_REQUIRED" ||
         data?.message === "2FA_REQUIRED"
       ) {
+        savePendingOtpSession({
+          flow: '2FA_LOGIN',
+          payload: { identifier: cleanIdentifier },
+          promptMessage: 'Enter the 2FA code sent to your email to complete login.'
+        });
         setTempIdentifier(cleanIdentifier);
         setStep("2fa");
         setInfoMsg("Password verified! Enter the 6-digit code sent to your registered email.");
@@ -102,6 +120,11 @@ function Login() {
       const serverMsg = err.response?.data?.message || err.response?.data?.error;
       
       if (serverMsg === "2FA_REQUIRED" || err.response?.data?.is2FARequired) {
+        savePendingOtpSession({
+          flow: '2FA_LOGIN',
+          payload: { identifier: cleanIdentifier },
+          promptMessage: 'Enter the 2FA code sent to your email to complete login.'
+        });
         setTempIdentifier(cleanIdentifier);
         setStep("2fa");
         setInfoMsg("Password verified! Enter the 6-digit code sent to your registered email.");
@@ -141,6 +164,7 @@ function Login() {
         res.status === 200 ||
         res.status === 201
       ) {
+        clearPendingOtpSession();
         const loggedUserId =
           data?.userId || data?.userid || data?.id || data?.data?.userId || tempIdentifier;
 
@@ -205,7 +229,24 @@ function Login() {
 
                 {/* Password Input */}
                 <div style={styles.inputGroup}>
-                  <label style={styles.label}>Password</label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label style={styles.label}>Password</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotPassword(true)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--accent-color, #3b82f6)',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        padding: 0
+                      }}
+                    >
+                      Forgot Password?
+                    </button>
+                  </div>
                   <div style={styles.inputWrapper}>
                     <Lock size={18} color="var(--text-secondary, #94a3b8)" style={styles.inputIcon} />
                     <input
@@ -338,6 +379,7 @@ function Login() {
                 <button
                   type="button"
                   onClick={() => {
+                    clearPendingOtpSession();
                     setStep("login");
                     setErrorMsg("");
                     setInfoMsg("");
@@ -355,6 +397,18 @@ function Login() {
           Don’t have an account? <Link to="/signin" style={styles.link}>Sign up here</Link>
         </p>
       </div>
+
+      {/* 3-Step Forgot Password Wizard Modal */}
+      <ForgotPasswordModal
+        isOpen={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+        initialIdentifier={form.identifier || form.userid || ""}
+        onResetComplete={(id) => {
+          setForm(prev => ({ ...prev, identifier: id, password: "" }));
+          setShowForgotPassword(false);
+          setInfoMsg("Password successfully reset! Please log in with your new password.");
+        }}
+      />
     </div>
   );
 }
