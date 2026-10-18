@@ -1,4 +1,4 @@
-import{a as $,r as d,aR as _,k as Z,j as e,aS as K,aT as T,aU as X,E as N,w as R,C as B,L as P,t as J,aV as Q,p as O,q as ee,T as te,K as se,aW as D,aX as re,aY as A,F as ae,aZ as ie,a_ as ne}from"./index-D_Na-bF8.js";import{D as oe}from"./DisplayNamePolicyModal-SM_chucJ.js";const le=({score:b})=>{const c=b||0;return e.jsxs("div",{style:{width:"64px",height:"40px",display:"flex",alignItems:"center",justifyContent:"center"},children:[e.jsx("style",{children:`
+import{a as $,r as d,aR as _,k as Z,j as e,aS as K,aT as T,aU as X,E as N,w as R,C as B,L as P,t as J,aV as Q,p as O,q as ee,T as te,K as se,aW as D,aX as re,aY as A,F as ae,aZ as ie,a_ as ne}from"./index-DWYgtmjk.js";import{D as oe}from"./DisplayNamePolicyModal-BPFnpwFO.js";const le=({score:b})=>{const c=b||0;return e.jsxs("div",{style:{width:"64px",height:"40px",display:"flex",alignItems:"center",justifyContent:"center"},children:[e.jsx("style",{children:`
         @keyframes idleBreath {
           0%, 100% { transform: translateY(0px); }
           50% { transform: translateY(-1.5px); }
