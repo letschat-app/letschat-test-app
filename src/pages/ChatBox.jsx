@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo, useLayoutEffect } from "react";
+import React, { useEffect, useState, useRef, useMemo, useLayoutEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import imageCompression from 'browser-image-compression';
@@ -7503,7 +7503,7 @@ const ChatBox = () => {
         </div>
 
         {/* Mobile Quick Access Radial Wheel */}
-        <QuickAccessWheel currentChatId={chatid} />
+        {isMobile && <QuickAccessWheel currentChatId={chatid} />}
 
         {/* Classroom Matrix Analytics Modal */}
         {showClassroomMatrixModal && (

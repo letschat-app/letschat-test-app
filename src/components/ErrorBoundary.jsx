@@ -25,13 +25,13 @@ class ErrorBoundary extends React.Component {
     if (window.history.length > 1) {
       window.history.back();
     } else {
-      window.location.href = '/chats';
+      window.location.hash = '#/chats';
     }
   };
 
   handleGoHome = () => {
     this.setState({ hasError: false, error: null });
-    window.location.href = '/chats';
+    window.location.hash = '#/chats';
   };
 
   render() {

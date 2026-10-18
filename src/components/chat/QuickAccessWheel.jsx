@@ -135,14 +135,14 @@ const QuickAccessWheel = ({ currentChatId }) => {
     }
   };
 
-  // Hide component completely if there are no items in the wheel
-  if (wheelItems.length === 0) {
+  // Hide component completely on desktop or if there are no items in the wheel
+  if (!isMobile || wheelItems.length === 0) {
     return null;
   }
 
-  // Calculate circular radial positions for active overlay
+  // Calculate circular radial positions for active overlay (scaled 10% down)
   const calculateBubbleStyles = (index, total) => {
-    const radius = Math.min(120, window.innerWidth * 0.32);
+    const radius = Math.min(108, window.innerWidth * 0.29);
     // Start angle from straight top (-90 deg / -PI/2) and distribute evenly
     const angle = (index / total) * 2 * Math.PI - Math.PI / 2;
     const x = Math.cos(angle) * radius;
@@ -157,7 +157,7 @@ const QuickAccessWheel = ({ currentChatId }) => {
 
   return (
     <>
-      {/* ── Draggable Half-Circle Trigger Button on Right Edge ── */}
+      {/* ── Draggable Half-Circle Trigger Button on Right Edge (10% smaller) ── */}
       {!isOpen && (
         <div
           onPointerDown={handlePointerDown}
@@ -168,9 +168,9 @@ const QuickAccessWheel = ({ currentChatId }) => {
             right: 0,
             top: `${posY}px`,
             transform: 'translateY(-50%)',
-            width: '42px',
-            height: '64px',
-            borderRadius: '32px 0 0 32px',
+            width: '38px',
+            height: '58px',
+            borderRadius: '29px 0 0 29px',
             background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.88), rgba(168, 85, 247, 0.88))',
             backdropFilter: 'blur(12px)',
             border: '1.5px solid rgba(255, 255, 255, 0.35)',
@@ -179,7 +179,7 @@ const QuickAccessWheel = ({ currentChatId }) => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            paddingLeft: '6px',
+            paddingLeft: '5px',
             zIndex: 900,
             cursor: 'grab',
             userSelect: 'none',
@@ -187,7 +187,7 @@ const QuickAccessWheel = ({ currentChatId }) => {
             transition: isDragging ? 'none' : 'background 0.2s, box-shadow 0.2s'
           }}
         >
-          <Zap size={20} color="white" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.4))' }} />
+          <Zap size={18} color="white" style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.4))' }} />
 
           {/* ── Half-Inside, Half-Outside Unread Chats Badge ── */}
           {unreadChatsCount > 0 && (
@@ -199,12 +199,12 @@ const QuickAccessWheel = ({ currentChatId }) => {
                 transform: 'translate(-50%, -50%)',
                 background: 'linear-gradient(135deg, #ef4444, #f97316)',
                 color: 'white',
-                fontSize: '11px',
+                fontSize: '10px',
                 fontWeight: '800',
-                height: '22px',
-                minWidth: '22px',
-                padding: '0 5px',
-                borderRadius: '11px',
+                height: '20px',
+                minWidth: '20px',
+                padding: '0 4px',
+                borderRadius: '10px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -221,7 +221,7 @@ const QuickAccessWheel = ({ currentChatId }) => {
         </div>
       )}
 
-      {/* ── Center-Screen Radial Chat Wheel Overlay ── */}
+      {/* ── Center-Screen Radial Chat Wheel Overlay (10% smaller) ── */}
       {isOpen && (
         <div
           onClick={() => setIsOpen(false)}
@@ -244,8 +244,8 @@ const QuickAccessWheel = ({ currentChatId }) => {
               setIsOpen(false);
             }}
             style={{
-              width: '40px',
-              height: '40px',
+              width: '36px',
+              height: '36px',
               borderRadius: '50%',
               background: 'transparent',
               display: 'flex',
@@ -256,7 +256,7 @@ const QuickAccessWheel = ({ currentChatId }) => {
               zIndex: 10
             }}
           >
-            <X size={28} color="#ef4444" style={{ strokeWidth: 2.5 }} />
+            <X size={25} color="#ef4444" style={{ strokeWidth: 2.5 }} />
           </div>
 
           {/* Surrounding Floating Chat Bubbles */}
@@ -273,10 +273,10 @@ const QuickAccessWheel = ({ currentChatId }) => {
                   }}
                   style={{
                     position: 'absolute',
-                    top: '-32px',
-                    left: '-32px',
-                    width: '64px',
-                    height: '64px',
+                    top: '-29px',
+                    left: '-29px',
+                    width: '58px',
+                    height: '58px',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
@@ -288,10 +288,10 @@ const QuickAccessWheel = ({ currentChatId }) => {
                   <div style={{ position: 'relative' }}>
                     <Avatar
                       chat={{ ...item, id: item.id, profile: item.profile }}
-                      size={54}
+                      size={48}
                       style={{
                         border: item.unreadCount > 0 
-                          ? '3px solid #ef4444' 
+                          ? '2.5px solid #ef4444' 
                           : '2px solid rgba(255, 255, 255, 0.35)',
                         boxShadow: '0 4px 15px rgba(0, 0, 0, 0.5)',
                         transition: 'transform 0.2s'
@@ -306,12 +306,12 @@ const QuickAccessWheel = ({ currentChatId }) => {
                         right: -4,
                         background: '#ef4444',
                         color: 'white',
-                        fontSize: '11px',
+                        fontSize: '10px',
                         fontWeight: '800',
-                        height: '20px',
-                        minWidth: '20px',
-                        padding: '0 4px',
-                        borderRadius: '10px',
+                        height: '18px',
+                        minWidth: '18px',
+                        padding: '0 3px',
+                        borderRadius: '9px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -330,21 +330,21 @@ const QuickAccessWheel = ({ currentChatId }) => {
                         right: -2,
                         background: '#8b5cf6',
                         borderRadius: '50%',
-                        width: '18px',
-                        height: '18px',
+                        width: '16px',
+                        height: '16px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         border: '1.5px solid #0f172a'
                       }}>
-                        <Sparkles size={11} color="white" />
+                        <Sparkles size={10} color="white" />
                       </div>
                     )}
                   </div>
                   {/* Chat Name Tooltip Label */}
                   <span style={{
-                    marginTop: '5px',
-                    fontSize: '10px',
+                    marginTop: '4px',
+                    fontSize: '9px',
                     fontWeight: '600',
                     color: 'white',
                     background: 'rgba(15, 23, 42, 0.85)',
@@ -353,15 +353,15 @@ const QuickAccessWheel = ({ currentChatId }) => {
                     border: 'none',
                     outline: 'none',
                     whiteSpace: 'nowrap',
-                    maxWidth: '54px',
-                    minWidth: '30px',
-                    minHeight: '14px',
+                    maxWidth: '48px',
+                    minWidth: '26px',
+                    minHeight: '13px',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     boxShadow: '0 2px 6px rgba(0, 0, 0, 0.4)',
                     textAlign: 'center',
                     display: 'inline-block',
-                    lineHeight: '14px'
+                    lineHeight: '13px'
                   }}>
                     {item.chatName?.trim() || 'Chat'}
                   </span>
