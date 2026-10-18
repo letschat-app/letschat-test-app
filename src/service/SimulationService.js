@@ -164,10 +164,12 @@ class SimulationService {
     const step = SIMULATION_SCRIPT[this.currentStepIndex];
     console.log("[SimulationService] Executing step:", step.step);
 
-    if (step.createSpace) {
-      this.ensureSpaceExists(step.createSpace.id, step.createSpace.name);
-    } else if (step.spaceid && step.spaceid > 0) {
-      this.ensureSpaceExists(step.spaceid);
+    if (step.type !== "message") {
+      if (step.createSpace) {
+        this.ensureSpaceExists(step.createSpace.id, step.createSpace.name);
+      } else if (step.spaceid && step.spaceid > 0) {
+        this.ensureSpaceExists(step.spaceid);
+      }
     }
 
     if (step.type === "message") {
@@ -197,16 +199,20 @@ class SimulationService {
   injectMessage(step) {
     const targetSpaceId = step.spaceid || 0;
 
-    if (targetSpaceId > 0) {
+    if (step.createSpace) {
+      this.ensureSpaceExists(step.createSpace.id, step.createSpace.name);
+    } else if (targetSpaceId > 0) {
       this.ensureSpaceExists(targetSpaceId);
     }
+
+    const messageContent = typeof step.content === 'function' ? step.content() : step.content;
 
     const msg = {
       msgid: `sim_${Date.now()}_${step.step}`,
       tempmsgid: `sim_temp_${Date.now()}_${step.step}`,
       chatid: this.chatId,
       sendername: "LetsChat",
-      content: step.content,
+      content: messageContent,
       timestamp: new Date().toISOString(),
       type: "text",
       spaceid: targetSpaceId,

@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo, useLayoutEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
-import imageCompression from 'browser-image-compression';
 import { getchat } from "./ChatNames";
 import { v4 as uuidv4 } from "uuid";
 import { API } from "../service/UserAuth";
@@ -82,6 +81,7 @@ import { uploadMedia, formatFileSize, getFileCategory, getVideoThumbnail, getPdf
 import { saveBlobToCache, getMediaInfo, renameCacheKey } from '../service/MediaCache';
 import spaceStore from "../service/SpaceStore";
 import { Edit2 } from "lucide-react";
+const ImageEditor = React.lazy(() => import('../editor/ImageEditor'));
 
 const MARBLE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="48"><filter id="m" x="0" y="0" width="100%" height="100%"><feTurbulence type="turbulence" baseFrequency="0.018 0.06" numOctaves="2" seed="11"/><feColorMatrix values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 -1.6 0 0 0 0.42"/></filter><rect width="96" height="48" filter="url(#m)"/></svg>';
 const MARBLE_URL = `url("data:image/svg+xml,${encodeURIComponent(MARBLE_SVG)}")`;
@@ -433,10 +433,6 @@ const ChatBox = () => {
   const currentUserId = localStorage.getItem('userid');
   const myDisplayName = localStorage.getItem('username') || currentUserId;
   const [input, setInput] = useState("");
-  const [file, setFile] = useState(null);
-  const fileInputRef = useRef(null)
-  const [url, setUrl] = useState(null)
-  const [isUploading, setIsUploading] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(false);
@@ -1006,6 +1002,7 @@ const ChatBox = () => {
   const [selectedAssignmentId, setSelectedAssignmentId] = useState(null);
   const [showAssignmentDetail, setShowAssignmentDetail] = useState(false);
   const [viewingMedia, setViewingMedia] = useState(null);
+  const [editingViewerSrc, setEditingViewerSrc] = useState(null);
   const [pendingMediaFile, setPendingMediaFile] = useState(null);
   const [uploadProgressInternal, setUploadProgressInternal] = useState(0);
   const [isUploadingInternal, setIsUploadingInternal] = useState(false);
@@ -1148,17 +1145,6 @@ const ChatBox = () => {
       document.removeEventListener('touchstart', close);
     };
   }, [showEmojiPicker]);
-
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setUrl(url);
-      setFile(file)
-      console.log(url)
-    }
-    e.target.value = "";
-  };
 
   const sendReaction = (msg, text) => {
     const cleanText = typeof text === 'string' ? text.trim().slice(0, 15) : '';
@@ -1796,69 +1782,6 @@ const ChatBox = () => {
       resetInChatTimer();
     }
   };
-  const sendImage = async () => {
-    setIsUploading(true);
-    setUrl(null)
-    if (!file) return
-
-    const formdata = new FormData()
-    formdata.append('file', file)
-    try {
-      const options = {
-        maxSizeMB: 1,
-        maxWidthOrHeight: 1024,
-        fileType: file.type,
-        useWebWorker: true,
-      };
-      console.log('Starting image compression...');
-      const compressedFile = await imageCompression(file, options);
-      console.log(`Original Size: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
-      console.log(`Compressed Size: ${(compressedFile.size / 1024 / 1024).toFixed(2)} MB`);
-      console.log('Compressed File Name:', compressedFile.name);
-      const formdata = new FormData()
-      formdata.append('file', compressedFile, file.name);
-      const res = await fetch(`${API}/files/media/upload`, {
-        method: "POST",
-        body: formdata,
-      });
-      const text = await res.text();
-      console.log(text)
-      const msg = {
-        tempmsgid: uuidv4().toString(),
-        chatid,
-        userid: localStorage.getItem('userid'),
-        sendername: myDisplayName,
-        type: "image",
-        content: text,
-        timestamp: getCurrentLocalDateTimeString(),
-        repliedto: repliedto ? repliedto.msgid : null,
-        spaceid: activeSpace
-      };
-      await sendSafe(msg);
-      autoPinIfRoom();
-
-      // Track total messages for push prompt
-      const totalSent = parseInt(localStorage.getItem('totalMessagesSent') || '0', 10) + 1;
-      localStorage.setItem('totalMessagesSent', totalSent.toString());
-      if (totalSent >= 3 && window.Notification && window.Notification.permission === 'default') {
-        if (!localStorage.getItem('hasAskedPushPermission')) {
-          setShowPermissionModal(true);
-          localStorage.setItem('hasAskedPushPermission', 'true');
-        }
-      }
-
-      messageStore.addMessage(msg);
-      setrepliedto(null);
-      setshowreplytomsg(false);
-      setFile(null);
-      setUrl(null);
-    } catch (err) {
-      console.error(err);
-      alert(err.message)
-    } finally {
-      setIsUploading(false);
-    }
-  }
 
   // ── New global media send ─────────────────────────────────────────────────
   const sendMediaMessage = async (result, originalMeta) => {
@@ -3952,11 +3875,12 @@ const ChatBox = () => {
             onCancel={() => {
               if (!isUploadingInternal) setPendingMediaFile(null);
             }}
-            onSend={(thumbBlob) => {
-              const file = pendingMediaFile;
+            onSend={(thumbBlob, editedFile) => {
+              const file = editedFile || pendingMediaFile;
               setPendingMediaFile(null);
               handleCaptureFile(file, 'Gallery Upload', { silent: true, thumbBlob });
             }}
+            onFileChange={setPendingMediaFile}
           />
         )}
         {/* {renderPermissionModal()}
@@ -4965,8 +4889,8 @@ const ChatBox = () => {
               </p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', maxWidth: '380px' }}>
                 {[
-                  { text: 'Say Hello 👋', action: () => setNewMsg('Hello 👋') },
-                  { text: 'Share a note 📝', action: () => setNewMsg('Hey! Sharing a quick note: ') },
+                  { text: 'Say Hello 👋', action: () => setInput('Hello 👋') },
+                  { text: 'Share a note 📝', action: () => setInput('Hey! Sharing a quick note: ') },
                   { text: 'Schedule a meeting 📅', action: () => setShowScheduleModal(true) }
                 ].map((chip, idx) => (
                   <button
@@ -5752,7 +5676,7 @@ const ChatBox = () => {
                 <CameraCaptureModal
                   onCapture={(file) => {
                     setCameraOpen(false);
-                    handleCaptureFile(file, 'Camera Capture');
+                    setPendingMediaFile(file);
                   }}
                   onClose={() => setCameraOpen(false)}
                 />
@@ -6935,134 +6859,6 @@ const ChatBox = () => {
               )
             }
             {
-              url && (
-                <div
-                  style={{
-                    position: "fixed",
-                    top: 0,
-                    left: 0,
-                    width: "100vw",
-                    height: "100vh",
-                    background: "rgba(0,0,0,0.9)",
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    zIndex: 9999,
-                  }}
-                >
-                  <div
-                    style={{
-                      position: "relative",
-                      width: "90%",
-                      height: "90%",
-                      background: "#111",
-                      borderRadius: "12px",
-                      display: "flex",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      overflow: "hidden",
-                    }}
-                  >
-                    {/* Close Button - Top Left */}
-                    <button
-                      onClick={() => setUrl(null)}
-                      style={{
-                        position: "absolute",
-                        top: "10px",
-                        left: "10px",
-                        background: "#111",
-                        color: 'red',
-                        border: "none",
-                        fontSize: "20px",
-                        borderRadius: "50%",
-                        width: "36px",
-                        height: "36px",
-                        cursor: "pointer",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      ✕
-                    </button>
-
-                    {/* Image - Center */}
-                    <img
-                      src={url}
-                      alt="preview"
-                      style={{
-                        maxWidth: "80%",
-                        maxHeight: "75%",
-                        objectFit: "contain",
-                        borderRadius: "8px",
-                      }}
-                    />
-
-                    {/* Send Button - Bottom Right */}
-                    <button
-                      onClick={sendImage}
-                      style={{
-                        position: "absolute",
-                        bottom: "10px",
-                        right: "10px",
-                        background: "#1e90ff",
-                        border: "none",
-                        padding: "10px",
-                        borderRadius: "50%",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <Bird size={22} />
-                    </button>
-                  </div>
-                </div>
-              )
-            }
-            {
-              isUploading && (
-                <div style={{
-                  position: 'fixed',
-                  inset: 0,
-                  backgroundColor: 'rgba(0, 0, 0, 0.3)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 9999
-                }}>
-                  <div style={{
-                    backgroundColor: 'var(--text-primary)',
-                    borderRadius: '8px',
-                    padding: '24px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '16px'
-                  }}>
-                    <div style={{
-                      width: '48px',
-                      height: '48px',
-                      border: '3px solid #e5e7eb',
-                      borderTop: '3px solid #3b82f6',
-                      borderRadius: '50%',
-                      animation: 'spin 1s linear infinite'
-                    }}></div>
-                    <p style={{
-                      color: '#374151',
-                      fontWeight: '500',
-                      margin: 0
-                    }}>Uploading media...</p>
-                  </div>
-                  <style>{`
-            @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-            }
-        `}</style>
-                </div>
-              )
-            }
-            {
               showmedia && (
                 <div
                   style={{
@@ -7132,6 +6928,38 @@ const ChatBox = () => {
                         >
                           &larr;
                         </button>
+
+                        {/* Edit Button next to Close */}
+                        {showmedia?.type === 'image' &&
+                          !showmedia?.fileName?.toLowerCase().endsWith('.gif') &&
+                          !showmedia?.content?.toLowerCase().endsWith('.gif') && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingViewerSrc(`${API}/files/media/serve/${showmedia.content}`);
+                            }}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "6px",
+                              background: "rgba(255, 255, 255, 0.15)",
+                              border: "none",
+                              color: "#fff",
+                              padding: "6px 14px",
+                              borderRadius: "6px",
+                              fontSize: "14px",
+                              fontWeight: "500",
+                              cursor: "pointer",
+                              transition: "background 0.2s",
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.25)")}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.15)")}
+                            title="Edit Image"
+                          >
+                            <Pencil size={16} />
+                            <span>Edit</span>
+                          </button>
+                        )}
 
                         {/* Chat Name */}
                         <span
@@ -7430,7 +7258,25 @@ const ChatBox = () => {
           <MediaViewer
             media={viewingMedia}
             onClose={() => setViewingMedia(null)}
+            onEdit={(media) => {
+              setEditingViewerSrc(media.fileUrl);
+            }}
           />
+        )}
+
+        {editingViewerSrc && (
+          <React.Suspense fallback={null}>
+            <ImageEditor
+              src={editingViewerSrc}
+              onDone={(editedFile) => {
+                setEditingViewerSrc(null);
+                setViewingMedia(null);
+                setshowmedia(null);
+                setPendingMediaFile(editedFile);
+              }}
+              onCancel={() => setEditingViewerSrc(null)}
+            />
+          </React.Suspense>
         )}
 
 

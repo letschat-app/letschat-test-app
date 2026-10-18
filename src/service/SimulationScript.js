@@ -34,7 +34,12 @@ export const SIMULATION_SCRIPT = [
   {
     step: 5,
     type: "message",
-    content: "Just click the **< Back** button on the top left to return to the space list. See if you can find the new space I created! 👀",
+    content: () => {
+      const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+      return isMobile
+        ? "Just click the **< Back** button on the top left to return to the space list. See if you can find the new space I created! 👀"
+        : "Look at the space list on the left — see if you can find and click the new space I created! 👀";
+    },
     delay: 2500,
     spaceid: 0,
     createSpace: { id: 1, name: "Space 1" },

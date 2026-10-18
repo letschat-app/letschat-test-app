@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { X, Type, Image as ImageIcon, Video, Mic, Music, Lock, Globe, Upload, Loader2, Sparkles, Check } from 'lucide-react';
 import { fetchPutUrls, uploadMediaToR2, savePulseMediaKeys, createPulse } from '../../service/PulseService';
+import { compressImageBlob } from '../../service/MediaUploader';
 
 const BG_COLORS = [
   '#1e293b', '#0f172a', '#7c2d12', '#14532d', '#1e3a8a', '#581c87', '#831843', '#713f12',
@@ -133,12 +134,27 @@ const CreatePulseModal = ({ isOpen, onClose, onSuccess }) => {
       const needsVideo = type === 'video';
 
       if (needsImage || needsAudio || needsVideo) {
+        let finalImageFile = imageFile;
+        let finalImageMime = imageFile?.type || '';
+
+        if (needsImage && imageFile) {
+          setStatusMessage('Compressing pulse image...');
+          setUploadProgress(15);
+          try {
+            const webpBlob = await compressImageBlob(imageFile, 1920, 1080, 0.75);
+            finalImageFile = new File([webpBlob], `${Date.now()}_pulse.webp`, { type: 'image/webp' });
+            finalImageMime = 'image/webp';
+          } catch (compressErr) {
+            console.warn('[CreatePulseModal] Image compression failed, falling back to original:', compressErr);
+          }
+        }
+
         setStatusMessage('Getting secure upload URLs...');
-        setUploadProgress(25);
+        setUploadProgress(30);
 
         const putUrlsData = await fetchPutUrls({
           needsImage,
-          imageMime: imageFile?.type || '',
+          imageMime: finalImageMime,
           needsAudio,
           audioMime: audioFile?.type || '',
           needsVideo,
@@ -146,10 +162,10 @@ const CreatePulseModal = ({ isOpen, onClose, onSuccess }) => {
         });
 
         setStatusMessage('Uploading media to storage...');
-        setUploadProgress(50);
+        setUploadProgress(55);
 
-        if (needsImage && putUrlsData.imagePutUrl && imageFile) {
-          await uploadMediaToR2(putUrlsData.imagePutUrl, imageFile);
+        if (needsImage && putUrlsData.imagePutUrl && finalImageFile) {
+          await uploadMediaToR2(putUrlsData.imagePutUrl, finalImageFile);
         }
         if (needsAudio && putUrlsData.audioPutUrl && audioFile) {
           await uploadMediaToR2(putUrlsData.audioPutUrl, audioFile);

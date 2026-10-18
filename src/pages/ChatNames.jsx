@@ -403,6 +403,10 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
   const hasAutoOpenedRef = useRef(false);
   const prevRouteRef = useRef(activeChatRoute);
   const userClosedSpacesRef = useRef(null);
+  const selectedChatForSpacesRef = useRef(selectedChatForSpaces);
+  useEffect(() => {
+    selectedChatForSpacesRef.current = selectedChatForSpaces;
+  }, [selectedChatForSpaces]);
   const [isCreatingSpace, setIsCreatingSpace] = useState(false);
   const [newSpaceName, setNewSpaceName] = useState("");
   const [isAddingSpace, setIsAddingSpace] = useState(false);
@@ -1103,10 +1107,18 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
       setCount(messageStore.getCount());
       if (isDesktop && shouldNavigate) {
         navigate(`/chat/${chat.chatId}?space=0`);
-      } else {
-        const simSpaces = spacesCache[chat.chatId] || [{ id: 0, name: "Main", icon: "💬" }];
-        setSelectedChatForSpaces({ ...chat, spaces: simSpaces });
       }
+      let simSpaces = spacesCache[chat.chatId];
+      if (!simSpaces) {
+        try {
+          const storedCache = JSON.parse(localStorage.getItem('spacesCache') || '{}');
+          simSpaces = storedCache[chat.chatId];
+        } catch {}
+      }
+      if (!simSpaces || simSpaces.length === 0) {
+        simSpaces = [{ id: 0, name: "Main", icon: "💬" }];
+      }
+      setSelectedChatForSpaces({ ...chat, spaces: simSpaces });
       return;
     }
 
@@ -1175,11 +1187,28 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
       }
     }
 
-    if (targetChatId && chatNames.length > 0) {
+    if (targetChatId) {
       // If user hasn't explicitly closed space view for this specific chat, sync space list
       if (userClosedSpacesRef.current !== String(targetChatId)) {
-        if (!selectedChatForSpaces || String(selectedChatForSpaces.chatId) !== String(targetChatId)) {
-          const chat = chatNames.find(c => String(c.chatId) === String(targetChatId));
+        if (!selectedChatForSpacesRef.current || String(selectedChatForSpacesRef.current.chatId) !== String(targetChatId)) {
+          let chat = chatNames.find(c => String(c.chatId) === String(targetChatId));
+          if (!chat && (targetChatId === SIMULATION_ID || targetChatId === "simulation_guide")) {
+            chat = {
+              chatId: SIMULATION_ID,
+              chatName: "LetsChat",
+              type: "guide",
+              isSimulation: true
+            };
+          } else if (!chat && targetChatId === "BROADCAST_SYSTEM") {
+            chat = {
+              chatId: "BROADCAST_SYSTEM",
+              id: "BROADCAST_SYSTEM",
+              chatName: "Letschat",
+              type: "broadcast",
+              isSystem: true,
+              verified: true
+            };
+          }
           if (chat) {
             handleChatClick(chat, false);
           }
@@ -1192,15 +1221,15 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
       } else if (searchParams.get('showSpacesForChat')) {
         navigate(location.pathname, { replace: true });
       }
-    } else if (!targetChatId && selectedChatForSpaces && !activeChatRoute?.startsWith('/chat/')) {
-      // Clear the space selection when navigating back to the main chat list
+    } else if (prevRouteRef.current?.startsWith('/chat/') && !activeChatRoute?.startsWith('/chat/')) {
+      // Only clear space selection when route actually transitioned away from a chat route
       setSelectedChatForSpaces(null);
       userClosedSpacesRef.current = null;
     }
     
     // Update ref for next render
     prevRouteRef.current = activeChatRoute;
-  }, [location.state, activeChatRoute, chatNames, handleChatClick, selectedChatForSpaces]);
+  }, [location.state, activeChatRoute, chatNames, handleChatClick]);
 
   const handleCreateSpace = async () => {
     if (!newSpaceName.trim() || !selectedChatForSpaces) {
@@ -1581,8 +1610,8 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
               );
             })}
 
-            {/* Create Space Row - Hidden for Classrooms */}
-            {selectedChatForSpaces.type !== 'classroom' && (
+            {/* Create Space Row - Hidden for Classrooms and Simulation */}
+            {selectedChatForSpaces.type !== 'classroom' && selectedChatForSpaces.chatId !== SIMULATION_ID && !selectedChatForSpaces.isSimulation && (
               isCreatingSpace ? (
                 <div style={{
                   display: 'flex',

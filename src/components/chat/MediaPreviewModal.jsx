@@ -1,30 +1,54 @@
 import React, { useState, useEffect } from 'react';
-import { X, Send, FileText, Music, Trash2 } from 'lucide-react';
+import { X, Send, FileText, Music, Trash2, Pencil, Download } from 'lucide-react';
 import { formatFileSize, getFileCategory, getPdfThumbnail, getVideoThumbnail } from '../../service/MediaUploader';
 
-export default function MediaPreviewModal({ file, onSend, onCancel, isUploading = false, uploadProgress = 0 }) {
+const ImageEditor = React.lazy(() => import('../../editor/ImageEditor'));
+
+export default function MediaPreviewModal({ file, onSend, onCancel, isUploading = false, uploadProgress = 0, onFileChange }) {
+  const [currentFile, setCurrentFile] = useState(file);
+  const [isEditing, setIsEditing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [loadingThumb, setLoadingThumb] = useState(false);
   const [thumbBlob, setThumbBlob] = useState(null); // Store the actual Blob for reliable handoff
-  const category = getFileCategory(file?.type, file?.name);
-  // Direct detection bypasses category for PDFs with non-standard MIME types
-  const isPdfFile = file?.type === 'application/pdf' || file?.name?.toLowerCase().endsWith('.pdf');
-  const isVideoFile = category === 'video' || file?.type?.startsWith('video/');
 
   useEffect(() => {
-    if (!file) return;
+    setCurrentFile(file);
+  }, [file]);
+
+  const category = getFileCategory(currentFile?.type, currentFile?.name);
+  const isGif = currentFile?.type === 'image/gif' || currentFile?.name?.toLowerCase().endsWith('.gif');
+  const canEdit = category === 'image' && !isGif;
+
+  const handleDownload = () => {
+    if (!currentFile) return;
+    const url = URL.createObjectURL(currentFile);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = currentFile.name || 'image.png';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Direct detection bypasses category for PDFs with non-standard MIME types
+  const isPdfFile = currentFile?.type === 'application/pdf' || currentFile?.name?.toLowerCase().endsWith('.pdf');
+  const isVideoFile = category === 'video' || currentFile?.type?.startsWith('video/');
+
+  useEffect(() => {
+    if (!currentFile) return;
     
     let url = null;
     let isActive = true;
 
     if (category === 'image') {
-      url = URL.createObjectURL(file);
+      url = URL.createObjectURL(currentFile);
       setPreviewUrl(url);
     } else if (isVideoFile) {
-      url = URL.createObjectURL(file);
+      url = URL.createObjectURL(currentFile);
       setPreviewUrl(url);
       setLoadingThumb(true);
-      getVideoThumbnail(file).then(res => {
+      getVideoThumbnail(currentFile).then(res => {
          if (isActive && res.blob) {
            setThumbBlob(res.blob);
            setPreviewUrl(URL.createObjectURL(res.blob));
@@ -33,7 +57,7 @@ export default function MediaPreviewModal({ file, onSend, onCancel, isUploading 
       });
     } else if (category === 'pdf' || isPdfFile) {
       setLoadingThumb(true);
-      getPdfThumbnail(file).then(res => {
+      getPdfThumbnail(currentFile).then(res => {
          if (isActive && res?.blob) {
             const tUrl = URL.createObjectURL(res.blob);
             setThumbBlob(res.blob);
@@ -47,7 +71,7 @@ export default function MediaPreviewModal({ file, onSend, onCancel, isUploading 
       isActive = false;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [file, category]);
+  }, [currentFile, category]);
 
   if (!file) return null;
 
@@ -73,9 +97,65 @@ export default function MediaPreviewModal({ file, onSend, onCancel, isUploading 
               cursor: 'pointer', padding: '4px' 
             }}
           >
-            <span style={{ fontSize: '24px', fontWeight: '700' }}>X</span>
+            <span style={{ fontSize: '24px', fontWeight: '700' }}>✕</span>
           </button>
           <span style={{ color: 'white', fontWeight: '500', fontSize: '16px' }}>Preview</span>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {!isUploading && (
+            <button
+              type="button"
+              onClick={handleDownload}
+              style={{
+                background: 'rgba(255, 255, 255, 0.12)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                color: '#fff',
+                borderRadius: '20px',
+                padding: '6px 14px',
+                fontSize: '13px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'background 0.2s',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.22)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'}
+              title="Download image"
+            >
+              <Download size={15} />
+              <span>Download</span>
+            </button>
+          )}
+
+          {canEdit && !isUploading && (
+            <button
+              type="button"
+              onClick={() => setIsEditing(true)}
+              style={{
+                background: 'rgba(255, 255, 255, 0.12)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                color: '#fff',
+                borderRadius: '20px',
+                padding: '6px 14px',
+                fontSize: '13px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'background 0.2s',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.22)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)'}
+              title="Edit image"
+            >
+              <Pencil size={15} />
+              <span>Edit</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -141,7 +221,7 @@ export default function MediaPreviewModal({ file, onSend, onCancel, isUploading 
           </div>
         ) : (
           <button
-            onClick={() => onSend(thumbBlob)}
+            onClick={() => onSend(thumbBlob, currentFile)}
             style={{
               background: '#00a884', color: 'white', border: 'none',
               borderRadius: '50%', width: '60px', height: '60px',
@@ -156,6 +236,20 @@ export default function MediaPreviewModal({ file, onSend, onCancel, isUploading 
           </button>
         )}
       </div>
+
+      {isEditing && (
+        <React.Suspense fallback={null}>
+          <ImageEditor
+            src={currentFile}
+            onDone={(editedFile) => {
+              setCurrentFile(editedFile);
+              if (onFileChange) onFileChange(editedFile);
+              setIsEditing(false);
+            }}
+            onCancel={() => setIsEditing(false)}
+          />
+        </React.Suspense>
+      )}
 
       <style>{`
         @keyframes previewSpin { to { transform: rotate(360deg); } }

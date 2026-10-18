@@ -13,6 +13,9 @@ import { UsernameStatusIndicator } from '../common/UsernameStatusIndicator';
 import { DisplayNamePolicyModal } from '../common/DisplayNamePolicyModal';
 
 const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) => {
+  const currentUserId = localStorage.getItem('userid');
+  const isSleepMode = localStorage.getItem('sleepMode') === 'true';
+
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [infoLoading, setInfoLoading] = useState(true);
@@ -66,9 +69,6 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
       console.error('Error updating quick access:', err);
     }
   };
-
-  const currentUserId = localStorage.getItem('userid');
-  const isSleepMode = localStorage.getItem('sleepMode') === 'true';
 
   useEffect(() => {
     fetchInfo();

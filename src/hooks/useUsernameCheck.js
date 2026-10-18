@@ -210,6 +210,32 @@ export const useUsernameCheck = ({
       return;
     }
 
+    // 5.5 Client-side reserved names rule (letschat, admin, system, server, etc.)
+    const reservedWords = ['letschat', 'admin', 'administrator', 'system', 'sysadmin', 'server', 'root', 'support', 'moderator', 'bot'];
+    const norm = trimmed.toLowerCase()
+      .replace(/0/g, 'o').replace(/1/g, 'i').replace(/3/g, 'e').replace(/4/g, 'a').replace(/5/g, 's').replace(/7/g, 't')
+      .replace(/[^a-z0-9]/g, '');
+    const noDigits = norm.replace(/\d+$/, '');
+    const tokens = trimmed.toLowerCase().split(/[^a-z0-9]+/);
+
+    const isReserved = norm.includes('letschat') ||
+      reservedWords.includes(norm) ||
+      (noDigits && reservedWords.includes(noDigits)) ||
+      tokens.some(t => {
+        const nt = t.replace(/0/g, 'o').replace(/1/g, 'i').replace(/3/g, 'e').replace(/4/g, 'a').replace(/5/g, 's').replace(/7/g, 't');
+        const ntNoDigits = nt.replace(/\d+$/, '');
+        return reservedWords.includes(nt) || (ntNoDigits && reservedWords.includes(ntNoDigits));
+      });
+
+    if (isReserved) {
+      setStatus('block');
+      setDecision('BLOCK');
+      setScore(10.0);
+      setMessage('Username is already taken');
+      setIsChecking(false);
+      return;
+    }
+
     // 6. Fast session cache check before waiting for debounce
     const cacheKey = `${trimmed.toLowerCase()}__${excludeUserId || ''}`;
     if (cacheRef.current.has(cacheKey)) {

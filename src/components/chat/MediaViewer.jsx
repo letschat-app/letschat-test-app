@@ -1,11 +1,13 @@
 import React from 'react';
-import { X, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Download, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
 import { downloadFile } from '../../service/MediaUploader';
 
-export default function MediaViewer({ media, onClose }) {
+export default function MediaViewer({ media, onClose, onEdit }) {
   if (!media) return null;
 
   const { fileUrl, fileName, fileType } = media;
+  const isGif = fileName?.toLowerCase().endsWith('.gif') || fileUrl?.toLowerCase().includes('.gif') || fileType === 'image/gif';
+  const canEdit = (fileType === 'image' || fileType?.startsWith('image/')) && !isGif && typeof onEdit === 'function';
 
   const handleDownload = (e) => {
     e.stopPropagation();
@@ -56,6 +58,35 @@ export default function MediaViewer({ media, onClose }) {
           >
             <span style={{ fontSize: '28px', fontWeight: '700' }}>X</span>
           </button>
+          {canEdit && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(media);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'rgba(255, 255, 255, 0.15)',
+                border: 'none',
+                color: '#fff',
+                padding: '6px 14px',
+                borderRadius: '6px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                transition: 'background 0.2s',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)')}
+              title="Edit image"
+            >
+              <Pencil size={16} />
+              <span>Edit</span>
+            </button>
+          )}
           <span style={{ color: 'white', fontWeight: '500', fontSize: '15px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {fileName}
           </span>
