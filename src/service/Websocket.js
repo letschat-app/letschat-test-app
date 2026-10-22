@@ -138,6 +138,11 @@ export function initWebsocket() {
       window.dispatchEvent(new CustomEvent('letschat_booking_request', { detail: msg }));
       return;
     }
+    if (msg.type === 'booking_update' || msg.type === 'booking_created') {
+      console.log("[Websocket] Booking update/created received:", msg);
+      window.dispatchEvent(new CustomEvent('letschat_booking_update', { detail: msg }));
+      return;
+    }
 
     // 4. Single Message ACK Response (onrecieve ACK payload)
     if (('tempmsgid' in msg || 'msgid' in msg) && 'status' in msg && !('sendername' in msg) && !('content' in msg)) {

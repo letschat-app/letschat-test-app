@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Volume2, VolumeX, Play, Pause, Eye, Tag, Send } from 'lucide-react';
+import { X, Volume2, VolumeX, Play, Pause, Eye, Tag, Send, ChevronLeft, ChevronRight } from 'lucide-react';
 import Avatar from '../chat/Avatar';
 import StreakBadge from './StreakBadge';
 import PulseViewersModal from './PulseViewersModal';
@@ -11,11 +11,23 @@ import { API } from '../../service/UserAuth';
 
 const DEFAULT_SLIDE_DURATION = 5000; // 5 seconds for text / image
 
-const PulseStoryViewer = ({ contactsFeed = [], initialUserIndex = 0, onClose, onPulseViewed }) => {
+const PulseStoryViewer = ({
+  contactsFeed = [],
+  initialUserIndex = 0,
+  onClose,
+  onPulseViewed,
+  isDesktop = false
+}) => {
   if (!contactsFeed || contactsFeed.length === 0) return null;
 
   const [userIndex, setUserIndex] = useState(initialUserIndex);
   const [pulseIndex, setPulseIndex] = useState(0);
+
+  // Synchronize active story if selected contact changes from outside
+  useEffect(() => {
+    setUserIndex(initialUserIndex);
+    setPulseIndex(0);
+  }, [initialUserIndex]);
   const [isPaused, setIsPaused] = useState(false);
   const [showPauseIndicator, setShowPauseIndicator] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -34,7 +46,7 @@ const PulseStoryViewer = ({ contactsFeed = [], initialUserIndex = 0, onClose, on
   const pulses = currentUser?.pulses || [];
   const currentPulse = pulses[pulseIndex] || pulses[0];
   const isMine = currentUser?.isMine || String(currentUser?.userId || '') === String(myUserId || '');
-  const isSystemAdmin = currentUser?.userId === 'SYSTEM_ADMIN' || currentUser?.user_id === 'SYSTEM_ADMIN' || currentPulse?.userId === 'SYSTEM_ADMIN';
+  const isSystemAdmin = currentUser?.userId === 'SYSTEM_ADMIN' || currentUser?.user_id === 'SYSTEM_ADMIN' || currentPulse?.userId === 'SYSTEM_ADMIN' || currentUser?.isSystemAdmin || currentUser?.isSystem;
 
   const timerRef = useRef(null);
   const elapsedRef = useRef(0);
@@ -273,26 +285,100 @@ const PulseStoryViewer = ({ contactsFeed = [], initialUserIndex = 0, onClose, on
     <div
       className="pulse-story-viewer-overlay"
       style={{
-        position: 'fixed', inset: 0, zIndex: 99999,
-        backgroundColor: '#000000',
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        userSelect: 'none'
-      }}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      onClick={handleMediaClick}
-    >
-      <div style={{
-        position: 'relative',
-        width: '100%', maxWidth: '440px',
-        height: '100%', maxHeight: '880px',
-        backgroundColor: currentPulse?.bgColor || '#090d16',
-        display: 'flex', flexDirection: 'column',
-        justifyContent: 'space-between',
+        position: isDesktop ? 'relative' : 'fixed',
+        inset: isDesktop ? undefined : 0,
+        zIndex: isDesktop ? 10 : 99999,
+        backgroundColor: isDesktop ? 'transparent' : '#000000',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        userSelect: 'none',
+        width: '100%',
+        height: '100%',
         overflow: 'hidden',
-        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.8)'
-      }}>
+        boxSizing: 'border-box',
+        padding: isDesktop ? '16px' : '0'
+      }}
+      onClick={isDesktop ? onClose : undefined}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: isDesktop ? '16px' : '0px',
+          width: '100%',
+          height: '100%',
+          position: 'relative'
+        }}
+        onClick={(e) => isDesktop && e.stopPropagation()}
+      >
+        {isDesktop && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePrev();
+            }}
+            title="Previous (Left Arrow)"
+            style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(255, 255, 255, 0.12)',
+              backdropFilter: 'blur(8px)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: (userIndex === 0 && pulseIndex === 0) ? 'default' : 'pointer',
+              opacity: (userIndex === 0 && pulseIndex === 0) ? 0.25 : 0.9,
+              pointerEvents: (userIndex === 0 && pulseIndex === 0) ? 'none' : 'auto',
+              flexShrink: 0,
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              if (userIndex !== 0 || pulseIndex !== 0) {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
+                e.currentTarget.style.opacity = '1';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (userIndex !== 0 || pulseIndex !== 0) {
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.12)';
+                e.currentTarget.style.opacity = '0.9';
+              }
+            }}
+          >
+            <ChevronLeft size={24} />
+          </button>
+        )}
+
+        <div
+          className="pulse-story-card"
+          style={{
+            position: 'relative',
+            width: '100%',
+            maxWidth: isDesktop ? '420px' : '440px',
+            height: isDesktop ? 'calc(100% - 24px)' : '100%',
+            maxHeight: isDesktop ? '800px' : '880px',
+            backgroundColor: currentPulse?.bgColor || '#090d16',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            overflow: 'hidden',
+            borderRadius: isDesktop ? '16px' : '0px',
+            border: isDesktop ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
+            boxShadow: isDesktop
+              ? '0 20px 40px -15px rgba(0,0,0,0.7), 0 0 0 1px rgba(255, 255, 255, 0.05)'
+              : '0 25px 50px -12px rgba(0,0,0,0.8)',
+            flexShrink: 0
+          }}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          onClick={handleMediaClick}
+        >
 
         {/* Top Overlay: Segmented Progress Bars & Contact Info Header */}
         <div className="story-viewer-top-bar" style={{
@@ -325,25 +411,36 @@ const PulseStoryViewer = ({ contactsFeed = [], initialUserIndex = 0, onClose, on
           {/* User Info Row */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Avatar chat={{ profile: currentUser.profile, userName: currentUser.userName }} size={40} />
+              <Avatar
+                chat={{
+                  ...currentUser,
+                  profile: isSystemAdmin ? `${import.meta.env.BASE_URL}icon.png` : currentUser.profile,
+                  userName: isSystemAdmin ? 'Letschat' : currentUser.userName,
+                  isSystem: isSystemAdmin
+                }}
+                size={40}
+              />
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ color: '#ffffff', fontWeight: '800', fontSize: '15px' }}>
-                    {currentUser.userId === 'SYSTEM_ADMIN' || currentUser.user_id === 'SYSTEM_ADMIN' ? 'Letschat' : (currentUser.userName || currentUser.userId)}
+                    {isSystemAdmin ? 'Letschat (System)' : (currentUser.userName || currentUser.userId)}
                   </span>
-                  {(currentUser.userId === 'SYSTEM_ADMIN' || currentUser.user_id === 'SYSTEM_ADMIN') && (
-                    <span title="Official System Admin" style={{
+                  {(isSystemAdmin || currentUser.userId === 'SYSTEM_ADMIN' || currentUser.user_id === 'SYSTEM_ADMIN' || currentUser.isSystem || /letschat/i.test(currentUser.userName || '')) && (
+                    <span title="Official Verified Channel" style={{
                       display: 'inline-flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       width: '16px',
                       height: '16px',
                       borderRadius: '50%',
-                      backgroundColor: '#f59e0b',
+                      backgroundColor: '#2563eb',
                       color: '#ffffff',
-                      fontSize: '10px',
-                      fontWeight: 'bold'
-                    }}>✓</span>
+                      flexShrink: 0
+                    }}>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                      </svg>
+                    </span>
                   )}
                   <StreakBadge streak={currentUser.pulseStreak} size="sm" />
                 </div>
@@ -616,6 +713,44 @@ const PulseStoryViewer = ({ contactsFeed = [], initialUserIndex = 0, onClose, on
             }}
             pulse={currentPulse}
           />
+        )}
+        </div>
+
+        {isDesktop && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleNext();
+            }}
+            title="Next (Right Arrow)"
+            style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '50%',
+              backgroundColor: 'rgba(255, 255, 255, 0.12)',
+              backdropFilter: 'blur(8px)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              opacity: 0.9,
+              flexShrink: 0,
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
+              e.currentTarget.style.opacity = '1';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.12)';
+              e.currentTarget.style.opacity = '0.9';
+            }}
+          >
+            <ChevronRight size={24} />
+          </button>
         )}
       </div>
     </div>

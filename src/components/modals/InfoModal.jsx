@@ -8,29 +8,44 @@ import { getMediaInfo, getMediaBlob } from '../../service/MediaCache';
 import Avatar from '../chat/Avatar';
 import MediaViewer from '../chat/MediaViewer';
 import { toggleMuteChat, isChatMuted, saveChatInfoToDB, getChatInfoFromDB, saveGroupMembersToDB, saveUsersBatchToDB, getGroupMembersFromDB } from '../../service/db';
-import { useUsernameCheck } from '../../hooks/useUsernameCheck';
-import { UsernameStatusIndicator } from '../common/UsernameStatusIndicator';
 import { DisplayNamePolicyModal } from '../common/DisplayNamePolicyModal';
+import { validateChatNickname } from '../../service/nameSimilarity';
 
 const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) => {
   const currentUserId = localStorage.getItem('userid');
+  const currentUsername = (localStorage.getItem('username') || currentUserId || '').toLowerCase();
   const isSleepMode = localStorage.getItem('sleepMode') === 'true';
 
-  const [members, setMembers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [infoLoading, setInfoLoading] = useState(true);
+  // Synchronous cache read for instantaneous first render
+  const cachedInfo = (() => {
+    try {
+      return JSON.parse(localStorage.getItem(`chatInfo_${chat.chatId}`) || '{}');
+    } catch { return {}; }
+  })();
+
+  const cachedMembersList = (() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(`groupMembers_${chat.chatId}`) || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch { return []; }
+  })();
+
+  const [members, setMembers] = useState(cachedMembersList);
+  const [loading, setLoading] = useState(() => {
+    if (chat.type !== 'group' && chat.type !== 'classroom') return false;
+    return cachedMembersList.length === 0;
+  });
+  const [infoLoading, setInfoLoading] = useState(() => {
+    return !cachedInfo.userName && !cachedInfo.profile;
+  });
   const [editMode, setEditMode] = useState(false);
-  const [myDisplayName, setMyDisplayName] = useState('');
-  const [initialDisplayName, setInitialDisplayName] = useState('');
-  const [myProfile, setMyProfile] = useState('');
+  const [myDisplayName, setMyDisplayName] = useState(cachedInfo.userName || '');
+  const [initialDisplayName, setInitialDisplayName] = useState(cachedInfo.userName || '');
+  const [myProfile, setMyProfile] = useState(cachedInfo.profile || '');
   const [showPolicyModal, setShowPolicyModal] = useState(false);
 
-  const usernameCheck = useUsernameCheck({
-    username: myDisplayName,
-    originalName: initialDisplayName,
-    excludeUserId: currentUserId,
-    debounceMs: 400
-  });
+  const peers = members.filter(m => String(m.userId) !== String(currentUserId));
+  const chatNicknameValidation = validateChatNickname(currentUsername, myDisplayName, peers);
   const [selectedMember, setSelectedMember] = useState(null);
   const [showMemberActions, setShowMemberActions] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
@@ -39,9 +54,10 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
   const [groupEditMode, setGroupEditMode] = useState(false);
   const [tempGroupName, setTempGroupName] = useState(chat.chatName || '');
   const [tempGroupProfile, setTempGroupProfile] = useState(chat.profile || '');
+  const [tempGroupMotto, setTempGroupMotto] = useState(chat.motto || chat.description || '');
   const [viewingMedia, setViewingMedia] = useState(null);
   const [onlineStatuses, setOnlineStatuses] = useState({});
-  const [memberCount, setMemberCount] = useState(0);
+  const [memberCount, setMemberCount] = useState(cachedInfo.memberCount || 0);
   const fileInputRef = useRef(null);
   const groupFileInputRef = useRef(null);
   const [muted, setMuted] = useState(false);
@@ -71,6 +87,35 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
   };
 
   useEffect(() => {
+    let isCurrent = true;
+
+    // 1. Immediate cache hydration from IndexedDB
+    getChatInfoFromDB(chat.chatId).then(cached => {
+      if (!isCurrent || !cached) return;
+      if (cached.userName) {
+        setMyDisplayName(cached.userName);
+        setInitialDisplayName(cached.userName);
+      }
+      if (cached.profile) setMyProfile(cached.profile);
+      if (cached.memberCount !== undefined) setMemberCount(cached.memberCount);
+      setInfoLoading(false);
+      try {
+        localStorage.setItem(`chatInfo_${chat.chatId}`, JSON.stringify(cached));
+      } catch {}
+    }).catch(err => console.warn('[InfoModal] DB read error for chat info:', err));
+
+    if (chat.type === 'group' || chat.type === 'classroom') {
+      getGroupMembersFromDB(chat.chatId).then(cached => {
+        if (!isCurrent || !cached || cached.length === 0) return;
+        setMembers(cached);
+        setLoading(false);
+        try {
+          localStorage.setItem(`groupMembers_${chat.chatId}`, JSON.stringify(cached));
+        } catch {}
+      }).catch(err => console.warn('[InfoModal] DB read error for members:', err));
+    }
+
+    // 2. Fetch from Network in background (Cache-First, Network-Later)
     fetchInfo();
     if (chat.type === 'group' || chat.type === 'classroom') {
       fetchMembers();
@@ -79,7 +124,11 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
       fetchCommonGroups();
     }
     checkMuteStatus();
-  }, [chat]);
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [chat.chatId]);
 
   const fetchCommonGroups = async () => {
     const partnerId = String(chat.chatId || chat.userid || chat.id);
@@ -115,6 +164,10 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
   };
 
   const fetchInfo = async () => {
+    if (isSleepMode || !navigator.onLine) {
+      setInfoLoading(false);
+      return;
+    }
     try {
       const res = await fetch(`${API}/user/getchatinfo/${chat.chatId}`, {
         method: "GET",
@@ -131,26 +184,24 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
         if (data.memberCount !== undefined) {
            setMemberCount(data.memberCount);
         }
-        saveChatInfoToDB({ chatId: chat.chatId, ...data });
-      } else {
-        throw new Error("Network fetch failed");
+        const infoObj = { chatId: chat.chatId, ...data };
+        saveChatInfoToDB(infoObj);
+        try {
+          localStorage.setItem(`chatInfo_${chat.chatId}`, JSON.stringify(infoObj));
+        } catch {}
       }
     } catch (ex) {
-      console.error("Failed to fetch userinfo, checking offline cache:", ex);
-      getChatInfoFromDB(chat.chatId).then(cached => {
-         if (cached) {
-            console.log("Loaded cached userinfo from offline cache");
-            setMyDisplayName(cached.userName || '');
-            setInitialDisplayName(cached.userName || '');
-            setMyProfile(cached.profile || '');
-         }
-      });
+      console.warn("Failed to fetch userinfo from network, relying on cached data:", ex);
     } finally {
       setInfoLoading(false);
     }
   };
 
   const fetchMembers = async () => {
+    if (isSleepMode || !navigator.onLine) {
+      setLoading(false);
+      return;
+    }
     try {
       const res = await fetch(`${API}/group/getmembers/${chat.chatId}`, {
         method: "GET",
@@ -164,17 +215,12 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
         setMembers(data);
         saveGroupMembersToDB(chat.chatId, data);
         saveUsersBatchToDB(data);
-      } else {
-        throw new Error("Network fetch failed");
+        try {
+          localStorage.setItem(`groupMembers_${chat.chatId}`, JSON.stringify(data));
+        } catch {}
       }
     } catch (ex) {
-      console.error("Failed to fetch members, checking offline cache:", ex);
-      getGroupMembersFromDB(chat.chatId).then(cached => {
-         if (cached && cached.length) {
-            console.log("Loaded members array from offline cache");
-            setMembers(cached);
-         }
-      });
+      console.warn("Failed to fetch members from network, relying on cached data:", ex);
     } finally {
       setLoading(false);
     }
@@ -250,33 +296,17 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
   }, [members]);
 
   const handleSaveMyInfo = async () => {
-    if (!myDisplayName.trim()) {
+    const cleanName = myDisplayName.trim();
+    if (!cleanName) {
       alert("Name cannot be empty.");
       return;
     }
 
-    if (usernameCheck.isBlocked) {
-      alert(usernameCheck.message || "Please choose a valid and available username.");
+    const peers = members.filter(m => String(m.userId) !== String(currentUserId));
+    const validation = validateChatNickname(currentUsername, cleanName, peers);
+    if (!validation.isValid) {
+      alert(validation.message);
       return;
-    }
-
-    if (usernameCheck.isChecking) {
-      alert("Validating name availability, please wait a moment...");
-      return;
-    }
-
-    if (chat.type === 'group' || chat.type === 'classroom') {
-      const normalizedNewName = myDisplayName.trim().toLowerCase().replace(/\s+/g, '');
-      const isTaken = members.some(m => {
-        if (m.userId === currentUserId) return false; // Ignore our own current name
-        const existingName = (m.userName || '').trim().toLowerCase().replace(/\s+/g, '');
-        return existingName === normalizedNewName;
-      });
-
-      if (isTaken) {
-        alert("this name already exist cannot be used");
-        return;
-      }
     }
 
     try {
@@ -287,17 +317,30 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
           "User-Id": currentUserId,
         },
         body: JSON.stringify({
-          userName: myDisplayName.trim(),
+          userName: cleanName,
           userId: currentUserId,
           profile: myProfile,
         }),
       });
       if (res.ok) {
-        setInitialDisplayName(myDisplayName.trim());
+        setInitialDisplayName(cleanName);
         setEditMode(false);
+        const updatedInfo = { chatId: chat.chatId, userName: cleanName, profile: myProfile, memberCount };
+        saveChatInfoToDB(updatedInfo);
+        try {
+          localStorage.setItem(`chatInfo_${chat.chatId}`, JSON.stringify(updatedInfo));
+        } catch {}
+        fetchInfo();
+        if (chat.type === 'group' || chat.type === 'classroom') {
+          fetchMembers();
+        }
+      } else {
+        const errText = await res.text();
+        alert(errText || "Failed to update chat info");
       }
     } catch (ex) {
       console.error("Failed to update info:", ex);
+      alert("Network error updating chat info.");
     }
   };
 
@@ -314,10 +357,27 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
         body: JSON.stringify({
           chatName: tempGroupName,
           profile: tempGroupProfile,
+          motto: tempGroupMotto,
+          description: tempGroupMotto
         }),
       });
       if (res.ok) {
         setGroupEditMode(false);
+        chat.motto = tempGroupMotto;
+        chat.description = tempGroupMotto;
+        try {
+          const chatsMap = JSON.parse(localStorage.getItem('chatsMap') || '{}');
+          if (chatsMap[chat.chatId]) {
+            chatsMap[chat.chatId] = {
+              ...chatsMap[chat.chatId],
+              chatName: tempGroupName,
+              profile: tempGroupProfile,
+              motto: tempGroupMotto,
+              description: tempGroupMotto
+            };
+            localStorage.setItem('chatsMap', JSON.stringify(chatsMap));
+          }
+        } catch {}
         // Trigger a global refresh of this chat
         if (typeof getchat === 'function') {
           getchat(chat.chatId);
@@ -573,6 +633,13 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
                 style={{ ...inputStyle, textAlign: 'center', fontSize: '18px', fontWeight: '700' }}
                 placeholder={`${chat.type === 'classroom' ? 'Classroom' : 'Group'} Name`}
               />
+              <input 
+                type="text" 
+                value={tempGroupMotto} 
+                onChange={e => setTempGroupMotto(e.target.value)} 
+                style={{ ...inputStyle, textAlign: 'center', fontSize: '14px', fontWeight: '500' }}
+                placeholder={`${chat.type === 'classroom' ? 'Classroom Description' : 'Group Motto'} (optional)`}
+              />
               <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
                 <button 
                   onClick={handleSaveGroupInfo} 
@@ -586,6 +653,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
                     setGroupEditMode(false);
                     setTempGroupName(chat.chatName);
                     setTempGroupProfile(chat.profile);
+                    setTempGroupMotto(chat.motto || chat.description || '');
                   }} 
                   style={{ ...secondaryBtnStyle, flex: 1, padding: '8px 12px', fontSize: '13px' }}
                 >
@@ -595,9 +663,31 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
             </div>
           ) : (
             <>
-              <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#f3f4f6', margin: '0 0 8px 0', textAlign: 'center' }}>
+              <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#f3f4f6', margin: '0 0 8px 0', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                 {chat.chatName}
+                {(chat.chatId === "BROADCAST_SYSTEM" || chat.id === "BROADCAST_SYSTEM" || chat.chatId === "simulation_guide" || chat.id === "simulation_guide" || chat.isSimulation || chat.isSystem || chat.verified || /letschat/i.test(chat.chatName || '')) && (
+                  <span title="Official Verified Channel" style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '50%',
+                    backgroundColor: '#2563eb',
+                    color: '#ffffff',
+                    flexShrink: 0
+                  }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  </span>
+                )}
               </h2>
+              {chat.type !== 'group' && chat.type !== 'classroom' && chat.type !== 'room' && (
+                <div style={{ fontSize: '13px', color: 'var(--text-secondary, #9ca3af)', marginBottom: '8px' }}>
+                  @{chat.username || chat.userName || chat.id} · {chat.id || chat.otherUserId || chat.userId || chat.chatId}
+                </div>
+              )}
               <div style={{ 
                 padding: '6px 14px', borderRadius: '20px',
                 backgroundColor: chat.type === 'classroom' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)',
@@ -607,6 +697,39 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
               }}>
                 {chat.type} Chat
               </div>
+
+              {(chat.type === 'group' || chat.type === 'classroom' || chat.type === 'room') && (
+                (chat.motto || chat.description) ? (
+                  <p style={{
+                    fontSize: '13px',
+                    color: 'var(--text-secondary, #9ca3af)',
+                    fontStyle: 'italic',
+                    margin: '10px 0 0 0',
+                    textAlign: 'center',
+                    maxWidth: '340px',
+                    lineHeight: '1.4'
+                  }}>
+                    "{chat.motto || chat.description}"
+                  </p>
+                ) : (
+                  isGroupAdmin && (
+                    <button 
+                      onClick={() => setGroupEditMode(true)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#60a5fa',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        marginTop: '8px',
+                        textDecoration: 'underline'
+                      }}
+                    >
+                      + Add {chat.type === 'classroom' ? 'description' : 'motto'}
+                    </button>
+                  )
+                )
+              )}
             </>
           )}
         </div>
@@ -688,21 +811,38 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
                     placeholder="Your Name"
                     style={{
                       ...inputStyle,
-                      paddingRight: '36px',
-                      borderColor: usernameCheck.status === 'block' ? '#ef4444' : usernameCheck.status === 'warn' ? '#f59e0b' : usernameCheck.status === 'allow' ? '#10b981' : undefined
+                      paddingRight: '12px',
+                      borderColor: !myDisplayName.trim()
+                        ? undefined
+                        : chatNicknameValidation.isValid
+                          ? '#10b981'
+                          : '#ef4444'
                     }}
                   />
-                  <div style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center' }}>
-                    <UsernameStatusIndicator checkResult={usernameCheck} showInlineIcon={true} />
-                  </div>
                 </div>
               </div>
               
-              <UsernameStatusIndicator checkResult={usernameCheck} containerStyle={{ marginBottom: '6px' }} />
+              {myDisplayName.trim() && (
+                <div style={{
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  marginBottom: '6px',
+                  color: chatNicknameValidation.isValid ? '#10b981' : '#ef4444'
+                }}>
+                  {chatNicknameValidation.isValid ? (
+                    <span>✓ Self similarity: {chatNicknameValidation.selfScore}/10 with @{currentUsername} (Valid)</span>
+                  ) : (
+                    <span>✕ {chatNicknameValidation.message}</span>
+                  )}
+                </div>
+              )}
               
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                 <span style={{ fontSize: '11px', color: '#9ca3af' }}>
-                  Names are checked to prevent impersonation.{" "}
+                  Per-chat names must have &ge; 3/10 similarity with your permanent username (@{currentUsername}) and &lt; 8/10 peer similarity.{" "}
                   <button
                     type="button"
                     onClick={() => setShowPolicyModal(true)}
@@ -725,15 +865,15 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button 
                   onClick={handleSaveMyInfo} 
-                  disabled={uploading || usernameCheck.isBlocked || usernameCheck.isChecking}
+                  disabled={uploading || !myDisplayName.trim() || !chatNicknameValidation.isValid}
                   style={{
                     ...primaryBtnStyle,
                     flex: 1,
-                    opacity: (uploading || usernameCheck.isBlocked || usernameCheck.isChecking) ? 0.6 : 1,
-                    cursor: (uploading || usernameCheck.isBlocked || usernameCheck.isChecking) ? 'not-allowed' : 'pointer'
+                    opacity: (uploading || !myDisplayName.trim() || !chatNicknameValidation.isValid) ? 0.6 : 1,
+                    cursor: (uploading || !myDisplayName.trim() || !chatNicknameValidation.isValid) ? 'not-allowed' : 'pointer'
                   }}
                 >
-                  {usernameCheck.isChecking ? 'Checking...' : 'Save Changes'}
+                  Save Changes
                 </button>
                 <button 
                   onClick={() => {
@@ -759,7 +899,10 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
               />
               <div>
                 <div style={{ fontSize: '16px', fontWeight: '600', color: '#f3f4f6' }}>{myDisplayName || 'Set your name'}</div>
-                <div style={{ fontSize: '12px', color: '#9ca3af' }}>Your visible name in this chat</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary, #9ca3af)', marginTop: '2px' }}>
+                  @{currentUsername} · {currentUserId}
+                </div>
+                <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>Your visible nickname in this chat</div>
               </div>
             </div>
           )}
@@ -958,6 +1101,9 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
                             {member.userId === currentUserId ? 'You' : member.userName}
                           </span>
                           {getRoleBadge(member.role)}
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary, #9ca3af)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          @{member.username || member.userName} · {member.userId}
                         </div>
                       </div>
                     </div>

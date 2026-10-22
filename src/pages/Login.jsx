@@ -103,8 +103,16 @@ function Login() {
 
         localStorage.setItem("userid", loggedUserId);
         if (data?.email) localStorage.setItem("email", data.email);
-        if (data?.username || data?.userName || data?.publicName) {
-          localStorage.setItem("username", data.username || data.userName || data.publicName);
+        if (data?.profile) localStorage.setItem("profile", data.profile);
+        if (data?.username || data?.publicName) {
+          localStorage.setItem("username", String(data.username || data.publicName).trim().toLowerCase());
+        } else if (data?.userName) {
+          localStorage.setItem("username", String(data.userName).trim().toLowerCase());
+        }
+        if (data?.displayName || data?.privateName) {
+          localStorage.setItem("displayName", String(data.displayName || data.privateName).trim());
+        } else if (data?.userName) {
+          localStorage.setItem("displayName", String(data.userName).trim());
         }
         if (data?.is2FAEnabled !== undefined) {
           localStorage.setItem("is2FAEnabled", String(data.is2FAEnabled));
@@ -170,8 +178,16 @@ function Login() {
 
         localStorage.setItem("userid", loggedUserId);
         if (data?.email) localStorage.setItem("email", data.email);
-        if (data?.username || data?.userName || data?.publicName) {
-          localStorage.setItem("username", data.username || data.userName || data.publicName);
+        if (data?.profile) localStorage.setItem("profile", data.profile);
+        if (data?.username || data?.publicName) {
+          localStorage.setItem("username", String(data.username || data.publicName).trim().toLowerCase());
+        } else if (data?.userName) {
+          localStorage.setItem("username", String(data.userName).trim().toLowerCase());
+        }
+        if (data?.displayName || data?.privateName) {
+          localStorage.setItem("displayName", String(data.displayName || data.privateName).trim());
+        } else if (data?.userName) {
+          localStorage.setItem("displayName", String(data.userName).trim());
         }
         if (data?.is2FAEnabled !== undefined) {
           localStorage.setItem("is2FAEnabled", String(data.is2FAEnabled));

@@ -6,7 +6,7 @@ import { savePendingOtpSession } from '../service/otpSessionManager';
 import { uploadMedia, STAGE_LABELS } from '../service/MediaUploader';
 import { getMediaInfo, getMediaBlob } from '../service/MediaCache';
 import MediaViewer from '../components/chat/MediaViewer';
-import { Camera, Loader2, LogOut, CheckCircle2, Bell, Moon, MessageCircle, ArrowLeft, ShieldCheck, Edit2, Lock, KeyRound, Eye, EyeOff, X } from 'lucide-react';
+import { Camera, Loader2, LogOut, CheckCircle2, Bell, Moon, MessageCircle, ArrowLeft, ShieldCheck, Edit2, Lock, KeyRound, Eye, EyeOff, X, Calendar, Copy, Check, ExternalLink, Clock } from 'lucide-react';
 import Avatar from '../components/chat/Avatar';
 import StreakBadge from '../components/pulse/StreakBadge';
 import { useNotifications } from '../hooks/useNotifications';
@@ -15,6 +15,7 @@ import { getchat } from './ChatNames';
 import { useUsernameCheck } from '../hooks/useUsernameCheck';
 import { UsernameStatusIndicator } from '../components/common/UsernameStatusIndicator';
 import { DisplayNamePolicyModal } from '../components/common/DisplayNamePolicyModal';
+import { computeSelfSimilarity } from '../service/nameSimilarity';
 
 const ProfilePage = () => {
     const navigate = useNavigate();
@@ -23,12 +24,28 @@ const ProfilePage = () => {
     
     const isTargetUser = Boolean(targetUserId && String(targetUserId) !== String(userId));
     const [targetUserData, setTargetUserData] = useState(null);
+    const [targetBookingInfo, setTargetBookingInfo] = useState(null);
     const [targetUserCommonGroups, setTargetUserCommonGroups] = useState([]);
     const [existingChatId, setExistingChatId] = useState(null);
     const [isStartingChat, setIsStartingChat] = useState(false);
 
+    // Meeting booking settings state
+    const [bookingSettings, setBookingSettings] = useState({
+        isBookingEnabled: true,
+        showBusySlots: false,
+        bookingSlug: ''
+    });
+    const [copiedBookingLink, setCopiedBookingLink] = useState(false);
+
     const { fcmToken, permissionStatus, requestPermissionAndGetToken, disableNotifications } = useNotifications();
-    const [username, setUsername] = useState(localStorage.getItem('username') || userId);
+    const [username, setUsername] = useState(() => (localStorage.getItem('username') || userId || '').toLowerCase());
+    const [displayName, setDisplayName] = useState(() => localStorage.getItem('displayName') || localStorage.getItem('username') || userId || '');
+    const [lastDisplayNameChangeAt, setLastDisplayNameChangeAt] = useState(() => localStorage.getItem('lastDisplayNameChangeAt') || null);
+    const [isEditingDisplayName, setIsEditingDisplayName] = useState(false);
+    const [newDisplayName, setNewDisplayName] = useState(displayName);
+    const [savingDisplayName, setSavingDisplayName] = useState(false);
+    const [displayNameError, setDisplayNameError] = useState('');
+
     const [profile, setProfile] = useState(localStorage.getItem('profile'));
     const [uploading, setUploading] = useState(false);
     const [progress, setProgress] = useState(0);
@@ -62,23 +79,12 @@ const ProfilePage = () => {
         return () => window.removeEventListener('2fa_status_changed', handle2FAChange);
     }, []);
 
-    // Profile & Room Nickname Edit States
+    // Room Nickname Edit States (for Public Rooms)
     const [roomNickname, setRoomNickname] = useState(() => localStorage.getItem('roomNickname') || '');
-    const [isEditingPublicName, setIsEditingPublicName] = useState(false);
-    const [newPublicName, setNewPublicName] = useState(username);
-    const [savingPublicName, setSavingPublicName] = useState(false);
-
     const [isEditingRoomNickname, setIsEditingRoomNickname] = useState(false);
     const [newRoomNickname, setNewRoomNickname] = useState(roomNickname);
     const [savingRoomNickname, setSavingRoomNickname] = useState(false);
     const [showPolicyModal, setShowPolicyModal] = useState(false);
-
-    const publicNameCheck = useUsernameCheck({
-        username: newPublicName,
-        originalName: username,
-        excludeUserId: userId,
-        debounceMs: 400
-    });
 
     const roomNicknameCheck = useUsernameCheck({
         username: newRoomNickname,
@@ -142,7 +148,38 @@ const ProfilePage = () => {
                 }
             };
             computeCommon();
+            const fetchTargetBooking = async () => {
+                try {
+                    const bRes = await fetch(`${API}/public/book/info/${targetUserId}`);
+                    if (bRes.ok) {
+                        const bData = await bRes.json();
+                        setTargetBookingInfo(bData);
+                    }
+                } catch (e) {
+                    console.error("Failed to load target booking info:", e);
+                }
+            };
+            fetchTargetBooking();
         } else if (userId) {
+            const fetchBookingSettings = async () => {
+                try {
+                    const bRes = await fetch(`${API}/user/event/booking-settings`, {
+                        headers: { 'User-Id': userId }
+                    });
+                    if (bRes.ok) {
+                        const bData = await bRes.json();
+                        setBookingSettings({
+                            isBookingEnabled: bData.isBookingEnabled !== undefined ? Boolean(bData.isBookingEnabled) : true,
+                            showBusySlots: Boolean(bData.showBusySlots),
+                            bookingSlug: bData.bookingSlug || bData.userId || ''
+                        });
+                    }
+                } catch (e) {
+                    console.error("Failed to load booking settings", e);
+                }
+            };
+            fetchBookingSettings();
+
             const fetchUserData = async () => {
                 try {
                     const response = await fetch(`${API}/user/me`, {
@@ -155,9 +192,20 @@ const ProfilePage = () => {
 
                     if (response.ok) {
                         const data = await response.json();
-                        if (data.userName) {
-                            localStorage.setItem('username', data.userName);
-                            setUsername(data.userName);
+                        const rawUser = data.username || data.userName || '';
+                        if (rawUser) {
+                            const lowerUser = rawUser.toLowerCase();
+                            localStorage.setItem('username', lowerUser);
+                            setUsername(lowerUser);
+                        }
+                        const disp = data.displayName || data.userName || '';
+                        if (disp) {
+                            localStorage.setItem('displayName', disp);
+                            setDisplayName(disp);
+                        }
+                        if (data.lastDisplayNameChangeAt) {
+                            localStorage.setItem('lastDisplayNameChangeAt', data.lastDisplayNameChangeAt);
+                            setLastDisplayNameChangeAt(data.lastDisplayNameChangeAt);
                         }
                         if (data.profile) {
                             localStorage.setItem('profile', data.profile);
@@ -192,34 +240,73 @@ const ProfilePage = () => {
         }
     }, [userId, isTargetUser]);
 
-    const handleSavePublicName = async () => {
-        if (publicNameCheck.isBlocked) {
-            alert(publicNameCheck.message || 'Please choose an available username');
+    const getCooldownRemaining = () => {
+        if (!lastDisplayNameChangeAt) return null;
+        const changeTime = new Date(lastDisplayNameChangeAt).getTime();
+        if (isNaN(changeTime)) return null;
+        const now = Date.now();
+        const elapsedMs = now - changeTime;
+        const cooldownMs = 24 * 60 * 60 * 1000;
+        const remainingMs = cooldownMs - elapsedMs;
+        if (remainingMs <= 0) return null;
+
+        const remainingSec = Math.floor(remainingMs / 1000);
+        const hours = Math.floor(remainingSec / 3600);
+        const minutes = Math.floor((remainingSec % 3600) / 60);
+        return { hours, minutes, totalMinutes: Math.floor(remainingMs / 60000) };
+    };
+    const cooldown = getCooldownRemaining();
+
+    const handleSaveDisplayName = async () => {
+        const clean = newDisplayName.trim();
+        if (!clean) {
+            setDisplayNameError('Display name cannot be empty');
             return;
         }
-        if (publicNameCheck.isChecking) {
-            alert('Validating username availability, please wait...');
+        const score = computeSelfSimilarity(username, clean);
+        if (score < 3.0) {
+            setDisplayNameError(`Must have at least 3/10 similarity with your permanent username (@${username}). Current: ${score}/10`);
             return;
         }
-        setSavingPublicName(true);
+
+        setSavingDisplayName(true);
+        setDisplayNameError('');
+
         try {
-            const clean = newPublicName.trim();
-            try {
-                await fetch(`${API}/user/update`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'User-Id': userId },
-                    body: JSON.stringify({ userId, username: clean, publicName: clean, userName: clean })
-                });
-            } catch (e) {
-                console.warn('[ProfilePage] Server update warning:', e);
+            const res = await fetch(`${API}/user/update-display-name`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'User-Id': userId
+                },
+                body: JSON.stringify({ displayName: clean })
+            });
+
+            const data = await res.json();
+            if (res.ok && (data.status === 'SUCCESS' || res.status === 200)) {
+                const updatedName = data.displayName || clean;
+                localStorage.setItem('displayName', updatedName);
+                setDisplayName(updatedName);
+                if (data.lastDisplayNameChangeAt) {
+                    localStorage.setItem('lastDisplayNameChangeAt', data.lastDisplayNameChangeAt);
+                    setLastDisplayNameChangeAt(data.lastDisplayNameChangeAt);
+                } else {
+                    const nowIso = new Date().toISOString();
+                    localStorage.setItem('lastDisplayNameChangeAt', nowIso);
+                    setLastDisplayNameChangeAt(nowIso);
+                }
+                setIsEditingDisplayName(false);
+                setDisplayNameError('');
+            } else if (res.status === 429 || data.status === 'COOLDOWN_ACTIVE') {
+                setDisplayNameError(data.message || 'Display name can only be changed once every 24 hours.');
+            } else {
+                setDisplayNameError(data.message || 'Failed to update display name.');
             }
-            localStorage.setItem('username', clean);
-            setUsername(clean);
-            setIsEditingPublicName(false);
         } catch (err) {
-            alert('Failed to update public name');
+            console.error('Failed to update display name:', err);
+            setDisplayNameError('Network error updating display name.');
         } finally {
-            setSavingPublicName(false);
+            setSavingDisplayName(false);
         }
     };
 
@@ -280,6 +367,50 @@ const ProfilePage = () => {
         } finally {
             setToggling2FA(false);
         }
+    };
+
+    const handleToggleBookingEnabled = async () => {
+        const nextVal = !bookingSettings.isBookingEnabled;
+        setBookingSettings(prev => ({ ...prev, isBookingEnabled: nextVal }));
+        try {
+            await fetch(`${API}/user/event/booking-settings`, {
+                method: 'POST',
+                headers: { 'User-Id': userId, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    isBookingEnabled: nextVal,
+                    showBusySlots: bookingSettings.showBusySlots
+                })
+            });
+        } catch (e) {
+            console.error('Failed to update booking enabled', e);
+            setBookingSettings(prev => ({ ...prev, isBookingEnabled: !nextVal }));
+        }
+    };
+
+    const handleToggleShowBusySlots = async () => {
+        const nextVal = !bookingSettings.showBusySlots;
+        setBookingSettings(prev => ({ ...prev, showBusySlots: nextVal }));
+        try {
+            await fetch(`${API}/user/event/booking-settings`, {
+                method: 'POST',
+                headers: { 'User-Id': userId, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    isBookingEnabled: bookingSettings.isBookingEnabled,
+                    showBusySlots: nextVal
+                })
+            });
+        } catch (e) {
+            console.error('Failed to update show busy slots', e);
+            setBookingSettings(prev => ({ ...prev, showBusySlots: !nextVal }));
+        }
+    };
+
+    const handleCopyBookingLink = () => {
+        const slug = bookingSettings.bookingSlug || username || userId;
+        const link = `${window.location.origin}/book/${slug}`;
+        navigator.clipboard.writeText(link);
+        setCopiedBookingLink(true);
+        setTimeout(() => setCopiedBookingLink(false), 2000);
     };
 
     const handleChangePassword = async (e) => {
@@ -504,11 +635,16 @@ const ProfilePage = () => {
                             highRes={true}
                             onClick={() => handleAvatarView(displayUser.profile)}
                         />
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
-                            <h1 style={nameStyle}>{displayUser.userName || targetUserId}</h1>
-                            {(displayUser.pulseStreak || displayUser.streak) > 0 && (
-                                <StreakBadge streak={displayUser.pulseStreak || displayUser.streak} size="md" />
-                            )}
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <h1 style={nameStyle}>{displayUser.displayName || displayUser.userName || targetUserId}</h1>
+                                {(displayUser.pulseStreak || displayUser.streak) > 0 && (
+                                    <StreakBadge streak={displayUser.pulseStreak || displayUser.streak} size="md" />
+                                )}
+                            </div>
+                            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                                @{displayUser.username || displayUser.userName || targetUserId} · {displayUser.userId || targetUserId}
+                            </div>
                         </div>
                         <p style={badgeStyle}>User Profile</p>
                     </div>
@@ -522,8 +658,12 @@ const ProfilePage = () => {
                                 <span style={valueStyle}>{displayUser.userId}</span>
                             </div>
                             <div style={{ ...infoItemStyle, borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                                <span style={labelStyle}>Username</span>
-                                <span style={valueStyle}>{displayUser.userName || targetUserId}</span>
+                                <span style={labelStyle}>Permanent Username</span>
+                                <span style={{ ...valueStyle, fontFamily: 'monospace' }}>@{displayUser.username || displayUser.userName || targetUserId}</span>
+                            </div>
+                            <div style={{ ...infoItemStyle, borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
+                                <span style={labelStyle}>Display Name</span>
+                                <span style={valueStyle}>{displayUser.displayName || displayUser.userName || targetUserId}</span>
                             </div>
                         </div>
                     </div>
@@ -557,6 +697,35 @@ const ProfilePage = () => {
                             {isStartingChat ? 'Opening Chat...' : existingChatId ? 'Go to Chat' : 'Start Chat'}
                         </button>
                     </div>
+
+                    {/* Book Meeting Button (if booking enabled) */}
+                    {(targetBookingInfo ? targetBookingInfo.isBookingEnabled : displayUser.isBookingEnabled !== false) && (
+                        <div>
+                            <button
+                                onClick={() => navigate(`/book/${(targetBookingInfo && targetBookingInfo.bookingSlug) || displayUser.bookingSlug || displayUser.userName || targetUserId}`)}
+                                style={{
+                                    width: '100%',
+                                    padding: '14px',
+                                    borderRadius: '14px',
+                                    border: '1px solid var(--border-color)',
+                                    background: 'var(--bg-secondary)',
+                                    color: 'var(--text-primary)',
+                                    fontSize: '15px',
+                                    fontWeight: '600',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '10px',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                    transition: 'all 0.2s ease'
+                                }}
+                            >
+                                <Calendar size={19} color="#6366f1" />
+                                Book Meeting
+                            </button>
+                        </div>
+                    )}
 
                     {/* Groups & Classrooms in Common */}
                     <div>
@@ -656,7 +825,10 @@ const ProfilePage = () => {
                             </div>
                         )}
                     </Avatar>
-                    <h1 style={nameStyle}>{username}</h1>
+                    <h1 style={nameStyle}>{displayName || username}</h1>
+                    <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                        @{username} · {userId}
+                    </div>
                     <p style={badgeStyle}>Active User</p>
                 </div>
 
@@ -668,50 +840,126 @@ const ProfilePage = () => {
                             <span style={labelStyle}>User ID</span>
                             <span style={valueStyle}>{userId}</span>
                         </div>
-                        {/* Username / Public Name */}
+
+                        {/* Permanent Username */}
+                        <div style={{ ...infoItemStyle, borderTop: '1px solid var(--border-color)', paddingTop: '12px', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={labelStyle}>Permanent Username</span>
+                                <span style={{
+                                    fontSize: '10px',
+                                    padding: '2px 8px',
+                                    borderRadius: '6px',
+                                    background: 'rgba(255, 255, 255, 0.05)',
+                                    color: 'var(--text-secondary)',
+                                    fontWeight: '600',
+                                    border: '1px solid var(--border-color)',
+                                    letterSpacing: '0.5px',
+                                    textTransform: 'uppercase'
+                                }}>
+                                    Permanent
+                                </span>
+                            </div>
+                            <span style={{ ...valueStyle, fontFamily: 'monospace' }}>@{username}</span>
+                        </div>
+
+                        {/* Changeable Display Name */}
                         <div style={{ ...infoItemStyle, borderTop: '1px solid var(--border-color)', paddingTop: '12px', flexDirection: 'column', alignItems: 'stretch', gap: '8px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={labelStyle}>Username / Public Name</span>
-                                {!isEditingPublicName && (
-                                    <button
-                                        onClick={() => {
-                                            setNewPublicName(username);
-                                            setIsEditingPublicName(true);
-                                        }}
-                                        style={{ background: 'none', border: 'none', color: 'var(--accent-color)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '600' }}
-                                    >
-                                        <Edit2 size={13} /> Edit
-                                    </button>
-                                )}
+                                <span style={labelStyle}>Display Name</span>
+                                {!isEditingDisplayName ? (
+                                    cooldown ? (
+                                        <span style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px',
+                                            fontSize: '11px',
+                                            color: '#f59e0b',
+                                            background: 'rgba(245, 158, 11, 0.1)',
+                                            padding: '3px 8px',
+                                            borderRadius: '8px',
+                                            fontWeight: '600',
+                                            border: '1px solid rgba(245, 158, 11, 0.2)'
+                                        }}>
+                                            <Clock size={12} /> Can change in {cooldown.hours}h {cooldown.minutes}m
+                                        </span>
+                                    ) : (
+                                        <button
+                                            onClick={() => {
+                                                setNewDisplayName(displayName);
+                                                setDisplayNameError('');
+                                                setIsEditingDisplayName(true);
+                                            }}
+                                            style={{ background: 'none', border: 'none', color: 'var(--accent-color)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: '600' }}
+                                        >
+                                            <Edit2 size={13} /> Edit
+                                        </button>
+                                    )
+                                ) : null}
                             </div>
-                            {!isEditingPublicName ? (
-                                <span style={valueStyle}>{username}</span>
+
+                            {!isEditingDisplayName ? (
+                                <div>
+                                    <span style={valueStyle}>{displayName || username}</span>
+                                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                                        Appears on your profile and uncustomized chats. Can be changed once every 24 hours.
+                                    </div>
+                                </div>
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                     <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                                         <input
                                             type="text"
-                                            value={newPublicName}
-                                            onChange={e => setNewPublicName(e.target.value)}
-                                            placeholder="Enter public name..."
+                                            value={newDisplayName}
+                                            onChange={e => {
+                                                setNewDisplayName(e.target.value);
+                                                setDisplayNameError('');
+                                            }}
+                                            placeholder="Enter display name..."
                                             style={{
                                                 width: '100%',
-                                                padding: '8px 36px 8px 12px',
+                                                padding: '8px 12px',
                                                 borderRadius: '10px',
-                                                border: `1px solid ${publicNameCheck.status === 'block' ? '#ef4444' : publicNameCheck.status === 'warn' ? '#f59e0b' : publicNameCheck.status === 'allow' ? '#10b981' : 'var(--border-color)'}`,
+                                                border: `1px solid ${
+                                                    displayNameError
+                                                        ? '#ef4444'
+                                                        : (newDisplayName.trim() && computeSelfSimilarity(username, newDisplayName) >= 3.0)
+                                                            ? '#10b981'
+                                                            : 'var(--border-color)'
+                                                }`,
                                                 background: 'var(--bg-primary)',
                                                 color: 'var(--text-primary)',
                                                 fontSize: '13px'
                                             }}
                                         />
-                                        <div style={{ position: 'absolute', right: '10px', display: 'flex', alignItems: 'center' }}>
-                                            <UsernameStatusIndicator checkResult={publicNameCheck} showInlineIcon={true} />
-                                        </div>
                                     </div>
-                                    <UsernameStatusIndicator checkResult={publicNameCheck} />
+
+                                    {/* Similarity Score feedback */}
+                                    {newDisplayName.trim() && (
+                                        <div style={{
+                                            fontSize: '12px',
+                                            fontWeight: '600',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            color: computeSelfSimilarity(username, newDisplayName) >= 3.0 ? '#10b981' : '#ef4444'
+                                        }}>
+                                            {computeSelfSimilarity(username, newDisplayName) >= 3.0 ? (
+                                                <span>✓ Similarity: {computeSelfSimilarity(username, newDisplayName)}/10 with @{username} (Valid)</span>
+                                            ) : (
+                                                <span>✕ Similarity: {computeSelfSimilarity(username, newDisplayName)}/10 (Must be at least 3/10 with @{username})</span>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {displayNameError && (
+                                        <div style={{ fontSize: '12px', color: '#ef4444', fontWeight: '500' }}>
+                                            {displayNameError}
+                                        </div>
+                                    )}
+
                                     <div style={{ display: 'flex', alignItems: 'center', marginTop: '2px', marginBottom: '4px' }}>
                                         <span style={{ fontSize: '11px', color: 'var(--text-secondary, #94a3b8)' }}>
-                                            Names are checked to prevent impersonation.{' '}
+                                            Display names require &ge; 3/10 similarity to your permanent username.{' '}
                                             <button
                                                 type="button"
                                                 onClick={() => setShowPolicyModal(true)}
@@ -730,10 +978,11 @@ const ProfilePage = () => {
                                             </button>
                                         </span>
                                     </div>
+
                                     <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
                                         <button
-                                            onClick={handleSavePublicName}
-                                            disabled={savingPublicName || publicNameCheck.isBlocked || publicNameCheck.isChecking}
+                                            onClick={handleSaveDisplayName}
+                                            disabled={savingDisplayName || !newDisplayName.trim() || computeSelfSimilarity(username, newDisplayName) < 3.0}
                                             style={{
                                                 padding: '6px 14px',
                                                 borderRadius: '8px',
@@ -742,16 +991,17 @@ const ProfilePage = () => {
                                                 border: 'none',
                                                 fontSize: '12px',
                                                 fontWeight: '600',
-                                                cursor: (savingPublicName || publicNameCheck.isBlocked || publicNameCheck.isChecking) ? 'not-allowed' : 'pointer',
-                                                opacity: (savingPublicName || publicNameCheck.isBlocked || publicNameCheck.isChecking) ? 0.6 : 1
+                                                cursor: (savingDisplayName || !newDisplayName.trim() || computeSelfSimilarity(username, newDisplayName) < 3.0) ? 'not-allowed' : 'pointer',
+                                                opacity: (savingDisplayName || !newDisplayName.trim() || computeSelfSimilarity(username, newDisplayName) < 3.0) ? 0.6 : 1
                                             }}
                                         >
-                                            {savingPublicName ? 'Saving...' : publicNameCheck.isChecking ? 'Checking...' : 'Save'}
+                                            {savingDisplayName ? 'Saving...' : 'Save'}
                                         </button>
                                         <button
                                             onClick={() => {
-                                                setNewPublicName(username);
-                                                setIsEditingPublicName(false);
+                                                setNewDisplayName(displayName);
+                                                setDisplayNameError('');
+                                                setIsEditingDisplayName(false);
                                             }}
                                             style={{
                                                 padding: '6px 14px',
@@ -1030,6 +1280,109 @@ const ProfilePage = () => {
                         >
                             Change Password
                         </button>
+                    </div>
+                </div>
+
+                {/* Meeting Booking & Scheduling Link */}
+                <div>
+                    <p style={sectionHeaderStyle}>Meeting Booking & Scheduling</p>
+                    <div style={infoSectionStyle}>
+                        {/* Toggle Booking Enabled */}
+                        <div style={{ ...infoItemStyle, marginBottom: '6px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Calendar size={16} color="var(--accent-color)" />
+                                <span style={{ ...labelStyle, color: 'var(--text-primary)', fontWeight: '600' }}>
+                                    Meeting Booking Link
+                                </span>
+                            </div>
+                            <button
+                                onClick={handleToggleBookingEnabled}
+                                style={{
+                                    border: 'none',
+                                    borderRadius: '20px',
+                                    padding: '4px 12px',
+                                    fontSize: '12px',
+                                    fontWeight: '700',
+                                    cursor: 'pointer',
+                                    backgroundColor: bookingSettings.isBookingEnabled ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                                    color: bookingSettings.isBookingEnabled ? '#10b981' : '#ef4444'
+                                }}
+                            >
+                                {bookingSettings.isBookingEnabled ? 'Enabled' : 'Disabled'}
+                            </button>
+                        </div>
+
+                        <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0 0 12px 0', lineHeight: '1.5' }}>
+                            {bookingSettings.isBookingEnabled
+                                ? "Your public booking URL is active. Anyone with the link or other LetsChat users can schedule meetings with you."
+                                : "Your booking link is currently deactivated. Visitors cannot schedule new meetings."}
+                        </p>
+
+                        {bookingSettings.isBookingEnabled && (
+                            <>
+                                {/* Booking URL copy box */}
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    backgroundColor: 'var(--bg-secondary)',
+                                    border: '1px solid var(--border-color)',
+                                    borderRadius: '12px',
+                                    padding: '8px 12px',
+                                    marginBottom: '14px'
+                                }}>
+                                    <span style={{ fontSize: '12px', color: 'var(--text-primary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {window.location.origin}/book/{bookingSettings.bookingSlug || username || userId}
+                                    </span>
+                                    <button
+                                        onClick={handleCopyBookingLink}
+                                        style={{
+                                            border: 'none',
+                                            backgroundColor: copiedBookingLink ? 'rgba(16, 185, 129, 0.2)' : 'var(--bg-card-hover)',
+                                            color: copiedBookingLink ? '#10b981' : 'var(--text-primary)',
+                                            borderRadius: '8px',
+                                            padding: '6px 10px',
+                                            fontSize: '12px',
+                                            fontWeight: '600',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '4px'
+                                        }}
+                                    >
+                                        {copiedBookingLink ? <Check size={14} /> : <Copy size={14} />}
+                                        {copiedBookingLink ? 'Copied' : 'Copy'}
+                                    </button>
+                                </div>
+
+                                {/* Privacy: Show busy slots toggle */}
+                                <div style={{ ...infoItemStyle, borderTop: '1px solid var(--border-color)', paddingTop: '12px', marginBottom: '4px' }}>
+                                    <span style={{ ...labelStyle, color: 'var(--text-primary)', fontSize: '13px' }}>
+                                        Show Busy Slots on Booking Page
+                                    </span>
+                                    <button
+                                        onClick={handleToggleShowBusySlots}
+                                        style={{
+                                            border: 'none',
+                                            borderRadius: '20px',
+                                            padding: '4px 12px',
+                                            fontSize: '12px',
+                                            fontWeight: '700',
+                                            cursor: 'pointer',
+                                            backgroundColor: bookingSettings.showBusySlots ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-secondary)',
+                                            color: bookingSettings.showBusySlots ? '#818cf8' : 'var(--text-secondary)'
+                                        }}
+                                    >
+                                        {bookingSettings.showBusySlots ? 'Public' : 'Hidden'}
+                                    </button>
+                                </div>
+                                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.5' }}>
+                                    {bookingSettings.showBusySlots
+                                        ? "Visitors can see your busy times to avoid booking overlapping slots."
+                                        : "Privacy mode: busy blocks are hidden, preventing visitors from seeing when you are occupied."}
+                                </p>
+                            </>
+                        )}
                     </div>
                 </div>
 

@@ -67,7 +67,6 @@ import MediaMessage from '../components/chat/MediaMessage';
 import MediaViewer from '../components/chat/MediaViewer';
 import MediaPreviewModal from '../components/chat/MediaPreviewModal';
 import Avatar from '../components/chat/Avatar';
-import PushPermissionPrompt from '../components/chat/PushPermissionPrompt';
 import ScheduleMessageModal from '../components/modals/ScheduleMessageModal';
 import ScheduledListModal from '../components/modals/ScheduledListModal';
 import CreatePollModal from '../components/modals/CreatePollModal';
@@ -403,22 +402,51 @@ const ChatBox = () => {
     if (chatid === SIMULATION_ID) {
       return {
         id: SIMULATION_ID,
+        chatId: SIMULATION_ID,
         chatName: "LetsChat",
         type: "guide",
-        role: "student"
+        role: "student",
+        isSystem: true,
+        profile: `${import.meta.env.BASE_URL}icon.png`
+      };
+    }
+    if (chatid === "BROADCAST_SYSTEM") {
+      return {
+        id: "BROADCAST_SYSTEM",
+        chatId: "BROADCAST_SYSTEM",
+        chatName: "Letschat (System)",
+        type: "broadcast",
+        isSystem: true,
+        verified: true,
+        profile: `${import.meta.env.BASE_URL}icon.png`
       };
     }
     const cached = JSON.parse(localStorage.getItem("chatsMap") || "{}");
-    return cached[chatid] || { id: chatid, chatName: "Chat" };
+    return cached[chatid] || { id: chatid, chatId: chatid, chatName: "Chat" };
   });
 
   useEffect(() => {
     if (chatid === SIMULATION_ID) {
       setChat({
         id: SIMULATION_ID,
+        chatId: SIMULATION_ID,
         chatName: "LetsChat",
         type: "guide",
-        role: "student"
+        role: "student",
+        isSystem: true,
+        profile: `${import.meta.env.BASE_URL}icon.png`
+      });
+      return;
+    }
+    if (chatid === "BROADCAST_SYSTEM") {
+      setChat({
+        id: "BROADCAST_SYSTEM",
+        chatId: "BROADCAST_SYSTEM",
+        chatName: "Letschat (System)",
+        type: "broadcast",
+        isSystem: true,
+        verified: true,
+        profile: `${import.meta.env.BASE_URL}icon.png`
       });
       return;
     }
@@ -426,7 +454,7 @@ const ChatBox = () => {
     if (cached[chatid]) {
       setChat(cached[chatid]);
     } else {
-      setChat({ id: chatid, chatName: "Chat" });
+      setChat({ id: chatid, chatId: chatid, chatName: "Chat" });
     }
   }, [chatid]);
   const { requestPermissionAndGetToken } = useNotifications();
@@ -513,6 +541,10 @@ const ChatBox = () => {
   useEffect(() => {
     if (chat && (chat.type === 'group' || chat.type === 'classroom' || chat.type === 'room')) {
       const fetchMembers = async () => {
+        // Cache first: immediate read from IndexedDB
+        getGroupMembersFromDB(chat.chatId).then(cached => {
+          if (cached && cached.length) setChatMembers(cached);
+        });
         try {
           const res = await fetch(`${API}/group/getmembers/${chat.chatId}`, {
             method: "GET",
@@ -530,10 +562,7 @@ const ChatBox = () => {
             throw new Error("Network fetch failed");
           }
         } catch (ex) {
-          console.warn("Failed to fetch members for mentions, checking offline cache:", ex);
-          getGroupMembersFromDB(chat.chatId).then(cached => {
-             if (cached && cached.length) setChatMembers(cached);
-          });
+          console.warn("Failed to fetch members for mentions, using offline cache:", ex);
         }
       };
       fetchMembers();
@@ -582,6 +611,15 @@ const ChatBox = () => {
       content: pollContent,
       spaceid: activeSpace || 0
     });
+
+    const totalSent = parseInt(localStorage.getItem('totalMessagesSent') || '0', 10) + 1;
+    localStorage.setItem('totalMessagesSent', totalSent.toString());
+    if (totalSent >= 1 && window.Notification && window.Notification.permission !== 'granted') {
+      const dismissed = localStorage.getItem('replyNotifyDismissed');
+      if (dismissed !== 'true') {
+        setShowReplyNotifyBanner(true);
+      }
+    }
   };
 
   const { events, updateEvent, addEvent: addEventToMediator } = useEventMediator();
@@ -607,7 +645,42 @@ const ChatBox = () => {
   const [reactionInfo, setReactionInfo] = useState(null);
   const [customReactionText, setCustomReactionText] = useState('');
   const isMounted = useRef(true);
-  const [showPermissionModal, setShowPermissionModal] = useState(false);
+  const [showReplyNotifyBanner, setShowReplyNotifyBanner] = useState(() => {
+    const dismissed = localStorage.getItem('replyNotifyDismissed');
+    const totalSent = parseInt(localStorage.getItem('totalMessagesSent') || '0', 10);
+    const hasPerm = window.Notification && window.Notification.permission === 'granted';
+    return totalSent >= 1 && dismissed !== 'true' && !hasPerm;
+  });
+
+  useEffect(() => {
+    const dismissed = localStorage.getItem('replyNotifyDismissed');
+    const totalSent = parseInt(localStorage.getItem('totalMessagesSent') || '0', 10);
+    const hasPerm = window.Notification && window.Notification.permission === 'granted';
+    if (totalSent >= 1 && dismissed !== 'true' && !hasPerm) {
+      setShowReplyNotifyBanner(true);
+    } else {
+      setShowReplyNotifyBanner(false);
+    }
+  }, [chatid]);
+
+  const handleDismissReplyNotifyBanner = () => {
+    localStorage.setItem('replyNotifyDismissed', 'true');
+    setShowReplyNotifyBanner(false);
+  };
+
+  const handleEnableReplyNotify = async () => {
+    try {
+      await requestPermissionAndGetToken();
+      if (window.Notification && (window.Notification.permission === 'granted' || window.Notification.permission === 'denied')) {
+        localStorage.setItem('replyNotifyDismissed', 'true');
+        setShowReplyNotifyBanner(false);
+      }
+    } catch (err) {
+      console.warn("Failed to request push notification permission:", err);
+      localStorage.setItem('replyNotifyDismissed', 'true');
+      setShowReplyNotifyBanner(false);
+    }
+  };
   const [showClassroomMatrixModal, setShowClassroomMatrixModal] = useState(false);
   const [showReportExportModal, setShowReportExportModal] = useState(false);
   const [showPollModal, setShowPollModal] = useState(false);
@@ -1006,8 +1079,6 @@ const ChatBox = () => {
   const [pendingMediaFile, setPendingMediaFile] = useState(null);
   const [uploadProgressInternal, setUploadProgressInternal] = useState(0);
   const [isUploadingInternal, setIsUploadingInternal] = useState(false);
-  //  const [showPermissionModal, setShowPermissionModal] = useState(false);
-  const [modalInitialStep, setModalInitialStep] = useState(1);
   const [showInputBox, setShowInputBox] = useState(true);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedMessages, setSelectedMessages] = useState(new Set());
@@ -1758,15 +1829,14 @@ const ChatBox = () => {
       };
       await sendSafe(msg);
 
-      // Request push permission after sending 3 total messages across any chat
+      // Trigger reply notify banner on first message sent
       const totalSent = parseInt(localStorage.getItem('totalMessagesSent') || '0', 10) + 1;
       localStorage.setItem('totalMessagesSent', totalSent.toString());
 
-      if (totalSent >= 3 && window.Notification && window.Notification.permission === 'default') {
-        const hasAskedPush = localStorage.getItem('hasAskedPushPermission');
-        if (!hasAskedPush) {
-          setShowPermissionModal(true);
-          localStorage.setItem('hasAskedPushPermission', 'true');
+      if (totalSent >= 1 && window.Notification && window.Notification.permission !== 'granted') {
+        const dismissed = localStorage.getItem('replyNotifyDismissed');
+        if (dismissed !== 'true') {
+          setShowReplyNotifyBanner(true);
         }
       }
 
@@ -1810,13 +1880,13 @@ const ChatBox = () => {
     messageStore.addMessage(finalMsg);
     await sendSafe(finalMsg);
 
-    // Track total messages for push prompt
+    // Track total messages and trigger reply notify banner on first message sent
     const totalSent = parseInt(localStorage.getItem('totalMessagesSent') || '0', 10) + 1;
     localStorage.setItem('totalMessagesSent', totalSent.toString());
-    if (totalSent >= 3 && window.Notification && window.Notification.permission === 'default') {
-      if (!localStorage.getItem('hasAskedPushPermission')) {
-        setShowPermissionModal(true);
-        localStorage.setItem('hasAskedPushPermission', 'true');
+    if (totalSent >= 1 && window.Notification && window.Notification.permission !== 'granted') {
+      const dismissed = localStorage.getItem('replyNotifyDismissed');
+      if (dismissed !== 'true') {
+        setShowReplyNotifyBanner(true);
       }
     }
 
@@ -1983,9 +2053,7 @@ const ChatBox = () => {
       }, 1000);
     } catch (err) {
       console.error("Microphone access denied or error:", err);
-      // If permission denied, trigger the onboarding modal (Permissions step)
-      setModalInitialStep(1);
-      setShowPermissionModal(true);
+      alert("Microphone permission was denied. Please allow microphone access in your browser settings to record voice messages.");
     }
   };
 
@@ -1998,9 +2066,7 @@ const ChatBox = () => {
       setCameraOpen(true);
     } catch (err) {
       console.error("Camera access denied or error:", err);
-      // If permission denied, trigger the onboarding modal (Permissions step)
-      setModalInitialStep(1);
-      setShowPermissionModal(true);
+      alert("Camera permission was denied. Please allow camera access in your browser settings to use the camera.");
     }
   };
 
@@ -2043,16 +2109,109 @@ const ChatBox = () => {
 
   const renderInputBar = () => (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '10px',
-      padding: isMobile ? '8px 10px 8px 8px' : '12px 20px',
+      display: 'flex',
+      flexDirection: 'column',
       background: 'var(--bg-secondary)',
       borderTop: '1px solid var(--border-color)',
       position: 'sticky', bottom: 0,
       width: '100%', boxSizing: 'border-box',
       zIndex: 100,
-      paddingBottom: isMobile ? 'max(8px, env(safe-area-inset-bottom))' : '12px',
       overflow: 'visible'
     }}>
+      {/* Reply Notify Banner (compact banner above input box) */}
+      {showReplyNotifyBanner && (
+        <div style={{
+          padding: isMobile ? '6px 8px 2px 8px' : '8px 20px 2px 20px',
+          width: '100%',
+          boxSizing: 'border-box'
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '10px',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '16px',
+            padding: isMobile ? '4px 10px 4px 14px' : '5px 14px 5px 18px',
+            minHeight: '34px',
+            boxSizing: 'border-box',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            animation: 'muFadeIn 0.2s ease-out'
+          }}>
+            <span style={{
+              fontSize: isMobile ? '12px' : '13px',
+              fontWeight: '500',
+              color: 'var(--text-primary)',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }}>
+              Want to be notified when you get a reply?
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={handleEnableReplyNotify}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: 'var(--text-primary, #ffffff)',
+                  border: '1px solid var(--border-color, rgba(255,255,255,0.15))',
+                  borderRadius: '8px',
+                  padding: '4px 12px',
+                  fontSize: '12.5px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background 0.15s ease',
+                  lineHeight: '1.2'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.18)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+              >
+                Notify
+              </button>
+              <button
+                type="button"
+                onClick={handleDismissReplyNotifyBanner}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#ef4444',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '6px',
+                  lineHeight: 1,
+                  transition: 'background 0.15s ease'
+                }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.15)'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                title="Dismiss"
+                aria-label="Close"
+              >
+                <X size={16} color="#ef4444" strokeWidth={2.5} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Input Controls Row */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: isMobile ? '6px' : '10px',
+        padding: isMobile ? '6px 10px 8px 8px' : '8px 20px 12px 20px',
+        paddingTop: showReplyNotifyBanner ? '2px' : (isMobile ? '8px' : '12px'),
+        paddingBottom: isMobile ? 'max(8px, env(safe-area-inset-bottom))' : '12px',
+        width: '100%',
+        boxSizing: 'border-box'
+      }}>
       {/* Emoji picker — PORTAL position to escape stacking contexts and backdrop filters completely */}
       {showEmojiPicker && createPortal(
         <div
@@ -2273,6 +2432,7 @@ const ChatBox = () => {
       >
         {isRecording ? <ArrowUp size={isMobile ? 22 : 24} /> : (input.trim() ? <ArrowUp size={isMobile ? 22 : 24} /> : <Mic size={isMobile ? 18 : 20} />)}
       </button>
+      </div>
 
       {/* Queued Messages Status Pill */}
       {queuedCount > 0 && (
@@ -4032,9 +4192,9 @@ const ChatBox = () => {
             />
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ color: 'var(--text-primary)', fontWeight: 'bold' }}>
-                  {chatid === "BROADCAST_SYSTEM" ? "Letschat" : (chat?.chatName || "Chat")}
-                  {(chatid === "BROADCAST_SYSTEM" || chat?.isSystem || chat?.verified) && (
+                <span style={{ color: 'var(--text-primary)', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  {chatid === "BROADCAST_SYSTEM" ? "Letschat (System)" : (chat?.chatName || "Chat")}
+                  {(chatid === "BROADCAST_SYSTEM" || chatid === SIMULATION_ID || chat?.id === SIMULATION_ID || chat?.isSimulation || chat?.isSystem || chat?.verified || /letschat/i.test(chat?.chatName || '')) && (
                     <span title="Official Verified Channel" style={{
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -4042,12 +4202,14 @@ const ChatBox = () => {
                       width: '16px',
                       height: '16px',
                       borderRadius: '50%',
-                      backgroundColor: '#3b82f6',
+                      backgroundColor: '#2563eb',
                       color: '#ffffff',
-                      fontSize: '10px',
-                      fontWeight: 'bold',
-                      marginLeft: '2px'
-                    }}>✓</span>
+                      flexShrink: 0
+                    }}>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                      </svg>
+                    </span>
                   )}
                 </span>
                 {chat?.pulseStreak > 0 && (
@@ -4111,9 +4273,9 @@ const ChatBox = () => {
                   {activeSpace !== 0 && chat?.type !== 'classroom' && <Pencil size={10} />}
                 </span>
               )}
-              {messageStore.isVolatile(chatid) && chat?.motto && (
-                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', opacity: 0.8 }}>
-                  {chat.motto}
+              {(chat?.motto || chat?.description) && (
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', opacity: 0.85, maxWidth: isMobile ? '130px' : '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={chat.motto || chat.description}>
+                  {chat.motto || chat.description}
                 </span>
               )}
             </div>
@@ -5244,6 +5406,11 @@ const ChatBox = () => {
                                       ? stripMentionEncoding(repliedMsg.content).substring(0, 50) + '...'
                                       : stripMentionEncoding(repliedMsg.content))}
                                     {repliedMsg.type === 'image' && '📷 Photo'}
+                                    {repliedMsg.type === 'video' && '🎥 Video'}
+                                    {repliedMsg.type === 'audio' && '🎤 Audio'}
+                                    {repliedMsg.type === 'file' && '📄 Document'}
+                                    {repliedMsg.type === 'assignment' && '📚 Assignment'}
+                                    {(repliedMsg.type === 'poll' || Boolean(repliedMsg.poll) || (typeof repliedMsg.content === 'string' && repliedMsg.content.trim().startsWith('{"poll_id"'))) && '📊 Poll'}
                                   </div>
                                 </div>
                               ) : null;
@@ -5253,7 +5420,15 @@ const ChatBox = () => {
                               {msg.type === 'text' && renderFormattedText(msg.content)}
                               {msg.type == 'assignment' && (<AssignmentMessage id={msg.content} userRole={chat.role} isMobile={isMobile} onOpenPanel={(id) => { setSelectedAssignmentId(id); setShowAssignmentDetail(true); }} />)}
                                {msg.type === 'poll' && (
-                                 <PollWidget message={msg} currentUserId={currentUserId} />
+                                 <div
+                                   onClick={(e) => e.stopPropagation()}
+                                   onMouseDown={(e) => e.stopPropagation()}
+                                   onTouchStart={(e) => e.stopPropagation()}
+                                   onTouchEnd={(e) => e.stopPropagation()}
+                                   style={{ width: '100%' }}
+                                 >
+                                   <PollWidget message={msg} currentUserId={currentUserId} members={chatMembers} />
+                                 </div>
                                )}
                               {['image', 'video', 'audio', 'file', 'pdf'].includes(msg.type) && msg.content && (
                                 <MediaMessage
@@ -6082,7 +6257,12 @@ const ChatBox = () => {
                           }}
                         >
                           {repliedto.type == 'text' && repliedto.content}
-                          {repliedto.type == 'image' && "Photo"}
+                          {repliedto.type == 'image' && "📷 Photo"}
+                          {repliedto.type == 'video' && "🎥 Video"}
+                          {repliedto.type == 'audio' && "🎤 Audio"}
+                          {repliedto.type == 'file' && "📄 Document"}
+                          {repliedto.type == 'assignment' && "📚 Assignment"}
+                          {(repliedto.type == 'poll' || Boolean(repliedto.poll) || (typeof repliedto.content === 'string' && repliedto.content.trim().startsWith('{"poll_id"'))) && "📊 Poll"}
                         </div>
                       </div>
                       <div style={{ display: 'flex' }}>
@@ -7304,15 +7484,6 @@ const ChatBox = () => {
           onDelete={handleDeleteSchedule}
         />
 
-        {showPermissionModal && (
-          <PushPermissionPrompt
-            onAllow={async () => {
-              setShowPermissionModal(false);
-              await requestPermissionAndGetToken();
-            }}
-            onDismiss={() => setShowPermissionModal(false)}
-          />
-        )}
 
         {reactionInfo && (
           <ReactorsModal

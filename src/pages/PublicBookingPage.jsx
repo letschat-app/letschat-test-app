@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { Calendar, Clock, Video, MapPin, User, Mail, CheckCircle, AlertTriangle, Shield } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Calendar, Clock, Video, MapPin, User, Mail, CheckCircle, AlertTriangle, Shield, ArrowLeft } from 'lucide-react';
 import { API } from '../service/UserAuth';
 
 const PublicBookingPage = () => {
   const { userIdentifier } = useParams();
-  const [hostInfo, setHostInfo] = useState({ name: userIdentifier || 'Host' });
+  const navigate = useNavigate();
+  const [hostInfo, setHostInfo] = useState({ name: userIdentifier || 'Host', isBookingEnabled: true });
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [startTime, setStartTime] = useState('10:00');
   const [duration, setDuration] = useState(60); // default 1 hr (60 mins)
   const [agenda, setAgenda] = useState('');
-  const [bookerName, setBookerName] = useState('');
+  const [bookerName, setBookerName] = useState(() => localStorage.getItem('username') || '');
   const [bookerEmail, setBookerEmail] = useState('');
   
   // Optional meeting details
@@ -27,7 +28,31 @@ const PublicBookingPage = () => {
   // Submission state
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [bookingToken, setBookingToken] = useState(null);
+  const [isInternalGuest, setIsInternalGuest] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Fetch host info
+  useEffect(() => {
+    if (!userIdentifier) return;
+    const fetchHostInfo = async () => {
+      try {
+        const res = await fetch(`${API}/public/book/info/${userIdentifier}`);
+        if (res.ok) {
+          const data = await res.json();
+          setHostInfo({
+            name: data.userName || userIdentifier,
+            profilePic: data.profilePic,
+            isBookingEnabled: data.isBookingEnabled !== undefined ? data.isBookingEnabled : true,
+            bookingSlug: data.bookingSlug
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch host info:', err);
+      }
+    };
+    fetchHostInfo();
+  }, [userIdentifier]);
 
   // Fetch busy slots for selected date
   useEffect(() => {
@@ -101,10 +126,12 @@ const PublicBookingPage = () => {
     const startIso = new Date(`${date}T${startTime}:00`).toISOString();
     const endIso = new Date(`${date}T${endTime}:00`).toISOString();
 
+    const loggedInUserId = localStorage.getItem('userid');
     const payload = {
       agenda: agenda.trim(),
       bookerName: bookerName.trim(),
       bookerEmail: bookerEmail.trim(),
+      guestUserId: loggedInUserId || null,
       startTime: startIso,
       endTime: endIso,
       meetingType: meetingType,
@@ -121,6 +148,8 @@ const PublicBookingPage = () => {
 
       const data = await res.json();
       if (res.ok) {
+        setBookingToken(data.bookingToken || data.eventId);
+        setIsInternalGuest(Boolean(loggedInUserId));
         setSubmitted(true);
       } else {
         setErrorMessage(data.message || 'Could not schedule meeting. Please try another slot.');
@@ -146,6 +175,56 @@ const PublicBookingPage = () => {
         label: `${displayH}:${mm} ${period}`
       });
     }
+  }
+
+  if (hostInfo.isBookingEnabled === false) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        backgroundColor: '#0b0f17',
+        color: '#f3f4f6',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px',
+        fontFamily: 'Inter, system-ui, sans-serif'
+      }}>
+        <div style={{
+          maxWidth: '460px',
+          width: '100%',
+          backgroundColor: '#161e2e',
+          border: '1px solid #374151',
+          borderRadius: '24px',
+          padding: '36px',
+          textAlign: 'center',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6)'
+        }}>
+          <div style={{ width: '56px', height: '56px', borderRadius: '16px', backgroundColor: 'rgba(239, 68, 68, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', margin: '0 auto 18px' }}>
+            <Calendar size={28} />
+          </div>
+          <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '8px', color: '#ffffff' }}>
+            Bookings Currently Closed
+          </h2>
+          <p style={{ color: '#9ca3af', fontSize: '14px', lineHeight: '1.6', marginBottom: '24px' }}>
+            <strong>{hostInfo.name}</strong> is currently not accepting new meeting requests. Please check back later or contact them directly.
+          </p>
+          <button
+            onClick={() => navigate(-1)}
+            style={{
+              padding: '12px 24px',
+              borderRadius: '12px',
+              backgroundColor: '#374151',
+              color: '#f3f4f6',
+              border: 'none',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (submitted) {
@@ -182,10 +261,33 @@ const PublicBookingPage = () => {
             borderRadius: '12px',
             backgroundColor: 'rgba(16, 185, 129, 0.1)',
             color: '#34d399',
-            fontSize: '13px'
+            fontSize: '13px',
+            marginBottom: '20px',
+            lineHeight: '1.5'
           }}>
-            The host will review your request and accept it into their LetsChat calendar.
+            {isInternalGuest 
+              ? 'The meeting request has been added to both your and the host\'s LetsChat calendar notifications.' 
+              : 'A confirmation email with your direct link to view, reschedule or manage this meeting has been sent to your email.'}
           </div>
+          {bookingToken && (
+            <button
+              onClick={() => navigate(`/booking/view/${bookingToken}`)}
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: '12px',
+                backgroundColor: '#6366f1',
+                color: '#ffffff',
+                border: 'none',
+                fontWeight: '700',
+                fontSize: '14px',
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(99, 102, 241, 0.3)'
+              }}
+            >
+              View & Manage Booking
+            </button>
+          )}
         </div>
       </div>
     );

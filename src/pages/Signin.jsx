@@ -143,11 +143,6 @@ function Signin() {
     username: "",
     password: "",
     confirmPassword: "",
-    age: "20",
-    gender: "Male",
-    stateName: "Tamil Nadu",
-    districtName: "Thanjavur",
-    villageName: "Vallam",
   });
 
   const [otp, setOtp] = useState("");
@@ -187,7 +182,8 @@ function Signin() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    const finalVal = name === "username" ? value.toLowerCase().replace(/[^a-z0-9_]/g, "") : value;
+    setForm((prev) => ({ ...prev, [name]: finalVal }));
     setErrorMsg("");
     setInfoMsg("");
   };
@@ -257,17 +253,13 @@ function Signin() {
 
     setLoading(true);
 
+    const cleanUsername = form.username.trim().toLowerCase();
     const payload = {
-      email: form.email.trim(),
-      username: form.username.trim(),
-      publicName: form.username.trim(),
-      privateName: form.username.trim(),
+      email: form.email.trim().toLowerCase(),
+      username: cleanUsername,
+      publicName: cleanUsername,
+      privateName: cleanUsername,
       password: form.password,
-      age: form.age,
-      gender: form.gender,
-      stateName: form.stateName,
-      districtName: form.districtName,
-      villageName: form.villageName,
     };
 
     try {
@@ -277,7 +269,7 @@ function Signin() {
       if (data?.status === "success" || res.status === 200 || res.status === 201) {
         savePendingOtpSession({
           flow: 'SIGNUP',
-          payload: { email: form.email.trim(), ...payload },
+          payload: { email: form.email.trim().toLowerCase(), ...payload },
           promptMessage: `Enter the 6-digit verification code sent to ${form.email}`
         });
         setStep(2);
@@ -301,17 +293,13 @@ function Signin() {
     setInfoMsg("");
     setResending(true);
 
+    const cleanUsername = form.username.trim().toLowerCase();
     const payload = {
-      email: form.email.trim(),
-      username: form.username.trim(),
-      publicName: form.username.trim(),
-      privateName: form.username.trim(),
+      email: form.email.trim().toLowerCase(),
+      username: cleanUsername,
+      publicName: cleanUsername,
+      privateName: cleanUsername,
       password: form.password,
-      age: form.age,
-      gender: form.gender,
-      stateName: form.stateName,
-      districtName: form.districtName,
-      villageName: form.villageName,
     };
 
     try {
@@ -362,9 +350,10 @@ function Signin() {
       if (createdUserId) {
         clearPendingOtpSession();
         localStorage.setItem("userid", createdUserId);
-        localStorage.setItem("email", form.email.trim());
-        localStorage.setItem("username", form.username.trim());
-        localStorage.setItem("profile", form.username.trim());
+        localStorage.setItem("email", form.email.trim().toLowerCase());
+        localStorage.setItem("username", form.username.trim().toLowerCase());
+        localStorage.setItem("displayName", form.username.trim());
+        localStorage.setItem("profile", data?.profile || form.username.trim().toLowerCase());
 
         initWebsocket();
         navigate("/chats", { replace: true });
@@ -430,9 +419,9 @@ function Signin() {
                 </div>
               </div>
 
-              {/* Default Display Name Callout Note */}
+              {/* Permanent Username Callout Note */}
               <div style={styles.subtleNote}>
-                💡 This name is your default display name, but you can customize how you appear to specific contacts when chatting.{" "}
+                💡 Your username is permanent and cannot be changed after creation. You can change your Display Name and customize per-chat names later.{" "}
                 <button
                   type="button"
                   onClick={() => setShowPolicyModal(true)}
@@ -445,7 +434,7 @@ function Signin() {
               {/* Username Input with Live Availability / Similarity Indicator */}
               <div style={styles.fieldGroup}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <label style={styles.label}>Display Name / Username</label>
+                  <label style={styles.label}>Permanent Username</label>
                   <UsernameStatusBadge checkResult={usernameCheck} />
                 </div>
                 <div style={styles.inputWrapper}>

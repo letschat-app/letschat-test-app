@@ -25,7 +25,42 @@ const Avatar = ({
   showStreak = false,
   children
 }) => {
-  const profileId = chat?.profile || chat?.profilePic;
+  const systemLogo = `${import.meta.env.BASE_URL}icon.png`;
+
+  const isSystem = Boolean(
+    chat?.chatId === 'BROADCAST_SYSTEM' ||
+    chat?.id === 'BROADCAST_SYSTEM' ||
+    chat?.chatid === 'BROADCAST_SYSTEM' ||
+    chat?.userId === 'SYSTEM_ADMIN' ||
+    chat?.user_id === 'SYSTEM_ADMIN' ||
+    chat?.contactUserId === 'SYSTEM_ADMIN' ||
+    chat?.isSystemAdmin ||
+    chat?.isSystem ||
+    chat?.isSystemBroadcast ||
+    chat?.isSimulation ||
+    chat?.chatId === 'simulation_guide' ||
+    chat?.id === 'simulation_guide' ||
+    chat?.type === 'broadcast' ||
+    chat?.type === 'guide' ||
+    (typeof chat?.chatName === 'string' && /letschat/i.test(chat.chatName)) ||
+    (typeof chat?.userName === 'string' && /letschat/i.test(chat.userName)) ||
+    (typeof chat?.name === 'string' && /letschat/i.test(chat.name))
+  );
+
+  const rawProfile = chat?.profile || chat?.profilePic;
+  const isDirectUrl = isSystem || (typeof rawProfile === 'string' && (
+    rawProfile.startsWith('/') ||
+    rawProfile.startsWith('http') ||
+    rawProfile.startsWith('data:') ||
+    rawProfile.endsWith('.png') ||
+    rawProfile.endsWith('.jpg') ||
+    rawProfile.endsWith('.jpeg') ||
+    rawProfile.endsWith('.svg') ||
+    rawProfile.endsWith('.webp')
+  ));
+
+  const directUrl = isSystem ? systemLogo : (isDirectUrl ? rawProfile : null);
+  const profileId = isDirectUrl ? null : rawProfile;
   const cacheKey = profileId ? (profileId + (highRes ? '_full' : '_thumb')) : null;
 
   const hasActivePulse = propHasActivePulse ?? chat?.hasActivePulse ?? chat?.hasPulse ?? false;
@@ -45,6 +80,7 @@ const Avatar = ({
   const isFireFrame = Boolean(fireFrameClass);
 
   const [resolvedThumb, setResolvedThumb] = useState(() => {
+    if (directUrl) return directUrl;
     return cacheKey ? memoryThumbCache.get(cacheKey) : null;
   });
 
@@ -52,6 +88,11 @@ const Avatar = ({
   const colors = getChatColor(chat?.chatId || chat?.id || chat?.userId || 'default');
 
   useEffect(() => {
+    if (directUrl) {
+      setResolvedThumb(directUrl);
+      return;
+    }
+
     if (!profileId) {
       setResolvedThumb(null);
       return;
@@ -82,7 +123,7 @@ const Avatar = ({
 
     resolve();
     return () => { isMounted = false; };
-  }, [profileId, cacheKey, highRes]);
+  }, [profileId, cacheKey, highRes, directUrl]);
 
   if (isFireFrame) {
     return (
@@ -187,7 +228,7 @@ const Avatar = ({
   const imageLayerStyle = {
     position: 'absolute',
     inset: 0,
-    backgroundImage: resolvedThumb ? `url(${resolvedThumb})` : 'none',
+    backgroundImage: resolvedThumb ? `url("${resolvedThumb}")` : 'none',
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     backgroundRepeat: 'no-repeat',

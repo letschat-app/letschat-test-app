@@ -104,9 +104,9 @@ const PulsesTab = () => {
   const now = Date.now();
   const activeFeed = feed.map(item => {
     const userIdVal = item.user_id || item.userId || item.contactUserId;
-    const isSysAdmin = userIdVal === 'SYSTEM_ADMIN';
-    const userNameVal = isSysAdmin ? 'Letschat' : (item.user_name || item.userName || item.contactName || userIdVal);
-    const profileVal = item.user_profile || item.profile || item.contactProfile;
+    const isSysAdmin = userIdVal === 'SYSTEM_ADMIN' || item.isSystemAdmin || item.isSystem;
+    const userNameVal = isSysAdmin ? 'Letschat (System)' : (item.user_name || item.userName || item.contactName || userIdVal);
+    const profileVal = isSysAdmin ? `${import.meta.env.BASE_URL}icon.png` : (item.user_profile || item.profile || item.contactProfile);
 
     // Handle single pulse DTO returned at root level
     const rawPulses = item.pulses || (item.pulse_id || item.pulseId ? [item] : []);
@@ -118,10 +118,12 @@ const PulsesTab = () => {
       userId: userIdVal,
       userName: userNameVal,
       profile: profileVal,
+      profilePic: profileVal,
       pulses: activePulses,
       hasActivePulse: activePulses.length > 0,
       allSeen: item.allSeen !== undefined ? item.allSeen : allSeenNow,
-      isSystemAdmin: isSysAdmin
+      isSystemAdmin: isSysAdmin,
+      isSystem: isSysAdmin
     };
   }).filter(item => item.hasActivePulse);
 
@@ -302,7 +304,15 @@ const PulsesTab = () => {
                       </div>
                     ) : (
                       myPulsesData.activePulses.map((pulse, idx) => (
-                        <div key={pulse.pulseId || idx} onClick={handleOpenMyStatus} style={statusRowStyle}>
+                        <div
+                          key={pulse.pulseId || idx}
+                          onClick={handleOpenMyStatus}
+                          style={{
+                            ...statusRowStyle,
+                            backgroundColor: selectedItem?.isMine ? 'var(--bg-hover)' : 'transparent',
+                            borderRadius: '10px'
+                          }}
+                        >
                           <div style={{ fontSize: '20px' }}>
                             {pulse.type === 'image' ? '📷' : pulse.type === 'video' ? '🎥' : '📝'}
                           </div>
@@ -364,7 +374,11 @@ const PulsesTab = () => {
                         <div
                           key={item.userId}
                           onClick={() => handleOpenViewer(item)}
-                          style={statusRowStyle}
+                          style={{
+                            ...statusRowStyle,
+                            backgroundColor: (selectedItem && !selectedItem.isMine && (selectedItem.userId === item.userId || selectedItem.user_id === item.userId)) ? 'var(--bg-hover)' : 'transparent',
+                            borderRadius: '10px'
+                          }}
                         >
                           <Avatar
                             chat={item}
@@ -376,19 +390,22 @@ const PulsesTab = () => {
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
                               <span>{item.userName || item.userId}</span>
-                              {(item.isSystemAdmin || item.userId === 'SYSTEM_ADMIN') && (
-                                <span title="Official System Admin" style={{
+                              {(item.isSystemAdmin || item.userId === 'SYSTEM_ADMIN' || item.isSystem || /letschat/i.test(item.userName || '')) && (
+                                <span title="Official Verified Channel" style={{
                                   display: 'inline-flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   width: '16px',
                                   height: '16px',
                                   borderRadius: '50%',
-                                  backgroundColor: '#f59e0b',
+                                  backgroundColor: '#2563eb',
                                   color: '#ffffff',
-                                  fontSize: '10px',
-                                  fontWeight: 'bold'
-                                }}>✓</span>
+                                  flexShrink: 0
+                                }}>
+                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                  </svg>
+                                </span>
                               )}
                             </div>
                             <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -436,7 +453,11 @@ const PulsesTab = () => {
                         <div
                           key={item.userId}
                           onClick={() => handleOpenViewer(item)}
-                          style={statusRowStyle}
+                          style={{
+                            ...statusRowStyle,
+                            backgroundColor: (selectedItem && !selectedItem.isMine && (selectedItem.userId === item.userId || selectedItem.user_id === item.userId)) ? 'var(--bg-hover)' : 'transparent',
+                            borderRadius: '10px'
+                          }}
                         >
                           <Avatar
                             chat={item}
@@ -446,8 +467,25 @@ const PulsesTab = () => {
                           />
 
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', opacity: 0.85, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {item.userName || item.userId}
+                            <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', opacity: 0.85, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span>{item.userName || item.userId}</span>
+                              {(item.isSystemAdmin || item.userId === 'SYSTEM_ADMIN' || item.isSystem || /letschat/i.test(item.userName || '')) && (
+                                <span title="Official Verified Channel" style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: '16px',
+                                  height: '16px',
+                                  borderRadius: '50%',
+                                  backgroundColor: '#2563eb',
+                                  color: '#ffffff',
+                                  flexShrink: 0
+                                }}>
+                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                  </svg>
+                                </span>
+                              )}
                             </div>
                             <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {item.pulses?.[0]?.content || item.pulses?.[0]?.caption || (item.pulses?.[0]?.createdAt ? `Yesterday at ${formatPulseTime(item.pulses[0].createdAt)}` : 'Viewed update')}
@@ -534,10 +572,12 @@ const PulsesTab = () => {
         }}>
           {selectedItem ? (
             <PulseStoryViewer
+              key={selectedItem.userId || selectedItem.user_id || selectedItem.pulseId || selectedUserIdx}
               contactsFeed={selectedUserIdx >= 0 ? activeFeed : [selectedItem]}
               initialUserIndex={selectedUserIdx >= 0 ? selectedUserIdx : 0}
               onClose={() => setSelectedItem(null)}
               onPulseViewed={handlePulseViewed}
+              isDesktop={true}
             />
           ) : (
             <div style={{
@@ -578,10 +618,12 @@ const PulsesTab = () => {
       {/* Mobile Fullscreen Viewer Modal */}
       {isMobile && selectedItem && (
         <PulseStoryViewer
+          key={selectedItem.userId || selectedItem.user_id || selectedItem.pulseId || selectedUserIdx}
           contactsFeed={selectedUserIdx >= 0 ? activeFeed : [selectedItem]}
           initialUserIndex={selectedUserIdx >= 0 ? selectedUserIdx : 0}
           onClose={() => setSelectedItem(null)}
           onPulseViewed={handlePulseViewed}
+          isDesktop={false}
         />
       )}
 

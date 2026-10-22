@@ -68,13 +68,20 @@ const InAppToast = () => {
         if (messageStore.getActivechatbox() && String(targetChatId) === String(messageStore.getActivechatbox())) return;
 
         let preview = '';
-        switch (msgType) {
-          case 'image': preview = '📷 Photo'; break;
-          case 'video': preview = '🎥 Video'; break;
-          case 'audio': preview = '🎤 Audio'; break;
-          case 'voice': preview = '🎤 Voice Message'; break;
-          case 'file': preview = '📄 Document'; break;
-          default: preview = content;
+        const isPoll = msgType === 'poll' || Boolean(payload.poll) || (typeof content === 'string' && content.trim().startsWith('{"poll_id"'));
+        if (isPoll) {
+          preview = '📊 Poll';
+        } else {
+          switch (msgType) {
+            case 'image': preview = '📷 Photo'; break;
+            case 'video': preview = '🎥 Video'; break;
+            case 'audio': preview = '🎤 Audio'; break;
+            case 'voice': preview = '🎤 Voice Message'; break;
+            case 'file': preview = '📄 Document'; break;
+            case 'assignment': preview = '📚 Assignment'; break;
+            case 'poll': preview = '📊 Poll'; break;
+            default: preview = content;
+          }
         }
 
         const repliedTo = payload.repliedto || payload.repliedTo;
@@ -349,6 +356,23 @@ const InAppToast = () => {
             gap: '6px'
           }}>
             {notification.title}
+            {/letschat/i.test(notification.title || '') && (
+              <span title="Official Verified Channel" style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '14px',
+                height: '14px',
+                borderRadius: '50%',
+                backgroundColor: '#2563eb',
+                color: '#ffffff',
+                flexShrink: 0
+              }}>
+                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </span>
+            )}
             {isEvent && (
               <span style={{ 
                 fontSize: '11px', 

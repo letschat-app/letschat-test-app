@@ -267,9 +267,9 @@ messaging.onBackgroundMessage((payload) => {
     if (typeof msgStr !== 'string') return msgStr;
     const parts = msgStr.split('/%20/');
     if (parts.length < 4) return msgStr;
-    const [, type, username, content] = parts;
-    const displayMap = { image: '📷 Image', video: '🎥 Video', audio: '🎤 Voice Message', voice: '🎤 Voice Message', file: '📁 File' };
-    return `${username}: ${displayMap[type] || content}`;
+    const displayMap = { image: '📷 Image', video: '🎥 Video', audio: '🎤 Voice Message', voice: '🎤 Voice Message', file: '📁 File', assignment: '📚 Assignment', poll: '📊 Poll' };
+    const resolvedContent = displayMap[type] || (typeof content === 'string' && content.trim().startsWith('{"poll_id"') ? '📊 Poll' : content);
+    return `${username}: ${resolvedContent}`;
   });
 
   const last5 = formattedMessages.slice(-5);
@@ -380,8 +380,8 @@ messaging.onBackgroundMessage((payload) => {
           if (parts.length >= 4) {
             latestSender = parts[2] || latestSender;
             const msgType = parts[1];
-            const displayMap = { image: '📷 Image', video: '🎥 Video', audio: '🎤 Voice Message', voice: '🎤 Voice Message', file: '📁 File' };
-            latestPreview = displayMap[msgType] || parts[3];
+            const displayMap = { image: '📷 Image', video: '🎥 Video', audio: '🎤 Voice Message', voice: '🎤 Voice Message', file: '📁 File', assignment: '📚 Assignment', poll: '📊 Poll' };
+            latestPreview = displayMap[msgType] || (typeof parts[3] === 'string' && parts[3].trim().startsWith('{"poll_id"') ? '📊 Poll' : parts[3]);
           } else {
             latestPreview = latestRaw;
           }

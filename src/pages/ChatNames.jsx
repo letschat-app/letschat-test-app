@@ -81,6 +81,55 @@ function resolveTotalCount(chatCount) {
   return Object.values(chatCount).reduce((sum, val) => sum + (parseInt(val) || 0), 0);
 }
 
+// ── Utility: Official Verified Badge & Check ─────────────────────────────────
+export function isVerifiedChat(chat, chatId) {
+  if (!chat && !chatId) return false;
+  const id = chatId || chat?.chatId || chat?.id;
+  const name = chat?.chatName || '';
+  return Boolean(
+    id === "BROADCAST_SYSTEM" ||
+    id === SIMULATION_ID ||
+    chat?.isSimulation ||
+    chat?.isSystem ||
+    chat?.verified ||
+    /letschat/i.test(name)
+  );
+}
+
+export function VerifiedBadge({ size = 16, style = {} }) {
+  const iconSize = Math.max(9, Math.round(size * 0.625));
+  return (
+    <span
+      title="Official Verified Channel"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: `${size}px`,
+        height: `${size}px`,
+        borderRadius: '50%',
+        backgroundColor: '#2563eb',
+        color: '#ffffff',
+        flexShrink: 0,
+        ...style
+      }}
+    >
+      <svg
+        width={iconSize}
+        height={iconSize}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="#ffffff"
+        strokeWidth="3.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <polyline points="20 6 9 17 4 12" />
+      </svg>
+    </span>
+  );
+}
+
 // ── ChatRow: memoized per-row component ──────────────────────────────────────
 // Hover state lives HERE, not in the parent, so hovering one row does NOT
 // cause any other rows to re-render. Critical for lists with 100+ chats.
@@ -107,17 +156,23 @@ const ChatRow = React.memo(function ChatRow({
   if (msg) {
     const prefix = (msg.userid == userId) ? 'You: ' : (msg.sendername ? `${msg.sendername}: ` : '');
     let text = '';
-    switch (msg.type) {
-      case 'image': text = '📷 Photo'; break;
-      case 'video': text = '🎥 Video'; break;
-      case 'audio': text = '🎤 Audio'; break;
-      case 'file': text = '📄 Document'; break;
-      case 'assignment': text = '📚 Assignment'; break;
-      default: {
-        text = msg.content || '';
-        // Strip mentions from preview
-        text = text.replace(/<@\w+:([^>]+)>/g, '@$1');
-        break;
+    const isPoll = msg.type === 'poll' || Boolean(msg.poll) || (typeof msg.content === 'string' && msg.content.trim().startsWith('{"poll_id"'));
+    if (isPoll) {
+      text = '📊 Poll';
+    } else {
+      switch (msg.type) {
+        case 'image': text = '📷 Photo'; break;
+        case 'video': text = '🎥 Video'; break;
+        case 'audio': text = '🎤 Audio'; break;
+        case 'file': text = '📄 Document'; break;
+        case 'assignment': text = '📚 Assignment'; break;
+        case 'poll': text = '📊 Poll'; break;
+        default: {
+          text = msg.content || '';
+          // Strip mentions from preview
+          text = text.replace(/<@\w+:([^>]+)>/g, '@$1');
+          break;
+        }
       }
     }
     preview = prefix + text;
@@ -256,21 +311,8 @@ const ChatRow = React.memo(function ChatRow({
               <Pin size={14} style={{ transform: 'rotate(45deg)', color: 'var(--accent-color)' }} />
             )}
             {chat.chatName}
-            {(chat.chatId === "BROADCAST_SYSTEM" || chat.isSystem || chat.verified) && (
-              <span title="Official Verified Channel" style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '16px',
-                height: '16px',
-                borderRadius: '50%',
-                backgroundColor: '#3b82f6',
-                color: '#ffffff',
-                fontSize: '10px',
-                fontWeight: 'bold',
-                marginLeft: '3px',
-                flexShrink: 0
-              }}>✓</span>
+            {isVerifiedChat(chat) && (
+              <VerifiedBadge size={16} style={{ marginLeft: '3px' }} />
             )}
             {chat?.pulseStreak > 0 && (
               <StreakBadge streak={chat.pulseStreak} size="sm" />
@@ -537,10 +579,8 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
       try { return JSON.parse(localStorage.getItem(key) || '{}'); } catch { return {}; }
     };
 
-    // Ensure initial simulation welcome greeting is injected if walkthrough is not completed
-    if (!walkthroughCompleted) {
-      simulationService.ensureInitialWelcome();
-    }
+    // Ensure initial simulation welcome greeting is present
+    simulationService.ensureInitialWelcome();
 
     // ── Hydrate state from messageStore + localStorage on mount ───────────
     const storeLastMsgs = messageStore.getLastMessage() || {};
@@ -549,6 +589,13 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
     Object.keys(storeLastMsgs).forEach(chatId => {
       if (storeLastMsgs[chatId] && storeLastMsgs[chatId] !== 0)
         initialLastMsgs[chatId] = storeLastMsgs[chatId];
+    });
+    // Ensure every last message has numeric _ts for sorting
+    Object.keys(initialLastMsgs).forEach(chatId => {
+      const m = initialLastMsgs[chatId];
+      if (m && m._ts == null) {
+        initialLastMsgs[chatId] = { ...m, _ts: resolveTimestamp(m) };
+      }
     });
     setLastMessages(initialLastMsgs);
 
@@ -612,9 +659,16 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
     const loadIDBMsgs = async (chats, signal) => {
       if (!isMounted.current) return;
       const dbLastMsgs = {};
-      for (let i = 0; i < chats.length; i += BATCH_SIZE) {
+      const chatsToScan = [...chats];
+      if (!chatsToScan.some(c => c.chatId === "BROADCAST_SYSTEM")) {
+        chatsToScan.push({ chatId: "BROADCAST_SYSTEM" });
+      }
+      if (!chatsToScan.some(c => c.chatId === SIMULATION_ID)) {
+        chatsToScan.push({ chatId: SIMULATION_ID });
+      }
+      for (let i = 0; i < chatsToScan.length; i += BATCH_SIZE) {
         if (signal?.aborted || !isMounted.current) return;
-        const batch = chats.slice(i, i + BATCH_SIZE);
+        const batch = chatsToScan.slice(i, i + BATCH_SIZE);
         const results = await Promise.all(
           batch.map(chat => getMessagesFromDB(chat.chatId, 1, 0))
         );
@@ -658,7 +712,37 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
         // Refresh with latest items
         loadIDBMsgs(uniqueData, controller.signal);
 
+        const existingMap = (() => {
+          try { return JSON.parse(localStorage.getItem("chatsMap") || '{}'); } catch { return {}; }
+        })();
         const chatsMap = {};
+        if (existingMap["BROADCAST_SYSTEM"]) {
+          chatsMap["BROADCAST_SYSTEM"] = existingMap["BROADCAST_SYSTEM"];
+        } else {
+          chatsMap["BROADCAST_SYSTEM"] = {
+            id: "BROADCAST_SYSTEM",
+            chatId: "BROADCAST_SYSTEM",
+            chatName: "Letschat (System)",
+            type: "broadcast",
+            isSystem: true,
+            verified: true,
+            profile: `${import.meta.env.BASE_URL}icon.png`
+          };
+        }
+        if (existingMap[SIMULATION_ID]) {
+          chatsMap[SIMULATION_ID] = existingMap[SIMULATION_ID];
+        } else {
+          chatsMap[SIMULATION_ID] = {
+            chatId: SIMULATION_ID,
+            id: SIMULATION_ID,
+            chatName: "LetsChat",
+            type: "guide",
+            isSimulation: true,
+            isSystem: true,
+            verified: true
+          };
+        }
+
         uniqueData.forEach(chat => {
           chatsMap[chat.chatId] = chat;
           if (chat.type === 'classroom') {
@@ -864,34 +948,35 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
       !messageStore.isVolatile(chat.chatId)
     );
 
-    // Inject Walkthrough Guide if not completed (walkthroughCompleted computed once at mount)
-    if (!walkthroughCompleted && !searchQuery) {
+    // Inject Walkthrough Guide (Permanently available, ordered by timestamp)
+    if (!searchQuery || "letschat".includes(lowerSearch) || SIMULATION_ID.toLowerCase().includes(lowerSearch)) {
       const guideChat = {
         chatId: SIMULATION_ID,
+        id: SIMULATION_ID,
         chatName: "LetsChat",
         type: "guide",
-        isSimulation: true
-      };
-      // Check if it's already in filtered (shouldn't be, but safe check)
-      if (!filtered.some(c => c.chatId === SIMULATION_ID)) {
-        filtered.unshift(guideChat);
-      }
-    }
-
-    // Inject Broadcast System Chat if system messages or broadcast entry exist
-    const systemMsgs = messageStore.getMessages("BROADCAST_SYSTEM");
-    const cachedMap = JSON.parse(localStorage.getItem('chatsMap') || '{}');
-    if ((cachedMap["BROADCAST_SYSTEM"] || (systemMsgs && systemMsgs.length > 0)) && !searchQuery) {
-      const broadcastChat = {
-        chatId: "BROADCAST_SYSTEM",
-        id: "BROADCAST_SYSTEM",
-        chatName: "Letschat",
-        type: "broadcast",
+        isSimulation: true,
         isSystem: true,
         verified: true
       };
+      if (!filtered.some(c => c.chatId === SIMULATION_ID)) {
+        filtered.push(guideChat);
+      }
+    }
+
+    // Inject Broadcast System Chat (Permanently available, ordered by timestamp)
+    if (!searchQuery || "letschat (system)".includes(lowerSearch) || "letschat".includes(lowerSearch) || "system".includes(lowerSearch) || "broadcast_system".toLowerCase().includes(lowerSearch)) {
+      const broadcastChat = {
+        chatId: "BROADCAST_SYSTEM",
+        id: "BROADCAST_SYSTEM",
+        chatName: "Letschat (System)",
+        type: "broadcast",
+        isSystem: true,
+        verified: true,
+        profile: `${import.meta.env.BASE_URL}icon.png`
+      };
       if (!filtered.some(c => c.chatId === "BROADCAST_SYSTEM")) {
-        filtered.unshift(broadcastChat);
+        filtered.push(broadcastChat);
       }
     }
 
@@ -924,11 +1009,13 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
   }, [chatNames, searchQuery, lastMessages, activeTab, count, pinnedSet]);
 
   const tabCounts = useMemo(() => {
-    // walkthroughCompleted is a stable useMemo at component level — no localStorage read here
-    const guideBonus = !walkthroughCompleted ? 1 : 0;
+    const regularChats = chatNames.filter(c => c.type !== 'room' && !messageStore.isVolatile(c.chatId));
+    let systemBonus = 0;
+    if (!regularChats.some(c => c.chatId === SIMULATION_ID)) systemBonus++;
+    if (!regularChats.some(c => c.chatId === "BROADCAST_SYSTEM")) systemBonus++;
 
     return {
-      All: chatNames.filter(c => c.type !== 'room' && !messageStore.isVolatile(c.chatId)).length + guideBonus,
+      All: regularChats.length + systemBonus,
       Unread: chatNames.filter(c => resolveTotalCount(count[c.chatId]) > 0 && c.type !== 'room' && !messageStore.isVolatile(c.chatId)).length,
       Groups: chatNames.filter(c => c.type === 'group' && !messageStore.isVolatile(c.chatId)).length,
       Classroom: chatNames.filter(c => (c.type === 'classroom' || c.type === 'subject') && !messageStore.isVolatile(c.chatId)).length,
@@ -1203,10 +1290,11 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
             chat = {
               chatId: "BROADCAST_SYSTEM",
               id: "BROADCAST_SYSTEM",
-              chatName: "Letschat",
+              chatName: "Letschat (System)",
               type: "broadcast",
               isSystem: true,
-              verified: true
+              verified: true,
+              profile: `${import.meta.env.BASE_URL}icon.png`
             };
           }
           if (chat) {
@@ -1534,8 +1622,11 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                 }}
               >
                 <Avatar chat={selectedChatForSpaces} size={36} />
-                <span style={{ fontWeight: '700', fontSize: '16px', color: 'var(--text-primary)' }}>
+                <span style={{ fontWeight: '700', fontSize: '16px', color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
                   {selectedChatForSpaces.chatName}
+                  {isVerifiedChat(selectedChatForSpaces) && (
+                    <VerifiedBadge size={16} />
+                  )}
                 </span>
               </div>
             </div>
@@ -1886,7 +1977,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
               letterSpacing: '0.05em',
               opacity: 0.7
             }}>
-              — End of chats —
+              — Chat Messages are encrypted —
             </div>
           </div>
         )}

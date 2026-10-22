@@ -66,9 +66,9 @@ export const DisplayNamePolicyModal = ({ isOpen, onClose }) => {
                   <Sparkles size={16} color="#38bdf8" />
                 </div>
                 <div>
-                  <h4 style={styles.itemTitle}>Usernames Are Not Static</h4>
+                  <h4 style={styles.itemTitle}>Permanent Public Username</h4>
                   <p style={styles.itemText}>
-                    In LetsChat, you have the flexibility to customize how you appear to specific contacts and in different groups, rather than being locked to one rigid identity.
+                    Your username (@username) is permanent, unique, and set at account creation. It provides a reliable, recognisable anchor across the entire platform.
                   </p>
                 </div>
               </div>
@@ -78,9 +78,9 @@ export const DisplayNamePolicyModal = ({ isOpen, onClose }) => {
                   <ShieldAlert size={16} color="#f59e0b" />
                 </div>
                 <div>
-                  <h4 style={styles.itemTitle}>Restricting Impersonation</h4>
+                  <h4 style={styles.itemTitle}>Display Name (24h Cooldown)</h4>
                   <p style={styles.itemText}>
-                    Because names are dynamic, baseline default names must be guarded against impersonation, scams, and clone accounts. Nobody can take or closely mimic an established name to deceive your contacts.
+                    You can change your profile display name once every 24 hours. To ensure consistency, it must retain at least 3/10 similarity with your permanent username.
                   </p>
                 </div>
               </div>
@@ -90,9 +90,9 @@ export const DisplayNamePolicyModal = ({ isOpen, onClose }) => {
                   <UserCheck size={16} color="#10b981" />
                 </div>
                 <div>
-                  <h4 style={styles.itemTitle}>Live Similarity Checking</h4>
+                  <h4 style={styles.itemTitle}>Custom Per-Chat Names</h4>
                   <p style={styles.itemText}>
-                    Our system checks both exact duplicates and look-alike variations. If a name is too similar to an existing account, we alert or block it to keep all conversations trustworthy.
+                    You can personalize how you appear in each individual group or chat. To prevent confusion, your chat nickname must be similar (&ge; 3/10) to your username and distinct (&lt; 8/10) from other participants.
                   </p>
                 </div>
               </div>

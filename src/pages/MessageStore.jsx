@@ -802,6 +802,7 @@ const messageStore = {
           total_voters: payload.total_voters !== undefined ? payload.total_voters : existingPoll.total_voters,
           total_members: payload.total_members !== undefined ? payload.total_members : existingPoll.total_members,
           options: payload.options || existingPoll.options || [],
+          other_votes: payload.other_votes !== undefined ? payload.other_votes : (existingPoll.other_votes || []),
           user_votes: user_votes !== undefined ? user_votes : (payload.option_ids || existingPoll.user_votes || [])
         };
 

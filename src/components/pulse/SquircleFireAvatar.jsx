@@ -260,8 +260,17 @@ const SquircleFireAvatar = forwardRef(({
     let imgObj = null;
     if (src) {
       const img = new Image();
-      img.crossOrigin = 'anonymous';
+      if (typeof src === 'string' && src.startsWith('http') && !src.startsWith(window.location.origin)) {
+        img.crossOrigin = 'anonymous';
+      }
       img.onload = () => { imgObj = img; };
+      img.onerror = () => {
+        if (img.crossOrigin) {
+          const fallback = new Image();
+          fallback.onload = () => { imgObj = fallback; };
+          fallback.src = src;
+        }
+      };
       img.src = src;
     }
 

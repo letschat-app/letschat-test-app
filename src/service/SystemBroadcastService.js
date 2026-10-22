@@ -48,6 +48,26 @@ export const checkSystemBroadcasts = async () => {
 
     if (!res.ok) return;
 
+    // Ensure BROADCAST_SYSTEM chat entry exists in chatsMap
+    const cachedMap = JSON.parse(localStorage.getItem('chatsMap') || '{}');
+    if (!cachedMap['BROADCAST_SYSTEM']) {
+      cachedMap['BROADCAST_SYSTEM'] = {
+        id: 'BROADCAST_SYSTEM',
+        chatId: 'BROADCAST_SYSTEM',
+        chatName: 'Letschat (System)',
+        type: 'broadcast',
+        isSystem: true,
+        verified: true,
+        profile: `${import.meta.env.BASE_URL}icon.png`
+      };
+      localStorage.setItem('chatsMap', JSON.stringify(cachedMap));
+    } else {
+      cachedMap['BROADCAST_SYSTEM'].profile = `${import.meta.env.BASE_URL}icon.png`;
+      cachedMap['BROADCAST_SYSTEM'].chatName = 'Letschat (System)';
+      cachedMap['BROADCAST_SYSTEM'].isSystem = true;
+      localStorage.setItem('chatsMap', JSON.stringify(cachedMap));
+    }
+
     const data = await res.json();
     if (!data || !data.hasNew || !Array.isArray(data.messages) || data.messages.length === 0) {
       if (data && data.latestTimestamp) {
@@ -66,20 +86,6 @@ export const checkSystemBroadcasts = async () => {
     const now = Date.now();
     let hasRecentUnread = false;
     let recentUnreadCount = 0;
-
-    // Ensure BROADCAST_SYSTEM chat entry exists in chatsMap
-    const cachedMap = JSON.parse(localStorage.getItem('chatsMap') || '{}');
-    if (!cachedMap['BROADCAST_SYSTEM']) {
-      cachedMap['BROADCAST_SYSTEM'] = {
-        id: 'BROADCAST_SYSTEM',
-        chatId: 'BROADCAST_SYSTEM',
-        chatName: 'Letschat',
-        type: 'broadcast',
-        isSystem: true,
-        verified: true
-      };
-      localStorage.setItem('chatsMap', JSON.stringify(cachedMap));
-    }
 
     data.messages.forEach(msg => {
       const createdAtMs = new Date(msg.createdAt || msg.created_at || Date.now()).getTime();
@@ -122,6 +128,22 @@ export const checkSystemBroadcasts = async () => {
 };
 
 export const initSystemBroadcastSync = () => {
+  try {
+    const cachedMap = JSON.parse(localStorage.getItem('chatsMap') || '{}');
+    if (!cachedMap['BROADCAST_SYSTEM']) {
+      cachedMap['BROADCAST_SYSTEM'] = {
+        id: 'BROADCAST_SYSTEM',
+        chatId: 'BROADCAST_SYSTEM',
+        chatName: 'Letschat (System)',
+        type: 'broadcast',
+        isSystem: true,
+        verified: true,
+        profile: `${import.meta.env.BASE_URL}icon.png`
+      };
+      localStorage.setItem('chatsMap', JSON.stringify(cachedMap));
+    }
+  } catch (e) {}
+
   // Check immediately on startup
   checkSystemBroadcasts();
 

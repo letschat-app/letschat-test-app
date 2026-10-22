@@ -13,7 +13,9 @@ function Navbar() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeSection, setActiveSection] = useState(null);
   const [groupName, setGroupName] = useState('');
+  const [groupMotto, setGroupMotto] = useState('');
   const [roomname, setRoomname] = useState('');
+  const [roomMotto, setRoomMotto] = useState('');
   const [roomid, setRoomid] = useState('');
   const [message, setMessage] = useState('');
   const [chatnames, setChatnames] = useState([]);
@@ -250,7 +252,9 @@ function Navbar() {
   const closeFullscreenForm = () => {
     setActiveSection(null);
     setGroupName('');
+    setGroupMotto('');
     setRoomname('');
+    setRoomMotto('');
     setRoomid('');
     setMessage('');
     setSelectedMembers([]);
@@ -275,8 +279,10 @@ function Navbar() {
           'Content-Type': 'application/json',
           "ngrok-skip-browser-warning": "true",
           'User-Id': userId,
-          'Group-Name': groupName
-        }
+          'Group-Name': groupName,
+          'Group-Motto': groupMotto.trim()
+        },
+        body: JSON.stringify({ motto: groupMotto.trim() })
       });
 
       if (!response.ok) {
@@ -342,8 +348,10 @@ function Navbar() {
         headers: {
           'Content-Type': 'application/json',
           "ngrok-skip-browser-warning": "true",
-          'User-Id': userId
-        }
+          'User-Id': userId,
+          'Class-Motto': roomMotto.trim()
+        },
+        body: JSON.stringify({ motto: roomMotto.trim(), description: roomMotto.trim() })
       });
 
       if (response.ok) {
@@ -705,6 +713,15 @@ function Navbar() {
                 autoFocus
               />
 
+              <input
+                type="text"
+                value={groupMotto}
+                onChange={(e) => setGroupMotto(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleCreateGroup()}
+                placeholder="Group Motto / Description (optional)"
+                style={{ ...fullscreenInputStyle, marginTop: '-6px' }}
+              />
+
               {selectedMembers.length > 0 && (
                 <div style={selectedCountStyle}>
                   <strong>Selected ({selectedMembers.length}):</strong>{' '}
@@ -772,6 +789,15 @@ function Navbar() {
                 placeholder="Enter classroom name"
                 style={fullscreenInputStyle}
                 autoFocus
+              />
+
+              <input
+                type="text"
+                value={roomMotto}
+                onChange={(e) => setRoomMotto(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleCreateRoom()}
+                placeholder="Classroom Description (optional)"
+                style={{ ...fullscreenInputStyle, marginTop: '-6px' }}
               />
               {message && <p style={fullscreenMessageStyle}>{message}</p>}
             </div>

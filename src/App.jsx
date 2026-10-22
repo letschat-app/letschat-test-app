@@ -55,6 +55,7 @@ import CollisionAlertToast from "./components/chat/CollisionAlertToast";
 import BookingRequestModal from "./components/modals/BookingRequestModal";
 
 const PublicBookingPage = lazyWithSplash(() => import("./pages/PublicBookingPage"));
+const PublicBookingView = lazyWithSplash(() => import("./pages/PublicBookingView"));
 import { initSystemBroadcastSync } from "./service/SystemBroadcastService";
 
 function App() {
@@ -90,7 +91,7 @@ function App() {
   const location = useLocation();
   const navigate=useNavigate();
   useNotifications(); // Initialize push notification logic
-  const isBookingPage = location.pathname.startsWith("/book");
+  const isBookingPage = location.pathname.startsWith("/book") || location.pathname.startsWith("/booking");
   const showNavbar = localStorage.getItem("userid") && location.pathname !== "/signin" && location.pathname !== "/login" && location.pathname !== "/welcome" && !isBookingPage;
 
   useEffect(() => {
@@ -189,6 +190,7 @@ function App() {
             <Route path="/signin" element={<Signin />} />
             <Route path="/login" element={<Login />} />
             <Route path="/book/:userIdentifier" element={<PublicBookingPage />} />
+            <Route path="/booking/view/:tokenOrId" element={<PublicBookingView />} />
             {/* New Desktop Layout Routing */}
             <Route element={<ChatLayout />}>
               <Route path="/chats" element={<ChatNames/>}/>
