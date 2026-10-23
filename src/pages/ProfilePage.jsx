@@ -265,7 +265,7 @@ const ProfilePage = () => {
         }
         const score = computeSelfSimilarity(username, clean);
         if (score < 3.0) {
-            setDisplayNameError(`Must have at least 3/10 similarity with your permanent username (@${username}). Current: ${score}/10`);
+            setDisplayNameError(`Display name must be somewhat similar to your username (@${username}).`);
             return;
         }
 
@@ -944,9 +944,9 @@ const ProfilePage = () => {
                                             color: computeSelfSimilarity(username, newDisplayName) >= 3.0 ? 'var(--success-color)' : 'var(--danger-color)'
                                         }}>
                                             {computeSelfSimilarity(username, newDisplayName) >= 3.0 ? (
-                                                <span>✓ Similarity: {computeSelfSimilarity(username, newDisplayName)}/10 with @{username} (Valid)</span>
+                                                <span>✓ Name is somewhat similar to @{username} (Valid)</span>
                                             ) : (
-                                                <span>✕ Similarity: {computeSelfSimilarity(username, newDisplayName)}/10 (Must be at least 3/10 with @{username})</span>
+                                                <span>✕ Name must be somewhat similar to @{username}</span>
                                             )}
                                         </div>
                                     )}
@@ -959,7 +959,7 @@ const ProfilePage = () => {
 
                                     <div style={{ display: 'flex', alignItems: 'center', marginTop: '2px', marginBottom: '4px' }}>
                                         <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                                            Display names require &ge; 3/10 similarity to your permanent username.{' '}
+                                            Display names must be somewhat similar to your username.{' '}
                                             <button
                                                 type="button"
                                                 onClick={() => setShowPolicyModal(true)}

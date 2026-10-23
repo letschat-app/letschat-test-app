@@ -211,7 +211,7 @@ export function validateChatNickname(permanentUsername, proposedName, peers = []
       isValid: false,
       selfScore,
       peerScore: 0,
-      message: `Must have at least 3/10 similarity with your permanent username (@${permanentUsername}). Current: ${selfScore}/10`
+      message: `Must be somewhat similar to your username (@${permanentUsername}).`
     };
   }
 
@@ -247,7 +247,7 @@ export function validateChatNickname(permanentUsername, proposedName, peers = []
         selfScore,
         peerScore: pScore,
         conflictingPeer: peerName,
-        message: `Name is too similar to "${peerName}" in this chat (${pScore}/10). Must be below 8/10.`
+        message: `Name is too similar to "${peerName}" in this chat. Please choose a more distinct name.`
       };
     }
   }

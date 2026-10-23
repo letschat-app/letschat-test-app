@@ -66,9 +66,9 @@ export const DisplayNamePolicyModal = ({ isOpen, onClose }) => {
                   <Sparkles size={16} color="#38bdf8" />
                 </div>
                 <div>
-                  <h4 style={styles.itemTitle}>Permanent Public Username</h4>
+                  <h4 style={styles.itemTitle}>Public Username</h4>
                   <p style={styles.itemText}>
-                    Your username (@username) is permanent, unique, and set at account creation. It provides a reliable, recognisable anchor across the entire platform.
+                    Your username (@username) is unique and set at account creation. It provides a reliable anchor across the entire platform.
                   </p>
                 </div>
               </div>
@@ -80,7 +80,7 @@ export const DisplayNamePolicyModal = ({ isOpen, onClose }) => {
                 <div>
                   <h4 style={styles.itemTitle}>Display Name (24h Cooldown)</h4>
                   <p style={styles.itemText}>
-                    You can change your profile display name once every 24 hours. To ensure consistency, it must retain at least 3/10 similarity with your permanent username.
+                    You can change your profile display name once every 24 hours. To ensure consistency, it must be somewhat similar to your username.
                   </p>
                 </div>
               </div>
@@ -92,7 +92,7 @@ export const DisplayNamePolicyModal = ({ isOpen, onClose }) => {
                 <div>
                   <h4 style={styles.itemTitle}>Custom Per-Chat Names</h4>
                   <p style={styles.itemText}>
-                    You can personalize how you appear in each individual group or chat. To prevent confusion, your chat nickname must be similar (&ge; 3/10) to your username and distinct (&lt; 8/10) from other participants.
+                    You can personalize how you appear in each individual group or chat. To prevent confusion and impersonation, your chat nickname must be somewhat similar to your username and cannot be too similar to other participants.
                   </p>
                 </div>
               </div>

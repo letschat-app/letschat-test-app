@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePWA } from '../context/PWAContext';
+import { useTheme } from '../context/ThemeContext';
 
 /* ── Scroll-reveal hook ── */
 function useReveal() {
@@ -38,7 +39,7 @@ function useReveal() {
 /* ── Before / After components ── */
 const COLORS = { Arun: '#e74c3c', Priya: '#8e44ad', Rahul: '#2980b9', Karthik: '#27ae60', Anu: '#f39c12' };
 
-const MessyChat = () => {
+const MessyChat = ({ isDark }) => {
   const msgs = [
     { name: 'Arun', text: 'Guys urgent doubt', time: '9:01' },
     { name: 'Priya', text: 'Wait', time: '9:01' },
@@ -59,27 +60,39 @@ const MessyChat = () => {
     { name: 'Priya', text: 'Exactly problem', time: '9:08' },
   ];
   return (
-    <div style={{ borderRadius: 16, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.15)', fontFamily: 'Inter,sans-serif' }}>
+    <div style={{
+      borderRadius: 16,
+      overflow: 'hidden',
+      boxShadow: isDark ? '0 12px 36px rgba(0,0,0,0.5)' : '0 8px 32px rgba(0,0,0,0.15)',
+      border: isDark ? '1px solid rgba(255,255,255,0.08)' : 'none',
+      fontFamily: 'Inter,sans-serif'
+    }}>
       {/* Header */}
-      <div style={{ background: '#075e54', padding: '10px 14px', color: '#fff', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#128c7e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 15, flexShrink: 0 }}>CS</div>
+      <div style={{ background: isDark ? '#1f2c34' : '#075e54', padding: '10px 14px', color: '#fff', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ width: 36, height: 36, borderRadius: '50%', background: isDark ? '#00a884' : '#128c7e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 15, flexShrink: 0 }}>CS</div>
         <div>
           <div style={{ fontWeight: 700, fontSize: 14 }}>CS Batch 2025 💬</div>
           <div style={{ fontSize: 11, opacity: 0.75 }}>Arun, Priya, Rahul, Karthik, Anu +12</div>
         </div>
       </div>
       {/* Body */}
-      <div style={{ background: '#e5ddd5', padding: '10px 10px 6px', maxHeight: 320, overflowY: 'auto' }}>
+      <div style={{ background: isDark ? '#0b141a' : '#e5ddd5', padding: '10px 10px 6px', maxHeight: 320, overflowY: 'auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 8 }}>
-          <span style={{ background: 'rgba(0,0,0,0.12)', borderRadius: 10, padding: '2px 10px', fontSize: 11, color: '#555' }}>TODAY</span>
+          <span style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.12)', borderRadius: 10, padding: '2px 10px', fontSize: 11, color: isDark ? '#8696a0' : '#555' }}>TODAY</span>
         </div>
         {msgs.map((m, i) => (
           <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 3, alignItems: 'flex-start' }}>
             <div style={{ width: 22, height: 22, borderRadius: '50%', background: COLORS[m.name], flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 9, fontWeight: 800, marginTop: 2 }}>{m.name[0]}</div>
-            <div style={{ background: '#fff', borderRadius: '2px 10px 10px 10px', padding: '4px 8px', maxWidth: '82%', boxShadow: '0 1px 1px rgba(0,0,0,0.1)' }}>
+            <div style={{
+              background: isDark ? '#202c33' : '#fff',
+              borderRadius: '2px 10px 10px 10px',
+              padding: '4px 8px',
+              maxWidth: '82%',
+              boxShadow: isDark ? '0 1px 2px rgba(0,0,0,0.3)' : '0 1px 1px rgba(0,0,0,0.1)'
+            }}>
               <div style={{ color: COLORS[m.name], fontWeight: 700, fontSize: 10.5 }}>{m.name}</div>
-              <div style={{ color: '#111', fontSize: 12.5, lineHeight: 1.35 }}>{m.text}</div>
-              <div style={{ color: '#999', fontSize: 9.5, textAlign: 'right', marginTop: 1 }}>{m.time}</div>
+              <div style={{ color: isDark ? '#e9edef' : '#111', fontSize: 12.5, lineHeight: 1.35 }}>{m.text}</div>
+              <div style={{ color: isDark ? '#8696a0' : '#999', fontSize: 9.5, textAlign: 'right', marginTop: 1 }}>{m.time}</div>
             </div>
           </div>
         ))}
@@ -88,8 +101,8 @@ const MessyChat = () => {
         </div>
       </div>
       {/* Input */}
-      <div style={{ background: '#f0f0f0', padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <div style={{ flex: 1, background: '#fff', borderRadius: 20, padding: '7px 14px', color: '#aaa', fontSize: 13 }}>Message</div>
+      <div style={{ background: isDark ? '#1f2c34' : '#f0f0f0', padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ flex: 1, background: isDark ? '#2a3942' : '#fff', borderRadius: 20, padding: '7px 14px', color: isDark ? '#8696a0' : '#aaa', fontSize: 13 }}>Message</div>
         <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#25d366', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 16 }}>🎤</div>
       </div>
     </div>
@@ -116,8 +129,15 @@ const SpaceCard = ({ icon, title, color, msgs }) => (
   </div>
 );
 
-const CleanChat = () => (
-  <div style={{ background: '#0b141a', borderRadius: 16, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.3)', fontFamily: 'Inter,sans-serif' }}>
+const CleanChat = ({ isDark }) => (
+  <div style={{
+    background: '#0b141a',
+    borderRadius: 16,
+    overflow: 'hidden',
+    boxShadow: isDark ? '0 12px 40px rgba(0,0,0,0.6)' : '0 8px 32px rgba(99,102,241,0.15)',
+    border: isDark ? '1px solid rgba(99, 102, 241, 0.35)' : '1px solid #e0e7ff',
+    fontFamily: 'Inter,sans-serif'
+  }}>
     {/* Header */}
     <div style={{ background: '#1f2c34', padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
       <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, color: '#fff', flexShrink: 0 }}>CS</div>
@@ -177,9 +197,15 @@ const CleanChat = () => (
   </div>
 );
 
-
-const ClassroomUI = () => (
-  <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', boxShadow: '0 8px 32px rgba(99,102,241,0.12)', fontFamily: 'Inter,sans-serif', border: '1px solid #e0e7ff' }}>
+const ClassroomUI = ({ isDark }) => (
+  <div style={{
+    background: isDark ? '#111827' : '#fff',
+    borderRadius: 16,
+    overflow: 'hidden',
+    boxShadow: isDark ? '0 12px 36px rgba(0,0,0,0.4)' : '0 8px 32px rgba(99,102,241,0.12)',
+    fontFamily: 'Inter,sans-serif',
+    border: isDark ? '1px solid rgba(99,102,241,0.25)' : '1px solid #e0e7ff'
+  }}>
     {/* Header */}
     <div style={{ background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', padding: '14px 16px', color: '#fff' }}>
       <div style={{ fontWeight: 800, fontSize: 15 }}>📚 DBMS Classroom</div>
@@ -187,13 +213,13 @@ const ClassroomUI = () => (
     </div>
 
     {/* Tabs */}
-    <div style={{ display: 'flex', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+    <div style={{ display: 'flex', background: isDark ? '#0f172a' : '#f8fafc', borderBottom: isDark ? '1px solid #1e293b' : '1px solid #e2e8f0' }}>
       {['Announcements', 'Materials', 'Discussion'].map((tab, i) => (
         <div key={i} style={{
           flex: 1, textAlign: 'center', padding: '9px 4px',
           fontSize: 12, fontWeight: 600,
-          color: i === 2 ? '#4f46e5' : '#94a3b8',
-          borderBottom: i === 2 ? '2px solid #4f46e5' : '2px solid transparent',
+          color: i === 2 ? (isDark ? '#818cf8' : '#4f46e5') : (isDark ? '#64748b' : '#94a3b8'),
+          borderBottom: i === 2 ? `2px solid ${isDark ? '#818cf8' : '#4f46e5'}` : '2px solid transparent',
           cursor: 'pointer',
           transition: 'color .15s',
         }}>{tab}</div>
@@ -201,25 +227,34 @@ const ClassroomUI = () => (
     </div>
 
     {/* Content */}
-    <div style={{ padding: '12px 14px', background: '#f8fafc' }}>
-
+    <div style={{ padding: '12px 14px', background: isDark ? '#0b0f19' : '#f8fafc' }}>
       {/* Announcement card */}
-      <div style={{ background: '#f5f3ff', border: '2px solid #ddd6fe', borderRadius: 14, padding: '12px', marginBottom: 16, display: 'flex', alignItems: 'flex-start', gap: 12, boxShadow: '0 4px 12px rgba(99,102,241,0.06)' }}>
-        <div style={{ width: 36, height: 36, borderRadius: 10, background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>📢</div>
+      <div style={{
+        background: isDark ? 'rgba(99,102,241,0.12)' : '#f5f3ff',
+        border: isDark ? '1.5px solid rgba(139,92,246,0.35)' : '2px solid #ddd6fe',
+        borderRadius: 14,
+        padding: '12px',
+        marginBottom: 16,
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 12,
+        boxShadow: isDark ? '0 4px 16px rgba(0,0,0,0.2)' : '0 4px 12px rgba(99,102,241,0.06)'
+      }}>
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: isDark ? 'rgba(139,92,246,0.25)' : '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>📢</div>
         <div>
-          <div style={{ fontWeight: 900, fontSize: 14, color: '#4338ca', marginBottom: 4 }}>New Assignment: Normalization</div>
+          <div style={{ fontWeight: 900, fontSize: 14, color: isDark ? '#c7d2fe' : '#4338ca', marginBottom: 4 }}>New Assignment: Normalization</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             <span style={{ background: '#ef4444', color: '#fff', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 900 }}>DUE TOMORROW</span>
-            <span style={{ color: '#6d28d9', fontSize: 12, fontWeight: 700 }}>Posted by Teacher</span>
+            <span style={{ color: isDark ? '#a78bfa' : '#6d28d9', fontSize: 12, fontWeight: 700 }}>Posted by Teacher</span>
           </div>
         </div>
       </div>
 
       {/* Divider */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
-        <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, whiteSpace: 'nowrap' }}>💬 Live Discussion</span>
-        <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
+        <div style={{ flex: 1, height: 1, background: isDark ? '#1e293b' : '#e2e8f0' }} />
+        <span style={{ fontSize: 10, color: isDark ? '#64748b' : '#94a3b8', fontWeight: 600, whiteSpace: 'nowrap' }}>💬 Live Discussion</span>
+        <div style={{ flex: 1, height: 1, background: isDark ? '#1e293b' : '#e2e8f0' }} />
       </div>
 
       {/* Chat bubbles */}
@@ -229,21 +264,29 @@ const ClassroomUI = () => (
           <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 10, fontWeight: 800, flexShrink: 0, marginTop: 1 }}>A</div>
           <div>
             <div style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700, marginBottom: 2 }}>Anu</div>
-            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '2px 12px 12px 12px', padding: '7px 11px', fontSize: 12.5, color: '#1e293b', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+            <div style={{
+              background: isDark ? '#1e293b' : '#fff',
+              border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
+              borderRadius: '2px 12px 12px 12px',
+              padding: '7px 11px',
+              fontSize: 12.5,
+              color: isDark ? '#f1f5f9' : '#1e293b',
+              boxShadow: isDark ? '0 1px 3px rgba(0,0,0,0.3)' : '0 1px 3px rgba(0,0,0,0.06)'
+            }}>
               Ma&apos;am is this for tomorrow?
             </div>
-            <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>9:14 AM</div>
+            <div style={{ fontSize: 10, color: isDark ? '#64748b' : '#94a3b8', marginTop: 2 }}>9:14 AM</div>
           </div>
         </div>
 
         {/* Teacher reply */}
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <div style={{ maxWidth: '78%', textAlign: 'right' }}>
-            <div style={{ fontSize: 10, color: '#4f46e5', fontWeight: 700, marginBottom: 2 }}>Teacher</div>
+            <div style={{ fontSize: 10, color: isDark ? '#818cf8' : '#4f46e5', fontWeight: 700, marginBottom: 2 }}>Teacher</div>
             <div style={{ background: '#4f46e5', borderRadius: '12px 2px 12px 12px', padding: '7px 11px', fontSize: 12.5, color: '#fff', display: 'inline-block', textAlign: 'left' }}>
               Yes, submit before 5 PM ✅
             </div>
-            <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>9:15 AM  ✓✓</div>
+            <div style={{ fontSize: 10, color: isDark ? '#64748b' : '#94a3b8', marginTop: 2 }}>9:15 AM ✓✓</div>
           </div>
         </div>
 
@@ -252,29 +295,51 @@ const ClassroomUI = () => (
           <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#27ae60', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 10, fontWeight: 800, flexShrink: 0, marginTop: 1 }}>K</div>
           <div>
             <div style={{ fontSize: 10, color: '#27ae60', fontWeight: 700, marginBottom: 2 }}>Karthik</div>
-            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '2px 12px 12px 12px', padding: '7px 11px', fontSize: 12.5, color: '#1e293b', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+            <div style={{
+              background: isDark ? '#1e293b' : '#fff',
+              border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
+              borderRadius: '2px 12px 12px 12px',
+              padding: '7px 11px',
+              fontSize: 12.5,
+              color: isDark ? '#f1f5f9' : '#1e293b',
+              boxShadow: isDark ? '0 1px 3px rgba(0,0,0,0.3)' : '0 1px 3px rgba(0,0,0,0.06)'
+            }}>
               Got it, uploading now 👍
             </div>
-            <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 2 }}>9:16 AM</div>
+            <div style={{ fontSize: 10, color: isDark ? '#64748b' : '#94a3b8', marginTop: 2 }}>9:16 AM</div>
           </div>
         </div>
       </div>
     </div>
 
     {/* Bottom banner */}
-    <div style={{ background: 'linear-gradient(135deg,rgba(79,70,229,0.08),rgba(124,58,237,0.08))', borderTop: '1px solid #e0e7ff', padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+    <div style={{
+      background: isDark ? 'rgba(79,70,229,0.15)' : 'linear-gradient(135deg,rgba(79,70,229,0.08),rgba(124,58,237,0.08))',
+      borderTop: isDark ? '1px solid rgba(99,102,241,0.25)' : '1px solid #e0e7ff',
+      padding: '9px 14px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8
+    }}>
       <span style={{ fontSize: 14 }}>⚡</span>
-      <span style={{ fontSize: 11.5, fontWeight: 600, color: '#4338ca' }}>Structured like a classroom + instant discussion</span>
+      <span style={{ fontSize: 11.5, fontWeight: 600, color: isDark ? '#c7d2fe' : '#4338ca' }}>Structured like a classroom + instant discussion</span>
     </div>
   </div>
 );
 
-const PublicRoomsUI = () => (
-  <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.08)', fontFamily: 'Inter,sans-serif', border: '1px solid #e2e8f0' }}>
+const PublicRoomsUI = ({ isDark }) => (
+  <div style={{
+    background: isDark ? '#111827' : '#fff',
+    borderRadius: 16,
+    overflow: 'hidden',
+    boxShadow: isDark ? '0 12px 36px rgba(0,0,0,0.4)' : '0 8px 32px rgba(0,0,0,0.08)',
+    fontFamily: 'Inter,sans-serif',
+    border: isDark ? '1px solid #1e293b' : '1px solid #e2e8f0'
+  }}>
     <div style={{ display: 'flex', flexDirection: window.innerWidth < 480 ? 'column' : 'row', minHeight: 300 }}>
       {/* Left Side: Discovery */}
-      <div style={{ flex: 1, background: '#f8fafc', borderRight: '1px solid #e2e8f0', padding: '16px' }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 12, letterSpacing: '0.5px' }}>Public Rooms</div>
+      <div style={{ flex: 1, background: isDark ? '#0f172a' : '#f8fafc', borderRight: isDark ? '1px solid #1e293b' : '1px solid #e2e8f0', padding: '16px' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: isDark ? '#64748b' : '#94a3b8', textTransform: 'uppercase', marginBottom: 12, letterSpacing: '0.5px' }}>Public Rooms</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {[
             { icon: '💻', name: 'Web Dev', members: '1.2k', tag: 'Trending', tagCol: '#ef4444', active: true },
@@ -282,22 +347,22 @@ const PublicRoomsUI = () => (
             { icon: '📈', name: 'Startups', members: '540', tag: 'Active', tagCol: '#10b981' },
           ].map((room, i) => (
             <div key={i} style={{
-              background: room.active ? '#fff' : 'transparent',
+              background: room.active ? (isDark ? '#1e293b' : '#fff') : 'transparent',
               padding: '10px 12px',
               borderRadius: 12,
-              border: room.active ? '1px solid #e2e8f0' : '1px solid transparent',
-              boxShadow: room.active ? '0 2px 8px rgba(0,0,0,0.04)' : 'none',
+              border: room.active ? (isDark ? '1px solid #334155' : '1px solid #e2e8f0') : '1px solid transparent',
+              boxShadow: room.active ? (isDark ? '0 2px 8px rgba(0,0,0,0.2)' : '0 2px 8px rgba(0,0,0,0.04)') : 'none',
               display: 'flex',
               alignItems: 'center',
               gap: 10
             }}>
               <span style={{ fontSize: 18 }}>{room.icon}</span>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>{room.name}</div>
-                <div style={{ fontSize: 11, color: '#64748b' }}>{room.members} members</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: isDark ? '#f1f5f9' : '#1e293b' }}>{room.name}</div>
+                <div style={{ fontSize: 11, color: isDark ? '#94a3b8' : '#64748b' }}>{room.members} members</div>
               </div>
               {room.tag && (
-                <span style={{ fontSize: 10, fontWeight: 800, color: room.tagCol, background: room.tagCol + '15', padding: '2px 6px', borderRadius: 6 }}>
+                <span style={{ fontSize: 10, fontWeight: 800, color: room.tagCol, background: room.tagCol + (isDark ? '25' : '15'), padding: '2px 6px', borderRadius: 6 }}>
                   {room.tag === 'Trending' ? '🔥' : '🟢'} {room.tag}
                 </span>
               )}
@@ -307,19 +372,39 @@ const PublicRoomsUI = () => (
       </div>
 
       {/* Right Side: Chat Preview */}
-      <div style={{ flex: 1.2, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1.2, display: 'flex', flexDirection: 'column', background: isDark ? '#0b0f19' : '#fff' }}>
         {/* Header */}
-        <div style={{ padding: '14px 16px', borderBottom: '1px solid #f1f5f9', background: '#fff', zIndex: 1 }}>
+        <div style={{ padding: '14px 16px', borderBottom: isDark ? '1px solid #1e293b' : '1px solid #f1f5f9', background: isDark ? '#111827' : '#fff', zIndex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>💻 Web Dev Room</div>
-            <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: 20, padding: '3px 12px', fontSize: 10.5, color: '#166534', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: isDark ? '#f8fafc' : '#0f172a' }}>💻 Web Dev Room</div>
+            <div style={{
+              background: isDark ? 'rgba(16,185,129,0.15)' : '#f0fdf4',
+              border: isDark ? '1.5px solid rgba(16,185,129,0.35)' : '1.5px solid #bbf7d0',
+              borderRadius: 20,
+              padding: '3px 12px',
+              fontSize: 10.5,
+              color: isDark ? '#34d399' : '#166534',
+              fontWeight: 800,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6
+            }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981' }} />
               Nickname Active
             </div>
           </div>
-          <div style={{ background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', border: '1.5px solid #3b82f6', borderRadius: 10, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 2px 10px rgba(59,130,246,0.1)' }}>
+          <div style={{
+            background: isDark ? 'rgba(59,130,246,0.12)' : 'linear-gradient(135deg, #eff6ff, #dbeafe)',
+            border: isDark ? '1.5px solid rgba(59,130,246,0.4)' : '1.5px solid #3b82f6',
+            borderRadius: 10,
+            padding: '8px 14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            boxShadow: isDark ? '0 2px 10px rgba(0,0,0,0.2)' : '0 2px 10px rgba(59,130,246,0.1)'
+          }}>
             <span style={{ fontSize: 14 }}>📌</span>
-            <span style={{ fontSize: 12.5, fontWeight: 800, color: '#1d4ed8', letterSpacing: '0.2px' }}>Topic: Learning React</span>
+            <span style={{ fontSize: 12.5, fontWeight: 800, color: isDark ? '#60a5fa' : '#1d4ed8', letterSpacing: '0.2px' }}>Topic: Learning React</span>
           </div>
         </div>
 
@@ -332,7 +417,15 @@ const PublicRoomsUI = () => (
           ].map((msg, i) => (
             <div key={i} style={{ display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontSize: 10, fontWeight: 800, color: msg.col, marginBottom: 2, marginLeft: 4 }}>{msg.nick}</span>
-              <div style={{ background: '#f1f5f9', padding: '8px 12px', borderRadius: '2px 12px 12px 12px', fontSize: 12.5, color: '#334155', maxWidth: '90%' }}>
+              <div style={{
+                background: isDark ? '#1e293b' : '#f1f5f9',
+                border: isDark ? '1px solid #334155' : 'none',
+                padding: '8px 12px',
+                borderRadius: '2px 12px 12px 12px',
+                fontSize: 12.5,
+                color: isDark ? '#e2e8f0' : '#334155',
+                maxWidth: '90%'
+              }}>
                 {msg.text}
               </div>
             </div>
@@ -340,7 +433,7 @@ const PublicRoomsUI = () => (
         </div>
 
         {/* Footer info */}
-        <div style={{ padding: '10px 16px', background: '#f8fafc', borderTop: '1px solid #f1f5f9', fontSize: 10, color: '#94a3b8', textAlign: 'center' }}>
+        <div style={{ padding: '10px 16px', background: isDark ? '#0f172a' : '#f8fafc', borderTop: isDark ? '1px solid #1e293b' : '1px solid #f1f5f9', fontSize: 10, color: isDark ? '#64748b' : '#94a3b8', textAlign: 'center' }}>
           Your personal profile stays private
         </div>
       </div>
@@ -348,8 +441,15 @@ const PublicRoomsUI = () => (
   </div>
 );
 
-const CalendarUI = () => (
-  <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', fontFamily: 'Inter,sans-serif' }}>
+const CalendarUI = ({ isDark }) => (
+  <div style={{
+    background: isDark ? '#111827' : '#fff',
+    borderRadius: 16,
+    overflow: 'hidden',
+    boxShadow: isDark ? '0 12px 36px rgba(0,0,0,0.4)' : '0 4px 20px rgba(0,0,0,0.08)',
+    fontFamily: 'Inter,sans-serif',
+    border: isDark ? '1px solid #1e293b' : 'none'
+  }}>
     <div style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', padding: '14px 16px', color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <div>
         <div style={{ fontWeight: 800, fontSize: 15 }}>📅 Events & Calendar</div>
@@ -363,13 +463,13 @@ const CalendarUI = () => (
         { day: 'Wed 7', title: 'Art Submission', time: '2:00 PM', color: '#f59e0b', tag: 'Deadline' },
         { day: 'Fri 9', title: 'Math Revision', time: '4:00 PM', color: '#6366f1', tag: 'Session' },
       ].map((ev, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: i < 2 ? '1px solid #f1f5f9' : 'none' }}>
-          <div style={{ background: ev.color + '15', color: ev.color, borderRadius: 10, padding: '6px 8px', textAlign: 'center', minWidth: 44, fontSize: 11, fontWeight: 700 }}>{ev.day}</div>
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: i < 2 ? (isDark ? '1px solid #1e293b' : '1px solid #f1f5f9') : 'none' }}>
+          <div style={{ background: ev.color + (isDark ? '25' : '15'), color: ev.color, borderRadius: 10, padding: '6px 8px', textAlign: 'center', minWidth: 44, fontSize: 11, fontWeight: 700 }}>{ev.day}</div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b' }}>{ev.title}</div>
-            <div style={{ fontSize: 11, color: '#64748b' }}>{ev.time}</div>
+            <div style={{ fontWeight: 700, fontSize: 13, color: isDark ? '#f1f5f9' : '#1e293b' }}>{ev.title}</div>
+            <div style={{ fontSize: 11, color: isDark ? '#94a3b8' : '#64748b' }}>{ev.time}</div>
           </div>
-          <div style={{ background: ev.color + '15', color: ev.color, borderRadius: 20, padding: '2px 10px', fontSize: 10, fontWeight: 700 }}>{ev.tag}</div>
+          <div style={{ background: ev.color + (isDark ? '25' : '15'), color: ev.color, borderRadius: 20, padding: '2px 10px', fontSize: 10, fontWeight: 700 }}>{ev.tag}</div>
         </div>
       ))}
     </div>
@@ -377,15 +477,52 @@ const CalendarUI = () => (
 );
 
 /* ── Section wrapper ── */
-const Section = ({ label, heading, sub, arrow, children, flip }) => (
+const Section = ({ label, heading, sub, arrow, children, flip, isDark }) => (
   <div className={`reveal section-layout ${flip ? 'flip' : ''}`}>
     <div style={{ flex: 1, width: '100%' }}>
-      {label && <div style={{ display: 'inline-block', background: '#ede9fe', color: '#7c3aed', borderRadius: 20, padding: '4px 14px', fontSize: 12, fontWeight: 700, marginBottom: 12, letterSpacing: '0.4px' }}>{label}</div>}
-      <h2 style={{ fontSize: 'clamp(26px,5vw,36px)', fontWeight: 800, color: '#0f172a', margin: '0 0 16px', lineHeight: 1.15 }}>
+      {label && (
+        <div style={{
+          display: 'inline-block',
+          background: isDark ? 'rgba(124, 58, 237, 0.2)' : '#ede9fe',
+          color: isDark ? '#c084fc' : '#7c3aed',
+          border: isDark ? '1px solid rgba(124, 58, 237, 0.35)' : 'none',
+          borderRadius: 20,
+          padding: '4px 14px',
+          fontSize: 12,
+          fontWeight: 700,
+          marginBottom: 12,
+          letterSpacing: '0.4px'
+        }}>
+          {label}
+        </div>
+      )}
+      <h2 style={{
+        fontSize: 'clamp(26px,5vw,36px)',
+        fontWeight: 800,
+        color: isDark ? '#f8fafc' : '#0f172a',
+        margin: '0 0 16px',
+        lineHeight: 1.15
+      }}>
         {heading}
-        {arrow && <div style={{ fontSize: 'clamp(22px,4vw,28px)', color: '#6366f1', marginTop: 8, fontWeight: 700 }}>{arrow}</div>}
+        {arrow && (
+          <div style={{
+            fontSize: 'clamp(22px,4vw,28px)',
+            color: isDark ? '#818cf8' : '#6366f1',
+            marginTop: 8,
+            fontWeight: 700
+          }}>
+            {arrow}
+          </div>
+        )}
       </h2>
-      <p style={{ fontSize: 16, color: '#64748b', lineHeight: 1.65, margin: 0 }}>{sub}</p>
+      <p style={{
+        fontSize: 16,
+        color: isDark ? '#94a3b8' : '#64748b',
+        lineHeight: 1.65,
+        margin: 0
+      }}>
+        {sub}
+      </p>
     </div>
     <div style={{ flex: 1.15, width: '100%' }}>{children}</div>
   </div>
@@ -395,12 +532,51 @@ export default function LandingPage() {
   useReveal();
   const navigate = useNavigate();
   const { deferredPrompt, installApp, isInstalled } = usePWA();
+  const { theme, setTheme } = useTheme();
+
+  // Device theme detection first, default is dark
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const hasManualChoice = localStorage.getItem('theme-manual-override');
+    if (!hasManualChoice) {
+      const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+      setTheme(prefersLight ? 'light' : 'dark');
+    }
+  }, [setTheme]);
+
+  // Dynamic system listener if user hasn't manually overridden
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(prefers-color-scheme: light)');
+    const handleSchemeChange = (e) => {
+      const hasManualChoice = localStorage.getItem('theme-manual-override');
+      if (!hasManualChoice) {
+        setTheme(e.matches ? 'light' : 'dark');
+      }
+    };
+    mq.addEventListener('change', handleSchemeChange);
+    return () => mq.removeEventListener('change', handleSchemeChange);
+  }, [setTheme]);
+
+  const isDark = theme !== 'light';
+
+  const toggleTheme = () => {
+    localStorage.setItem('theme-manual-override', 'true');
+    setTheme(isDark ? 'light' : 'dark');
+  };
 
   const goSignup = () => navigate('/signin');
   const handleInstall = async () => { if (deferredPrompt && !isInstalled) await installApp(); navigate('/signin'); };
 
   return (
-    <div style={{ height: '100dvh', overflowY: 'auto', background: '#f8fafc', fontFamily: "'Inter','Segoe UI',sans-serif", color: '#0f172a' }}>
+    <div style={{
+      height: '100dvh',
+      overflowY: 'auto',
+      background: isDark ? '#090d16' : '#f8fafc',
+      fontFamily: "'Inter','Segoe UI',sans-serif",
+      color: isDark ? '#f8fafc' : '#0f172a',
+      transition: 'background-color 0.25s ease, color 0.25s ease'
+    }}>
 
       {/* CSS */}
       <style>{`
@@ -408,10 +584,10 @@ export default function LandingPage() {
         .revealed { opacity:1 !important; transform:translateY(0) !important; }
         .btn-primary { background:linear-gradient(135deg,#6366f1,#8b5cf6); color:#fff; border:none; border-radius:14px; padding:14px 28px; font-size:15px; font-weight:700; cursor:pointer; box-shadow:0 4px 18px rgba(99,102,241,0.4); transition:transform .15s,box-shadow .15s; }
         .btn-primary:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(99,102,241,0.45); }
-        .btn-secondary { background:#fff; color:#374151; border:1.5px solid #e2e8f0; border-radius:14px; padding:14px 28px; font-size:15px; font-weight:600; cursor:pointer; transition:background .15s; }
-        .btn-secondary:hover { background:#f1f5f9; }
-        .lp-divider { display:flex; align-items:center; gap:16px; color:#94a3b8; font-size:13px; font-weight:600; }
-        .lp-divider::before,.lp-divider::after { content:''; flex:1; height:1px; background:#e2e8f0; }
+        .btn-secondary { background:${isDark ? 'rgba(255,255,255,0.08)' : '#fff'}; color:${isDark ? '#f1f5f9' : '#374151'}; border:1.5px solid ${isDark ? 'rgba(255,255,255,0.15)' : '#e2e8f0'}; border-radius:14px; padding:14px 28px; font-size:15px; font-weight:600; cursor:pointer; transition:background .15s; }
+        .btn-secondary:hover { background:${isDark ? 'rgba(255,255,255,0.15)' : '#f1f5f9'}; }
+        .lp-divider { display:flex; align-items:center; gap:16px; color:${isDark ? '#64748b' : '#94a3b8'}; font-size:13px; font-weight:600; }
+        .lp-divider::before,.lp-divider::after { content:''; flex:1; height:1px; background:${isDark ? 'rgba(255,255,255,0.1)' : '#e2e8f0'}; }
         @keyframes bounce {
           0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
           40% { transform: translateY(-6px); }
@@ -441,26 +617,45 @@ export default function LandingPage() {
           position: sticky;
           top: 0;
           z-index: 100;
-          background: rgba(248, 250, 252, 0.85);
+          background: ${isDark ? 'rgba(9, 13, 22, 0.85)' : 'rgba(248, 250, 252, 0.85)'};
           backdrop-filter: blur(16px);
           -webkit-backdrop-filter: blur(16px);
-          border-bottom: 1px solid #e2e8f0;
-          padding: 12px 24px;
+          border-bottom: 1px solid ${isDark ? 'rgba(255, 255, 255, 0.08)' : '#e2e8f0'};
+          padding: 14px 24px;
+          min-height: 64px;
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 12px;
           box-sizing: border-box;
           width: 100%;
+          transition: background-color 0.25s ease, border-color 0.25s ease;
         }
         .landing-nav-logo {
           font-size: 20px;
           font-weight: 800;
           background: linear-gradient(135deg, #6366f1, #8b5cf6);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
+          -webkit-background-clip: text !important;
+          background-clip: text !important;
+          -webkit-text-fill-color: transparent !important;
+          color: transparent !important;
           flex-shrink: 0;
           user-select: none;
+        }
+        .hero-gradient-text {
+          background: linear-gradient(135deg, #6366f1, #a78bfa);
+          -webkit-background-clip: text !important;
+          background-clip: text !important;
+          -webkit-text-fill-color: transparent !important;
+          color: transparent !important;
+          display: inline;
+        }
+        .hero-gradient-text.dark {
+          background: linear-gradient(135deg, #818cf8, #c084fc);
+          -webkit-background-clip: text !important;
+          background-clip: text !important;
+          -webkit-text-fill-color: transparent !important;
+          color: transparent !important;
         }
         .landing-nav-actions {
           display: flex;
@@ -474,7 +669,7 @@ export default function LandingPage() {
           align-items: center;
           justify-content: center;
           gap: 6px;
-          border-radius: 10px;
+          border-radius: 12px;
           padding: 8px 16px;
           font-size: 13.5px;
           font-weight: 600;
@@ -483,6 +678,16 @@ export default function LandingPage() {
           flex-shrink: 0;
           transition: all 0.15s ease;
           text-decoration: none;
+        }
+        .landing-nav-theme {
+          background: ${isDark ? 'rgba(255, 255, 255, 0.08)' : '#ffffff'};
+          color: ${isDark ? '#e2e8f0' : '#374151'};
+          border: 1.5px solid ${isDark ? 'rgba(255, 255, 255, 0.15)' : '#e2e8f0'};
+          padding: 8px 12px;
+        }
+        .landing-nav-theme:hover {
+          background: ${isDark ? 'rgba(255, 255, 255, 0.16)' : '#f1f5f9'};
+          transform: translateY(-1px);
         }
         .landing-nav-download {
           background: linear-gradient(135deg, #6366f1, #8b5cf6);
@@ -495,53 +700,96 @@ export default function LandingPage() {
           box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
         }
         .landing-nav-login {
-          background: #ffffff;
-          color: #374151;
-          border: 1.5px solid #e2e8f0;
+          background: ${isDark ? 'rgba(255, 255, 255, 0.06)' : '#ffffff'};
+          color: ${isDark ? '#e2e8f0' : '#374151'};
+          border: 1.5px solid ${isDark ? 'rgba(255, 255, 255, 0.14)' : '#e2e8f0'};
         }
         .landing-nav-login:hover {
-          background: #f1f5f9;
+          background: ${isDark ? 'rgba(255, 255, 255, 0.12)' : '#f1f5f9'};
         }
         @media (max-width: 640px) {
           .landing-nav {
-            padding: 10px 16px;
+            padding: 14px 18px;
+            min-height: 64px;
             gap: 10px;
+          }
+          .landing-nav-logo {
+            font-size: 20px;
+          }
+          .landing-nav-actions {
+            gap: 8px;
+          }
+          .theme-btn-label,
+          .download-btn-label {
+            display: none !important;
+          }
+          .landing-nav-theme,
+          .landing-nav-download {
+            padding: 0;
+            width: 38px;
+            height: 38px;
+            min-width: 38px;
+            border-radius: 12px;
+            box-sizing: border-box;
+          }
+          .landing-nav-login {
+            height: 38px;
+            padding: 0 16px;
+            font-size: 13.5px;
+            border-radius: 12px;
+            box-sizing: border-box;
+          }
+        }
+        @media (max-width: 380px) {
+          .landing-nav {
+            padding: 12px 14px;
+            min-height: 58px;
+            gap: 8px;
           }
           .landing-nav-logo {
             font-size: 18px;
           }
           .landing-nav-actions {
-            gap: 8px;
+            gap: 6px;
           }
-          .landing-nav-btn {
-            padding: 6px 12px;
+          .landing-nav-theme,
+          .landing-nav-download {
+            width: 35px;
+            height: 35px;
+            min-width: 35px;
+            border-radius: 10px;
+          }
+          .landing-nav-login {
+            height: 35px;
+            padding: 0 13px;
             font-size: 12.5px;
-          }
-        }
-        @media (max-width: 380px) {
-          .landing-nav {
-            padding: 8px 12px;
-            gap: 6px;
-          }
-          .landing-nav-logo {
-            font-size: 16.5px;
-          }
-          .landing-nav-actions {
-            gap: 6px;
-          }
-          .landing-nav-btn {
-            padding: 5px 9px;
-            font-size: 11.5px;
-            gap: 4px;
+            border-radius: 10px;
           }
         }
         @media (max-width: 330px) {
           .landing-nav {
-            padding: 6px 8px;
+            padding: 10px 10px;
+            min-height: 54px;
+            gap: 6px;
           }
-          .landing-nav-btn {
-            padding: 5px 7px;
-            font-size: 11px;
+          .landing-nav-logo {
+            font-size: 17px;
+          }
+          .landing-nav-actions {
+            gap: 5px;
+          }
+          .landing-nav-theme,
+          .landing-nav-download {
+            width: 32px;
+            height: 32px;
+            min-width: 32px;
+            border-radius: 8px;
+          }
+          .landing-nav-login {
+            height: 32px;
+            padding: 0 10px;
+            font-size: 11.5px;
+            border-radius: 8px;
           }
         }
       `}</style>
@@ -550,6 +798,38 @@ export default function LandingPage() {
       <nav className="landing-nav">
         <span className="landing-nav-logo">LetsChat</span>
         <div className="landing-nav-actions">
+          {/* Theme Toggle: Dark / White */}
+          <button
+            onClick={toggleTheme}
+            className="landing-nav-btn landing-nav-theme"
+            title={isDark ? "Switch to white/light theme" : "Switch to dark theme"}
+            aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
+          >
+            {isDark ? (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="5" />
+                  <line x1="12" y1="1" x2="12" y2="3" />
+                  <line x1="12" y1="21" x2="12" y2="23" />
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                  <line x1="1" y1="12" x2="3" y2="12" />
+                  <line x1="21" y1="12" x2="23" y2="12" />
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                </svg>
+                <span className="theme-btn-label">Light</span>
+              </>
+            ) : (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+                <span className="theme-btn-label">Dark</span>
+              </>
+            )}
+          </button>
+
           <button
             onClick={handleInstall}
             className="landing-nav-btn landing-nav-download"
@@ -560,8 +840,9 @@ export default function LandingPage() {
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-            <span>Download</span>
+            <span className="download-btn-label">Download</span>
           </button>
+
           <button
             onClick={() => navigate('/login')}
             className="landing-nav-btn landing-nav-login"
@@ -574,20 +855,54 @@ export default function LandingPage() {
 
       {/* ── Hero ── */}
       <section style={{ padding: '72px 24px 24px', textAlign: 'center', maxWidth: 600, margin: '0 auto' }}>
-        <div style={{ display: 'inline-block', background: 'linear-gradient(135deg,#ede9fe,#ddd6fe)', color: '#6d28d9', borderRadius: 100, padding: '6px 18px', fontSize: 12, fontWeight: 700, marginBottom: 24, letterSpacing: '0.5px' }}>
+        <div style={{
+          display: 'inline-block',
+          background: isDark ? 'rgba(99, 102, 241, 0.15)' : 'linear-gradient(135deg,#ede9fe,#ddd6fe)',
+          border: isDark ? '1px solid rgba(99, 102, 241, 0.35)' : 'none',
+          color: isDark ? '#a78bfa' : '#6d28d9',
+          borderRadius: 100,
+          padding: '6px 18px',
+          fontSize: 12,
+          fontWeight: 700,
+          marginBottom: 24,
+          letterSpacing: '0.5px'
+        }}>
           ✦ CLOSED BETA
         </div>
-        <h1 style={{ fontSize: 'clamp(32px,8vw,56px)', fontWeight: 800, lineHeight: 1.1, marginBottom: 18 }}>
+        <h1 style={{
+          fontSize: 'clamp(32px,8vw,56px)',
+          fontWeight: 800,
+          lineHeight: 1.1,
+          marginBottom: 18,
+          color: isDark ? '#f8fafc' : '#0f172a'
+        }}>
           Chat without<br />
-          <span style={{ background: 'linear-gradient(135deg,#6366f1,#a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>the chaos.</span>
+          <span className={`hero-gradient-text ${isDark ? 'dark' : ''}`}>
+            the chaos.
+          </span>
         </h1>
-        <p style={{ fontSize: 16, color: '#64748b', lineHeight: 1.65, marginBottom: 12, maxWidth: 440, margin: '0 auto' }}>
+        <p style={{
+          fontSize: 16,
+          color: isDark ? '#94a3b8' : '#64748b',
+          lineHeight: 1.65,
+          marginBottom: 12,
+          maxWidth: 440,
+          margin: '0 auto'
+        }}>
           Give every conversation its own place.<br />
           Organized spaces, focused rooms, and a built-in calendar — designed for communities that do more than just chat.
         </p>
 
         {/* Scroll Hint */}
-        <div style={{ marginTop: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, color: '#94a3b8', animation: 'bounce 2s infinite' }}>
+        <div style={{
+          marginTop: 32,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 4,
+          color: isDark ? '#64748b' : '#94a3b8',
+          animation: 'bounce 2s infinite'
+        }}>
           <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase' }}>Scroll to explore</span>
           <span style={{ fontSize: 18 }}>↓</span>
         </div>
@@ -604,16 +919,17 @@ export default function LandingPage() {
           label="The Problem"
           heading="From messy group chats"
           sub="Homework, birthday wishes, memes, and announcements — all in one thread. Important messages disappear in days."
+          isDark={isDark}
         >
-          <MessyChat />
+          <MessyChat isDark={isDark} />
         </Section>
 
         {/* Arrow transition */}
         <div className="reveal" style={{ textAlign: 'center' }}>
           <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-            <div style={{ width: 2, height: 20, background: 'linear-gradient(#e2e8f0,#6366f1)' }} />
+            <div style={{ width: 2, height: 20, background: isDark ? 'linear-gradient(#1e293b,#6366f1)' : 'linear-gradient(#e2e8f0,#6366f1)' }} />
             <div style={{ background: '#6366f1', color: '#fff', borderRadius: 50, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, boxShadow: '0 4px 14px rgba(99,102,241,0.4)' }}>↓</div>
-            <div style={{ fontWeight: 700, color: '#6366f1', fontSize: 13 }}>LetsChat</div>
+            <div style={{ fontWeight: 700, color: isDark ? '#818cf8' : '#6366f1', fontSize: 13 }}>LetsChat</div>
           </div>
         </div>
 
@@ -625,8 +941,9 @@ export default function LandingPage() {
           heading="To organized spaces"
           sub="Split conversations by subject. Homework goes in Homework. Doubts stay in Doubts. Nothing gets buried."
           flip
+          isDark={isDark}
         >
-          <CleanChat />
+          <CleanChat isDark={isDark} />
         </Section>
 
         <div className="lp-divider reveal">CLASSROOMS</div>
@@ -636,8 +953,9 @@ export default function LandingPage() {
           label="Classroom"
           heading="A real classroom, not just a group"
           sub="Assignments, materials, and announcements — organized like a classroom, with real-time discussion built in."
+          isDark={isDark}
         >
-          <ClassroomUI />
+          <ClassroomUI isDark={isDark} />
         </Section>
 
         <div className="lp-divider reveal">PUBLIC ROOMS</div>
@@ -649,27 +967,36 @@ export default function LandingPage() {
           sub="Join topic-based rooms, explore ideas, and participate using a separate nickname—keeping your personal identity private."
           arrow="Explore freely. Discuss clearly."
           flip
+          isDark={isDark}
         >
-          <PublicRoomsUI />
+          <PublicRoomsUI isDark={isDark} />
         </Section>
 
         <div className="lp-divider reveal">EVENTS &amp; CALENDAR</div>
 
-        {/* Section 4 – Events */}
+        {/* Section 5 – Events */}
         <Section
           label="Never miss anything"
           heading="From missed updates"
           sub="Track exams, deadlines, and sessions in a built-in calendar shared across your groups."
           arrow="→ to tracked events"
+          isDark={isDark}
         >
-          <CalendarUI />
+          <CalendarUI isDark={isDark} />
         </Section>
 
         {/* ── CTA ── */}
-        <div className="reveal" style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', borderRadius: 24, padding: '48px 28px', textAlign: 'center', marginBottom: 0 }}>
+        <div className="reveal" style={{
+          background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+          borderRadius: 24,
+          padding: '48px 28px',
+          textAlign: 'center',
+          marginBottom: 0,
+          boxShadow: isDark ? '0 16px 48px rgba(99,102,241,0.3)' : '0 12px 36px rgba(99,102,241,0.2)'
+        }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.7)', letterSpacing: '0.5px', marginBottom: 12 }}>✦ CLOSED BETA</div>
           <h2 style={{ fontSize: 'clamp(22px,5vw,34px)', fontWeight: 800, color: '#fff', margin: '0 0 12px' }}>Ready to get organized?</h2>
-          <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 15, marginBottom: 28 }}>Join now and experience structured communication.</p>
+          <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 15, marginBottom: 28 }}>Join now and experience structured communication.</p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             <button onClick={goSignup} style={{ background: '#fff', color: '#6366f1', border: 'none', borderRadius: 14, padding: '14px 28px', fontSize: 15, fontWeight: 800, cursor: 'pointer', boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
               Get Started →
@@ -681,9 +1008,9 @@ export default function LandingPage() {
         </div>
 
         {/* Footer */}
-        <footer style={{ textAlign: 'center', padding: '24px 0 40px', color: '#94a3b8', fontSize: 13 }}>
+        <footer style={{ textAlign: 'center', padding: '24px 0 40px', color: isDark ? '#64748b' : '#94a3b8', fontSize: 13 }}>
           © {new Date().getFullYear()} LetsChat &nbsp;·&nbsp;
-          <span onClick={() => navigate('/login')} style={{ cursor: 'pointer', color: '#6366f1', fontWeight: 600, textDecoration: 'none' }}>Already have an account?</span>
+          <span onClick={() => navigate('/login')} style={{ cursor: 'pointer', color: isDark ? '#818cf8' : '#6366f1', fontWeight: 600, textDecoration: 'none' }}>Already have an account?</span>
         </footer>
       </div>
     </div>

@@ -141,6 +141,7 @@ function Signin() {
   const [form, setForm] = useState({
     email: "",
     username: "",
+    displayName: "",
     password: "",
     confirmPassword: "",
   });
@@ -222,7 +223,7 @@ function Signin() {
     }
 
     if (!form.username.trim()) {
-      setErrorMsg("Please enter your display name.");
+      setErrorMsg("Please choose a username.");
       return;
     }
 
@@ -254,11 +255,11 @@ function Signin() {
     setLoading(true);
 
     const cleanUsername = form.username.trim().toLowerCase();
+    const effectiveDisplayName = form.displayName.trim() ? form.displayName.trim() : cleanUsername;
     const payload = {
       email: form.email.trim().toLowerCase(),
       username: cleanUsername,
-      publicName: cleanUsername,
-      privateName: cleanUsername,
+      displayName: effectiveDisplayName,
       password: form.password,
     };
 
@@ -294,11 +295,11 @@ function Signin() {
     setResending(true);
 
     const cleanUsername = form.username.trim().toLowerCase();
+    const effectiveDisplayName = form.displayName.trim() ? form.displayName.trim() : cleanUsername;
     const payload = {
       email: form.email.trim().toLowerCase(),
       username: cleanUsername,
-      publicName: cleanUsername,
-      privateName: cleanUsername,
+      displayName: effectiveDisplayName,
       password: form.password,
     };
 
@@ -352,8 +353,8 @@ function Signin() {
         localStorage.setItem("userid", createdUserId);
         localStorage.setItem("email", form.email.trim().toLowerCase());
         localStorage.setItem("username", form.username.trim().toLowerCase());
-        localStorage.setItem("displayName", form.username.trim());
-        localStorage.setItem("profile", data?.profile || form.username.trim().toLowerCase());
+        localStorage.setItem("displayName", form.displayName.trim() || form.username.trim());
+        localStorage.setItem("profile", responseData?.profile || form.username.trim().toLowerCase());
 
         initWebsocket();
         navigate("/chats", { replace: true });
@@ -413,15 +414,15 @@ function Signin() {
                     required
                     value={form.email}
                     onChange={handleChange}
-                    placeholder="alex@example.com"
+                    placeholder="yokesh@letschat.com"
                     style={styles.input}
                   />
                 </div>
               </div>
 
-              {/* Permanent Username Callout Note */}
+              {/* Username Callout Note */}
               <div style={styles.subtleNote}>
-                💡 Your username is permanent and cannot be changed after creation. You can change your Display Name and customize per-chat names later.{" "}
+                💡 Your username cannot be changed after creation. You can change your Display Name anytime in your profile.{" "}
                 <button
                   type="button"
                   onClick={() => setShowPolicyModal(true)}
@@ -434,7 +435,7 @@ function Signin() {
               {/* Username Input with Live Availability / Similarity Indicator */}
               <div style={styles.fieldGroup}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <label style={styles.label}>Permanent Username</label>
+                  <label style={styles.label}>Username</label>
                   <UsernameStatusBadge checkResult={usernameCheck} />
                 </div>
                 <div style={styles.inputWrapper}>
@@ -444,17 +445,10 @@ function Signin() {
                     required
                     value={form.username}
                     onChange={handleChange}
-                    placeholder="alex_dev"
+                    placeholder="yokesh_2513"
                     style={{
                       ...styles.input,
-                      borderColor: (usernameCheck.status === 'block' && form.username.trim().length >= 3) ? 'var(--danger-color)' 
-                        : usernameCheck.status === 'warn' ? 'var(--warning-color)' 
-                        : usernameCheck.status === 'allow' ? 'var(--success-color)' 
-                        : undefined,
-                      boxShadow: usernameCheck.status === 'allow' ? '0 0 0 1px rgba(16, 185, 129, 0.2)' 
-                        : usernameCheck.status === 'warn' ? '0 0 0 1px rgba(245, 158, 11, 0.2)' 
-                        : (usernameCheck.status === 'block' && form.username.trim().length >= 3) ? '0 0 0 1px var(--danger-tint)' 
-                        : undefined
+                      borderColor: (usernameCheck.status === 'block' && form.username.trim().length >= 3) ? 'var(--danger-color)' : undefined
                     }}
                   />
                 </div>
@@ -468,6 +462,25 @@ function Signin() {
                     Available but similar to existing username
                   </span>
                 )}
+              </div>
+
+              {/* Display Name Input */}
+              <div style={styles.fieldGroup}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <label style={styles.label}>Display Name</label>
+                  <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Optional (defaults to @username)</span>
+                </div>
+                <div style={styles.inputWrapper}>
+                  <input
+                    type="text"
+                    name="displayName"
+                    value={form.displayName}
+                    onChange={handleChange}
+                    placeholder="e.g. Yokeshwar Ravindhiran"
+                    maxLength={32}
+                    style={styles.input}
+                  />
+                </div>
               </div>
 
               {/* Password Input with Strength Checker & Side-by-Side Weightlifter */}

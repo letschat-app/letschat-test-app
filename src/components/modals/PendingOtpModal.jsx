@@ -292,6 +292,11 @@ export default function PendingOtpModal() {
             localStorage.setItem('userid', createdUserId);
             if (session.payload.email) localStorage.setItem('email', session.payload.email);
             if (session.payload.username) localStorage.setItem('username', session.payload.username);
+            if (session.payload.displayName) {
+              localStorage.setItem('displayName', session.payload.displayName);
+            } else if (session.payload.username) {
+              localStorage.setItem('displayName', session.payload.username);
+            }
             initWebsocket();
             navigate('/chats', { replace: true });
           } else {

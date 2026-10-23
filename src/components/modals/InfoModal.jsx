@@ -840,7 +840,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
               
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                 <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                  Per-chat names must have &ge; 3/10 similarity with your permanent username (@{currentUsername}) and &lt; 8/10 peer similarity.{" "}
+                  Per-chat names must be somewhat similar to your username (@{currentUsername}) and cannot be too similar to other members.{" "}
                   <button
                     type="button"
                     onClick={() => setShowPolicyModal(true)}
