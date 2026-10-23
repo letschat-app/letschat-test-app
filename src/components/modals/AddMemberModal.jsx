@@ -98,23 +98,23 @@ const AddMemberModal = ({ chat, API, myDisplayName, onClose, onSuccess, isPanel 
       maxHeight: isPanel ? 'none' : '80vh', 
       borderRadius: isPanel ? '0' : '24px',
       display: 'flex', flexDirection: 'column',
-      border: isPanel ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+      border: isPanel ? 'none' : '1px solid var(--border-color)',
       boxShadow: isPanel ? 'none' : '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
       animation: isPanel ? 'none' : 'slideUp 0.3s ease-out',
       overflow: 'hidden'
     }}>
       {/* Header */}
-      <div style={{ padding: '24px 24px 16px', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+      <div style={{ padding: '24px 24px 16px', borderBottom: '1px solid var(--bg-hover)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#f3f4f6', margin: 0 }}>Add Members</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: '24px', fontWeight: '700' }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '24px', fontWeight: '700' }}>
              X
           </button>
         </div>
         
         {/* Search Bar */}
         <div style={{ position: 'relative' }}>
-          <Search size={18} color="#64748b" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
+          <Search size={18} color="var(--text-secondary)" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
           <input 
             type="text" 
             placeholder="Search users..." 
@@ -122,11 +122,11 @@ const AddMemberModal = ({ chat, API, myDisplayName, onClose, onSuccess, isPanel 
             onChange={(e) => setSearchTerm(e.target.value)}
             style={{
               width: '100%', padding: '12px 14px 12px 44px', borderRadius: '14px',
-              backgroundColor: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)',
+              backgroundColor: 'var(--bg-hover)', border: '1px solid var(--border-color)',
               color: '#f3f4f6', fontSize: '15px', outline: 'none', transition: 'all 0.2s'
             }}
-            onFocus={e => e.target.style.borderColor = '#3b82f6'}
-            onBlur={e => e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'}
+            onFocus={e => e.target.style.borderColor = 'var(--accent-solid)'}
+            onBlur={e => e.target.style.borderColor = 'var(--border-color)'}
           />
         </div>
       </div>
@@ -134,9 +134,9 @@ const AddMemberModal = ({ chat, API, myDisplayName, onClose, onSuccess, isPanel 
       {/* User List */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 24px', scrollbarWidth: 'none' }}>
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>Finding users...</div>
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>Finding users...</div>
         ) : filteredUsers.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
             {searchTerm ? 'No users match your search' : 'No available users to add'}
           </div>
         ) : (
@@ -150,8 +150,8 @@ const AddMemberModal = ({ chat, API, myDisplayName, onClose, onSuccess, isPanel 
                   style={{
                     display: 'flex', alignItems: 'center', gap: '14px',
                     padding: '12px', borderRadius: '16px',
-                    backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'rgba(255, 255, 255, 0.02)',
-                    border: `1px solid ${isSelected ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255, 255, 255, 0.05)'}`,
+                    backgroundColor: isSelected ? 'var(--accent-tint)' : 'rgba(255, 255, 255, 0.02)',
+                    border: `1px solid ${isSelected ? 'var(--accent-tint-border)' : 'var(--bg-hover)'}`,
                     cursor: 'pointer', transition: 'all 0.2s'
                   }}
                 >
@@ -159,10 +159,10 @@ const AddMemberModal = ({ chat, API, myDisplayName, onClose, onSuccess, isPanel 
                     chat={{ ...user, profile: user.profile, id: user.id, type: 'private' }} 
                     size={40} 
                   />
-                  <span style={{ flex: 1, fontSize: '15px', fontWeight: '600', color: isSelected ? '#3b82f6' : '#f3f4f6' }}>
+                  <span style={{ flex: 1, fontSize: '15px', fontWeight: '600', color: isSelected ? 'var(--accent-text)' : '#f3f4f6' }}>
                     {user.name}
                   </span>
-                  {isSelected ? <CheckCircle2 size={20} color="#3b82f6" /> : <div style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid rgba(255, 255, 255, 0.1)' }} />}
+                  {isSelected ? <CheckCircle2 size={20} color="var(--accent-text)" /> : <div style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid var(--border-color)' }} />}
                 </div>
               );
             })}
@@ -171,14 +171,14 @@ const AddMemberModal = ({ chat, API, myDisplayName, onClose, onSuccess, isPanel 
       </div>
 
       {/* Footer */}
-      <div style={{ padding: '24px', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
+      <div style={{ padding: '24px', borderTop: '1px solid var(--bg-hover)' }}>
         <button 
           onClick={handleAddMembers}
           disabled={selectedUsers.length === 0 || isAdding}
           style={{
             width: '100%', padding: '16px', borderRadius: '14px',
-            backgroundColor: selectedUsers.length > 0 ? '#3b82f6' : 'rgba(255, 255, 255, 0.05)',
-            color: selectedUsers.length > 0 ? '#fff' : '#64748b',
+            backgroundColor: selectedUsers.length > 0 ? 'var(--accent-text)' : 'var(--bg-hover)',
+            color: selectedUsers.length > 0 ? '#fff' : 'var(--text-secondary)',
             border: 'none', fontWeight: '700', fontSize: '16px',
             cursor: selectedUsers.length > 0 ? 'pointer' : 'not-allowed',
             transition: 'all 0.3s',

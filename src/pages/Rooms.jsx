@@ -441,20 +441,20 @@ export default function Rooms({ isSidebar = false }) {
               {nickname && (
                 <div style={{
                   fontSize: '12px',
-                  color: '#9ca3af',
+                  color: 'var(--text-secondary)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
                   paddingLeft: '2px'
                 }}>
-                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981' }}></span>
-                  Acting as: <span style={{ color: '#60a5fa', fontWeight: '600' }}>{nickname}</span>
+                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--success-color)' }}></span>
+                  Acting as: <span style={{ color: 'var(--accent-text)', fontWeight: '600' }}>{nickname}</span>
                   <button
                     onClick={() => setShowOnboarding(true)}
                     style={{
                       background: 'none',
                       border: 'none',
-                      color: '#60a5fa',
+                      color: 'var(--accent-text)',
                       cursor: 'pointer',
                       padding: '2px 4px',
                       fontSize: '11px',
@@ -469,7 +469,7 @@ export default function Rooms({ isSidebar = false }) {
             </div>
             <div className="res-header-actions" style={headerActionsStyle}>
               <div className="res-search" style={searchContainerStyle}>
-                <Search size={18} color="#9ca3af" />
+                <Search size={18} color="var(--text-secondary)" />
                 <input
                   type="text"
                   placeholder="Search topics..."
@@ -498,7 +498,7 @@ export default function Rooms({ isSidebar = false }) {
             {userCreatedRooms.length > 0 && (
               <section className="res-section" style={sectionStyle}>
                 <div style={sectionHeaderStyle}>
-                  <Sparkles size={18} color="#fbbf24" />
+                  <Sparkles size={18} color="var(--warning-color)" />
                   <h2 style={sectionTitleStyle}>Your Rooms</h2>
                 </div>
                 <div className="res-grid" style={{ ...gridStyle, gridTemplateColumns: isSidebar ? '1fr' : gridStyle.gridTemplateColumns }}>
@@ -511,7 +511,7 @@ export default function Rooms({ isSidebar = false }) {
                         isPinned={pinnedRoomIds.includes(id)}
                         onTogglePin={(e) => togglePinRoom(e, id)}
                         badgeText="Joined"
-                        badgeColor="#10b981"
+                        badgeColor="var(--success-color)"
                         chatCount={counts[room.ChatId || room.chatId]}
                         onClick={() => handleJoinRoom(room)}
                       />
@@ -525,7 +525,7 @@ export default function Rooms({ isSidebar = false }) {
             {pinnedRooms.length > 0 && (
               <section className="res-section" style={sectionStyle}>
                 <div style={sectionHeaderStyle}>
-                  <Pin size={18} color="#f87171" />
+                  <Pin size={18} color="var(--danger-color)" />
                   <h2 style={sectionTitleStyle}>Pinned Rooms</h2>
                 </div>
                 <div className="res-grid" style={gridStyle}>
@@ -539,7 +539,7 @@ export default function Rooms({ isSidebar = false }) {
                         isPinned={true}
                         onTogglePin={(e) => togglePinRoom(e, id)}
                         badgeText="Pinned"
-                        badgeColor="#f87171"
+                        badgeColor="var(--danger-color)"
                         chatCount={counts[room.ChatId || room.chatId]}
                         onClick={() => handleJoinRoom(room)}
                       />
@@ -552,7 +552,7 @@ export default function Rooms({ isSidebar = false }) {
             {/* Global Rooms Section */}
             <section className="res-section" style={sectionStyle}>
               <div style={sectionHeaderStyle}>
-                <Users size={18} color="#60a5fa" />
+                <Users size={18} color="var(--accent-text)" />
                 <h2 style={sectionTitleStyle}>Global Discovery</h2>
               </div>
               {discoveryRooms.length > 0 ? (
@@ -567,7 +567,7 @@ export default function Rooms({ isSidebar = false }) {
                         isPinned={isPinned}
                         onTogglePin={(e) => togglePinRoom(e, roomId)}
                         badgeText="Discovery"
-                        badgeColor="#60a5fa"
+                        badgeColor="var(--accent-text)"
                         chatCount={counts[room.ChatId || room.chatId]}
                         onClick={() => handleJoinRoom(room)}
                       />
@@ -576,7 +576,7 @@ export default function Rooms({ isSidebar = false }) {
                 </div>
               ) : (
                 <div style={emptyStateStyle}>
-                  <Hash size={48} color="#374151" />
+                  <Hash size={48} color="var(--border-color)" />
                   <p>No other rooms found. Be the first to start a conversation!</p>
                 </div>
               )}
@@ -593,35 +593,35 @@ export default function Rooms({ isSidebar = false }) {
             maxWidth: '460px',
             textAlign: 'center',
             padding: '36px 28px',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
+            border: '1px solid var(--border-color)',
             boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6)'
           }}>
             <div style={{
               width: '56px',
               height: '56px',
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, rgba(96, 165, 250, 0.2) 0%, rgba(167, 139, 250, 0.2) 100%)',
-              border: '1px solid rgba(96, 165, 250, 0.3)',
+              background: 'linear-gradient(135deg, var(--accent-tint) 0%, rgba(167, 139, 250, 0.2) 100%)',
+              border: '1px solid var(--accent-tint-border)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               margin: '0 auto 16px auto'
             }}>
-              <Sparkles size={28} color="#60a5fa" />
+              <Sparkles size={28} color="var(--accent-text)" />
             </div>
 
             <h2 style={{
               fontSize: '22px',
               fontWeight: '800',
               marginBottom: '8px',
-              background: 'linear-gradient(to right, #60a5fa, #a78bfa)',
+              background: 'var(--accent-gradient)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent'
             }}>
               Welcome to Public Rooms
             </h2>
 
-            <p style={{ color: '#9ca3af', lineHeight: '1.5', marginBottom: '22px', fontSize: '14px' }}>
+            <p style={{ color: 'var(--text-secondary)', lineHeight: '1.5', marginBottom: '22px', fontSize: '14px' }}>
               Public rooms are completely anonymous — nicknames are recommended to protect your privacy.
             </p>
 
@@ -644,7 +644,7 @@ export default function Rooms({ isSidebar = false }) {
                     fontWeight: '600',
                     letterSpacing: '0.3px',
                     paddingRight: '36px',
-                    borderColor: roomNicknameCheck.status === 'block' ? '#ef4444' : roomNicknameCheck.status === 'warn' ? '#f59e0b' : roomNicknameCheck.status === 'allow' ? '#10b981' : undefined
+                    borderColor: roomNicknameCheck.status === 'block' ? 'var(--danger-color)' : roomNicknameCheck.status === 'warn' ? 'var(--warning-color)' : roomNicknameCheck.status === 'allow' ? 'var(--success-color)' : undefined
                   }}
                 />
                 <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center' }}>
@@ -663,7 +663,7 @@ export default function Rooms({ isSidebar = false }) {
                   marginBottom: '10px',
                   padding: '0 4px'
                 }}>
-                  <span style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                     Suggested Handles
                   </span>
                   <button
@@ -677,9 +677,9 @@ export default function Rooms({ isSidebar = false }) {
                       }
                     }}
                     style={{
-                      background: 'rgba(96, 165, 250, 0.1)',
-                      border: '1px solid rgba(96, 165, 250, 0.2)',
-                      color: '#60a5fa',
+                      background: 'var(--accent-tint)',
+                      border: '1px solid var(--accent-tint-border)',
+                      color: 'var(--accent-text)',
                       fontSize: '12px',
                       fontWeight: '600',
                       cursor: 'pointer',
@@ -716,9 +716,9 @@ export default function Rooms({ isSidebar = false }) {
                       style={{
                         padding: '6px 12px',
                         borderRadius: '20px',
-                        background: nickname === item ? 'rgba(96, 165, 250, 0.25)' : 'rgba(255, 255, 255, 0.05)',
-                        border: nickname === item ? '1px solid rgba(96, 165, 250, 0.6)' : '1px solid rgba(255, 255, 255, 0.1)',
-                        color: nickname === item ? '#93c5fd' : '#d1d5db',
+                        background: nickname === item ? 'var(--accent-tint)' : 'var(--bg-hover)',
+                        border: nickname === item ? '1px solid var(--accent-tint-border)' : '1px solid var(--border-color)',
+                        color: nickname === item ? 'var(--accent-text)' : '#d1d5db',
                         fontSize: '13px',
                         fontWeight: '500',
                         cursor: 'pointer',
@@ -726,14 +726,14 @@ export default function Rooms({ isSidebar = false }) {
                       }}
                       onMouseEnter={(e) => {
                         if (nickname !== item) {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                          e.currentTarget.style.background = 'var(--border-color)';
                           e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
                         }
                       }}
                       onMouseLeave={(e) => {
                         if (nickname !== item) {
-                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                          e.currentTarget.style.background = 'var(--bg-hover)';
+                          e.currentTarget.style.borderColor = 'var(--border-color)';
                         }
                       }}
                     >
@@ -769,15 +769,15 @@ export default function Rooms({ isSidebar = false }) {
         <div className="res-modal-overlay" style={modalOverlayStyle}>
           <div className="res-modal" style={modalContentStyle}>
             <div className="res-modal-header" style={modalHeaderStyle}>
-              <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '800', background: 'linear-gradient(to right, #60a5fa, #a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Create a Room</h2>
+              <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '800', background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Create a Room</h2>
               <button className="close-btn" onClick={() => setIsCreateModalOpen(false)} style={closeButtonStyle}>×</button>
             </div>
             <form onSubmit={handleCreateRoom} style={formStyle}>
               <div style={inputGroupStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Room Name</label>
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Room Name</label>
                   {roomNameCheck.isChecking && (
-                    <span style={{ fontSize: '11px', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--accent-text)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <Loader2 size={12} className="animate-spin" /> Checking...
                     </span>
                   )}
@@ -790,7 +790,7 @@ export default function Rooms({ isSidebar = false }) {
                     required
                     className="premium-input"
                     style={{
-                      borderColor: roomNameCheck.available === false ? '#ef4444' : roomNameCheck.available === true ? '#10b981' : undefined,
+                      borderColor: roomNameCheck.available === false ? 'var(--danger-color)' : roomNameCheck.available === true ? 'var(--success-color)' : undefined,
                       paddingRight: '36px'
                     }}
                     value={newRoom.name}
@@ -801,17 +801,17 @@ export default function Rooms({ isSidebar = false }) {
                   />
                   <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center' }}>
                     {roomNameCheck.available === true && !roomNameCheck.isChecking && (
-                      <CheckCircle2 size={18} color="#10b981" />
+                      <CheckCircle2 size={18} color="var(--success-color)" />
                     )}
                     {roomNameCheck.available === false && !roomNameCheck.isChecking && (
-                      <AlertCircle size={18} color="#ef4444" />
+                      <AlertCircle size={18} color="var(--danger-color)" />
                     )}
                   </div>
                 </div>
                 {roomNameCheck.message && !roomNameCheck.isChecking && (
                   <span style={{
                     fontSize: '12px',
-                    color: roomNameCheck.available ? '#10b981' : '#ef4444',
+                    color: roomNameCheck.available ? 'var(--success-color)' : 'var(--danger-color)',
                     marginTop: '2px',
                     display: 'flex',
                     alignItems: 'center',
@@ -822,7 +822,7 @@ export default function Rooms({ isSidebar = false }) {
                 )}
               </div>
               <div style={inputGroupStyle}>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Motto / Topic</label>
+                <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Motto / Topic</label>
                 <input
                   type="text"
                   placeholder="e.g. Discussing the future of web dev"
@@ -854,11 +854,11 @@ export default function Rooms({ isSidebar = false }) {
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
         .room-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        .room-card:hover { transform: translateY(-4px); background: #252525 !important; border-color: rgba(255, 255, 255, 0.15) !important; }
+        .room-card:hover { transform: translateY(-4px); background: #252525 !important; border-color: var(--border-color) !important; }
         .animate-spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         
-        .create-btn:hover { background-color: rgba(96, 165, 250, 0.1) !important; transform: scale(1.05); }
+        .create-btn:hover { background-color: var(--accent-tint) !important; transform: scale(1.05); }
         .create-btn:active { transform: scale(0.95); }
         
         .close-btn { transition: all 0.3s ease; }
@@ -867,7 +867,7 @@ export default function Rooms({ isSidebar = false }) {
         .premium-input {
           width: 100%;
           background: rgba(0, 0, 0, 0.2) !important;
-          border: 1px solid rgba(255, 255, 255, 0.1) !important;
+          border: 1px solid var(--border-color) !important;
           border-radius: 12px;
           padding: 16px 20px;
           color: white;
@@ -879,11 +879,11 @@ export default function Rooms({ isSidebar = false }) {
         .premium-input:focus {
           border-color: var(--accent-color) !important;
           background: rgba(0, 0, 0, 0.4) !important;
-          box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+          box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-solid) 45%, transparent);
         }
-        .premium-input::placeholder { color: #6B7280; }
+        .premium-input::placeholder { color: var(--text-muted); }
         
-        .submit-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(96, 165, 250, 0.4) !important; }
+        .submit-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 20px color-mix(in srgb, var(--accent-solid) 45%, transparent) !important; }
         .submit-btn:active:not(:disabled) { transform: translateY(0); }
 
         /* Mobile Responsiveness */
@@ -917,7 +917,7 @@ function RoomCard({ room, badgeText, badgeColor, onClick, isPinned, onTogglePin,
           position: 'absolute',
           top: '-8px',
           right: '-8px',
-          backgroundColor: '#ef4444',
+          backgroundColor: 'var(--danger-color)',
           color: 'white',
           fontSize: '11px',
           fontWeight: '800',
@@ -928,8 +928,8 @@ function RoomCard({ room, badgeText, badgeColor, onClick, isPinned, onTogglePin,
           alignItems: 'center',
           justifyContent: 'center',
           padding: '0 6px',
-          boxShadow: '0 4px 12px rgba(239, 68, 68, 0.4)',
-          border: '2px solid #1a1a1a',
+          boxShadow: '0 4px 12px var(--danger-tint)',
+          border: '2px solid var(--bg-secondary)',
           zIndex: 10,
           animation: 'scaleIn 0.2s ease-out'
         }}>
@@ -943,7 +943,7 @@ function RoomCard({ room, badgeText, badgeColor, onClick, isPinned, onTogglePin,
           top: '12px',
           right: '12px',
           background: 'rgba(0, 0, 0, 0.4)',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
+          border: '1px solid var(--border-color)',
           borderRadius: '8px',
           width: '32px',
           height: '32px',
@@ -952,7 +952,7 @@ function RoomCard({ room, badgeText, badgeColor, onClick, isPinned, onTogglePin,
           justifyContent: 'center',
           cursor: 'pointer',
           zIndex: 5,
-          color: isPinned ? '#f87171' : '#9ca3af',
+          color: isPinned ? 'var(--danger-color)' : 'var(--text-secondary)',
           transition: 'all 0.2s ease',
           backdropFilter: 'blur(4px)'
         }}
@@ -1002,7 +1002,7 @@ const headerStyle = {
   zIndex: 10,
   backgroundColor: 'rgba(18, 18, 18, 0.8)',
   backdropFilter: 'blur(20px)',
-  borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+  borderBottom: '1px solid var(--bg-hover)',
   padding: '24px',
 };
 
@@ -1035,12 +1035,12 @@ const headerActionsStyle = {
 const searchContainerStyle = {
   display: 'flex',
   alignItems: 'center',
-  backgroundColor: '#1E1E1E',
+  backgroundColor: 'var(--bg-card)',
   borderRadius: '12px',
   padding: '0 16px',
   maxWidth: '400px',
   width: '100%',
-  border: '1px solid rgba(255, 255, 255, 0.1)',
+  border: '1px solid var(--border-color)',
   height: '44px'
 };
 
@@ -1104,10 +1104,10 @@ const gridStyle = {
 };
 
 const cardStyle = {
-  backgroundColor: '#1A1A1A',
+  backgroundColor: 'var(--bg-secondary)',
   borderRadius: '20px',
   padding: '24px',
-  border: '1px solid rgba(255, 255, 255, 0.05)',
+  border: '1px solid var(--bg-hover)',
   cursor: 'pointer',
   display: 'flex',
   flexDirection: 'column',
@@ -1143,7 +1143,7 @@ const cardMottoStyle = {
   margin: 0,
   fontSize: '13px',
   lineHeight: '1.5',
-  color: '#9CA3AF',
+  color: 'var(--text-secondary)',
   display: '-webkit-box',
   WebkitLineClamp: '2',
   WebkitBoxOrient: 'vertical',
@@ -1188,8 +1188,8 @@ const modalContentStyle = {
   width: '100%',
   maxWidth: '440px',
   padding: '40px',
-  boxShadow: '0 30px 60px -12px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-  border: '1px solid rgba(255, 255, 255, 0.08)',
+  boxShadow: '0 30px 60px -12px rgba(0, 0, 0, 0.7), inset 0 1px 0 var(--border-color)',
+  border: '1px solid var(--bg-hover)',
   animation: 'scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
 };
 
@@ -1203,7 +1203,7 @@ const modalHeaderStyle = {
 const closeButtonStyle = {
   backgroundColor: 'transparent',
   border: 'none',
-  color: '#9CA3AF',
+  color: 'var(--text-secondary)',
   fontSize: '32px',
   cursor: 'pointer',
   lineHeight: '1'
@@ -1223,7 +1223,7 @@ const inputGroupStyle = {
 };
 
 const errorStyle = {
-  color: '#EF4444',
+  color: 'var(--danger-color)',
   fontSize: '13px',
   margin: '0'
 };

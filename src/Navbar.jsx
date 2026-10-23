@@ -7,8 +7,10 @@ import { useTheme } from './context/ThemeContext';
 import Avatar from './components/chat/Avatar';
 import { syncChatsMapToDB, saveUserIdToDB } from './service/db';
 import messageStore from './pages/MessageStore';
+import { useBadges } from './service/BadgeStore';
 
 function Navbar() {
+  const { calendarUnread, pulsesUnread } = useBadges();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeSection, setActiveSection] = useState(null);
@@ -154,8 +156,8 @@ function Navbar() {
   const mobileBottomPages = [
     { name: 'Chats', path: '/chats' },
     { name: 'Pulses', path: '/pulses' },
-    { name: 'Search', path: '/search' },
-    { name: 'Rooms', path: '/rooms' }
+    { name: 'Rooms', path: '/rooms' },
+    { name: 'Calendar', path: '/calendar' }
   ];
 
   const isActive = (path) => location.pathname === path;
@@ -495,7 +497,7 @@ function Navbar() {
     return null;
   }
 
-  if (location.pathname.startsWith("/chat/") && !isSidebarOpen && !activeSection) {
+  if ((location.pathname.startsWith("/chat/") || location.pathname.startsWith("/batch-message")) && !isSidebarOpen && !activeSection) {
     return null;
   }
 
@@ -512,31 +514,32 @@ function Navbar() {
               transition: 'background-color 0.1s'
             }}></span>
           </h3>
-          <span style={{ fontSize: '13px', color: '#9ca3af', fontWeight: '500', display: 'flex', alignItems: 'center', minHeight: '16px', marginTop: '-2px' }}>
+          <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '500', display: 'flex', alignItems: 'center', minHeight: '16px', marginTop: '-2px' }}>
             {headerText2}
             {activeCursor >= 2 && (
               <span style={{ 
                 width: '2px', height: '13px', marginLeft: '4px', display: 'inline-block',
-                backgroundColor: (activeCursor === 2 && cursorVisible) ? '#9ca3af' : 'transparent',
+                backgroundColor: (activeCursor === 2 && cursorVisible) ? 'var(--text-secondary)' : 'transparent',
                 transition: 'background-color 0.1s'
               }}></span>
             )}
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {/* Calendar Icon Button */}
+          {/* Search Icon Button */}
           <button
-            onClick={() => navigate('/calendar')}
+            onClick={() => navigate('/search')}
             style={{
               ...menuButtonStyle,
-              color: isActive('/calendar') ? 'var(--accent-color)' : 'var(--text-primary)',
-              backgroundColor: isActive('/calendar') ? 'var(--nav-active-bg)' : 'transparent'
+              position: 'relative',
+              color: isActive('/search') ? 'var(--accent-color)' : 'var(--text-primary)',
+              backgroundColor: isActive('/search') ? 'var(--nav-active-bg)' : 'transparent'
             }}
-            title="Calendar"
+            title="Search"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
-              <path d="M16 2v4M8 2v4M3 10h18" />
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
             </svg>
           </button>
 
@@ -566,16 +569,57 @@ function Navbar() {
               }}
               style={{
                 ...navLinkStyle,
+                position: 'relative',
                 ...(isActive(page.path) ? activeLinkStyle : {})
               }}
             >
-              <div style={{ marginBottom: '4px' }}>
+              <div style={{ marginBottom: '4px', position: 'relative', display: 'inline-block' }}>
                 {/* Simple Dynamic Icons */}
                 {page.name === 'Chats' && <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 1 1-7.6-11.23 8.38 8.38 0 0 1 3.8.9L21 3.5Z" /></svg>}
-                {page.name === 'Pulses' && <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><polygon points="10 8 16 12 10 16 10 8" fill="currentColor" /></svg>}
+                {page.name === 'Pulses' && (
+                  <>
+                    <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><polygon points="10 8 16 12 10 16 10 8" fill="currentColor" /></svg>
+                    {pulsesUnread && (
+                      <span
+                        style={{
+                          position: 'absolute',
+                          top: '-2px',
+                          right: '-3px',
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          backgroundColor: 'var(--accent-solid)',
+                          boxShadow: '0 0 6px 1px var(--accent-text)',
+                          border: '1.5px solid var(--bg-primary)',
+                          zIndex: 5
+                        }}
+                      />
+                    )}
+                  </>
+                )}
                 {page.name === 'Rooms' && <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>}
                 {page.name === 'Search' && <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>}
-                {page.name === 'Calendar' && <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>}
+                {page.name === 'Calendar' && (
+                  <>
+                    <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="4" rx="2" ry="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
+                    {calendarUnread && (
+                      <span
+                        style={{
+                          position: 'absolute',
+                          top: '-2px',
+                          right: '-3px',
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          backgroundColor: 'var(--accent-solid)',
+                          boxShadow: '0 0 6px 1px var(--accent-text)',
+                          border: '1.5px solid var(--bg-primary)',
+                          zIndex: 5
+                        }}
+                      />
+                    )}
+                  </>
+                )}
               </div>
               <span style={navTextStyle}>{page.name}</span>
             </button>
@@ -637,6 +681,15 @@ function Navbar() {
                 <circle cx="12" cy="7" r="4"></circle>
               </svg>
               <span>Profile</span>
+            </button>
+
+            <button onClick={() => { navigate('/labs'); setIsSidebarOpen(false); }} style={menuItemStyle}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M10 2v7.31L4.14 19.33a2 2 0 0 0 1.72 2.67h12.28a2 2 0 0 0 1.72-2.67L14 9.31V2"></path>
+                <line x1="8.5" y1="2" x2="15.5" y2="2"></line>
+                <path d="M7 16h10"></path>
+              </svg>
+              <span>LetsChat Labs</span>
             </button>
 
             <div style={dividerStyle} />
@@ -997,7 +1050,7 @@ const sidebarHeaderStyle = {
   justifyContent: 'space-between',
   alignItems: 'center',
   padding: '20px',
-  borderBottom: '2px solid #3b82f6'
+  borderBottom: '2px solid var(--accent-solid)'
 };
 
 const sidebarTitleStyle = {
@@ -1060,7 +1113,7 @@ const confirmBoxStyle = {
   borderRadius: '12px',
   padding: '20px',
   boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
-  border: '1px solid #3b82f6',
+  border: '1px solid var(--accent-solid)',
   marginTop: '10px'
 };
 
@@ -1113,7 +1166,7 @@ const fullscreenHeaderStyle = {
   justifyContent: 'space-between',
   alignItems: 'center',
   padding: '20px 24px',
-  borderBottom: '2px solid #3b82f6',
+  borderBottom: '2px solid var(--accent-solid)',
   background: 'var(--bg-gradient)',
   position: 'sticky',
   top: 0,
@@ -1156,7 +1209,7 @@ const fullscreenBodyStyle = {
 
 const fullscreenInputStyle = {
   padding: '18px 20px',
-  background: 'rgba(255, 255, 255, 0.1)',
+  background: 'var(--border-color)',
   border: '2px solid var(--border-color)',
   borderRadius: '6px',
   color: 'var(--text-primary)',
@@ -1168,7 +1221,7 @@ const fullscreenInputStyle = {
 
 const fullscreenFooterStyle = {
   padding: '20px 24px',
-  borderTop: '2px solid #3b82f6',
+  borderTop: '2px solid var(--accent-solid)',
   background: 'var(--bg-gradient)',
   position: 'sticky',
   bottom: 0,
@@ -1244,7 +1297,7 @@ const memberItemStyle = {
   justifyContent: 'space-between',
   alignItems: 'center',
   padding: '12px 16px',
-  background: 'rgba(59, 130, 246, 0.1)',
+  background: 'var(--accent-tint)',
   border: '1px solid var(--border-color)',
   borderRadius: '6px',
   transition: 'all 0.3s ease'

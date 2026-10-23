@@ -8,6 +8,7 @@ import PulseStoryViewer from '../components/pulse/PulseStoryViewer';
 import StreakTierExplainerModal from '../components/pulse/StreakTierExplainerModal';
 import PulseViewersModal from '../components/pulse/PulseViewersModal';
 import { getTierIndexFromStreak } from '../components/pulse/SquircleFireAvatar';
+import { badgeStore } from '../service/BadgeStore';
 
 const PulsesTab = () => {
   const [loading, setLoading] = useState(true);
@@ -98,6 +99,7 @@ const PulsesTab = () => {
   };
 
   useEffect(() => {
+    badgeStore.clearPulsesUnread();
     fetchData();
   }, []);
 
@@ -231,7 +233,7 @@ const PulsesTab = () => {
                 width: '18px',
                 height: '18px',
                 borderRadius: '50%',
-                backgroundColor: '#10b981',
+                backgroundColor: 'var(--success-color)',
                 color: '#ffffff',
                 display: 'flex',
                 alignItems: 'center',
@@ -274,9 +276,9 @@ const PulsesTab = () => {
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{
-                      backgroundColor: 'rgba(99, 102, 241, 0.12)',
+                      backgroundColor: 'var(--accent-tint)',
                       color: 'var(--accent-color)',
-                      border: '1px solid rgba(99, 102, 241, 0.25)',
+                      border: '1px solid var(--accent-tint)',
                       padding: '2px 8px',
                       borderRadius: '10px',
                       fontSize: '11px',
@@ -329,7 +331,7 @@ const PulsesTab = () => {
                               e.stopPropagation();
                               setSelectedPulseViewers(pulse);
                             }}
-                            style={{ fontSize: '12px', fontWeight: '800', color: 'var(--accent-color)', cursor: 'pointer', padding: '4px 8px', borderRadius: '8px', backgroundColor: 'rgba(99, 102, 241, 0.12)' }}
+                            style={{ fontSize: '12px', fontWeight: '800', color: 'var(--accent-color)', cursor: 'pointer', padding: '4px 8px', borderRadius: '8px', backgroundColor: 'var(--accent-tint)' }}
                           >
                             👁️ {pulse.totalViews ?? pulse.viewCount ?? pulse.viewsCount ?? pulse.viewers?.length ?? 0}
                           </div>
@@ -347,7 +349,7 @@ const PulsesTab = () => {
                   style={collapsibleHeaderStyle}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Sparkles size={17} color="#10b981" />
+                    <Sparkles size={17} color="var(--success-color)" />
                     <span style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-primary)' }}>
                       Recent Updates ({unviewedList.length})
                     </span>
@@ -356,7 +358,7 @@ const PulsesTab = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{
                       backgroundColor: unviewedList.length > 0 ? 'rgba(16, 185, 129, 0.15)' : 'var(--bg-card)',
-                      color: unviewedList.length > 0 ? '#10b981' : 'var(--text-secondary)',
+                      color: unviewedList.length > 0 ? 'var(--success-color)' : 'var(--text-secondary)',
                       padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: '800'
                     }}>
                       {unviewedList.length} New
@@ -398,7 +400,7 @@ const PulsesTab = () => {
                                   width: '16px',
                                   height: '16px',
                                   borderRadius: '50%',
-                                  backgroundColor: '#2563eb',
+                                  backgroundColor: 'var(--accent-solid)',
                                   color: '#ffffff',
                                   flexShrink: 0
                                 }}>
@@ -477,7 +479,7 @@ const PulsesTab = () => {
                                   width: '16px',
                                   height: '16px',
                                   borderRadius: '50%',
-                                  backgroundColor: '#2563eb',
+                                  backgroundColor: 'var(--accent-solid)',
                                   color: '#ffffff',
                                   flexShrink: 0
                                 }}>
@@ -506,7 +508,7 @@ const PulsesTab = () => {
         {!bannerDismissed && (
           <div style={{
             padding: '12px 16px',
-            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+            backgroundColor: 'var(--accent-tint)',
             borderTop: '1px solid var(--border-color)',
             display: 'flex',
             alignItems: 'center',
@@ -524,7 +526,7 @@ const PulsesTab = () => {
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: '#3b82f6',
+                  color: 'var(--accent-text)',
                   fontSize: '13px',
                   fontWeight: '700',
                   textDecoration: 'underline',

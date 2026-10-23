@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { API } from './UserAuth';
 import messageStore from '../pages/MessageStore';
 import { saveEventToDB, getEventsFromDB } from './db';
+import { badgeStore } from './BadgeStore';
 const EventMediatorContext = createContext();
 
 export const EventStorage = ({ children }) => {
@@ -16,7 +17,7 @@ export const EventStorage = ({ children }) => {
     return `${year}-${month}-${day}`;
   };
 
-  //to fetch event from server
+  //to fetch event from server and diff against IDB snapshot
   useEffect(()=>{
     console.log("calling")
     if(!userId)return;
@@ -40,11 +41,17 @@ export const EventStorage = ({ children }) => {
 
     const fetchevent=async()=>{
       try {
+        const localEvents = await getEventsFromDB();
+        const localMap = new Map((localEvents || []).map(e => [String(e.id), e]));
+
         const res = await fetch(
           `${API}/user/getevents/${userId}`
         );
         const data = await res.json();
         const newGrouped = {};
+        let hasEventChanges = false;
+        const changedIds = [];
+
         for (const evt of data) {
           const tim=new Date(evt.startTime*1000).toISOString();
           const datekey=formatDateKey(tim.toLocaleString());
@@ -61,12 +68,81 @@ export const EventStorage = ({ children }) => {
             action:evt.action,
             isAdded:evt.isAdded,
             isSync:evt.isSync,
+            meetingType: evt.meetingType,
+            meetingLink: evt.meetingLink,
+            location: evt.location,
+            groupEventId: evt.groupEventId,
+            externalStatus: evt.externalStatus
           };
+
+          // Client-side change detection: Compare against local IDB snapshot
+          if (localEvents && localEvents.length > 0) {
+            const existing = localMap.get(String(evet.id));
+            if (!existing) {
+              // New event created while offline or in background
+              hasEventChanges = true;
+              changedIds.push(String(evet.id));
+            } else {
+              const timeChanged = (existing.startTime !== evet.startTime) || (existing.endTime !== evet.endTime) || (existing.date !== evet.date);
+              const actionChanged = existing.action !== evet.action;
+              const statusChanged = existing.externalStatus !== evet.externalStatus;
+              const locChanged = (existing.location !== evet.location) || (existing.meetingLink !== evet.meetingLink);
+              const titleChanged = existing.title !== evet.title;
+
+              if (timeChanged || actionChanged || statusChanged || locChanged || titleChanged) {
+                hasEventChanges = true;
+                changedIds.push(String(evet.id));
+              }
+            }
+          }
+
           await saveEventToDB(evet);
 
           if (!newGrouped[datekey]) newGrouped[datekey] = [];
           newGrouped[datekey].push(evet);
         }
+
+        if (hasEventChanges) {
+          badgeStore.setCalendarUnread(true, changedIds);
+        }
+
+        // Diff User Bookings
+        try {
+          const bRes = await fetch(`${API}/user/event/bookings`, {
+            headers: { 'User-Id': userId }
+          });
+          if (bRes.ok) {
+            const freshBookings = await bRes.json();
+            const cachedBookingsRaw = localStorage.getItem('letschat_cached_bookings');
+            if (cachedBookingsRaw) {
+              const cachedBookings = JSON.parse(cachedBookingsRaw);
+              const cachedBMap = new Map((cachedBookings || []).map(b => [String(b.eventId || b.bookingToken), b]));
+
+              let bookingChanges = false;
+              for (const b of (freshBookings || [])) {
+                const key = String(b.eventId || b.bookingToken);
+                const prev = cachedBMap.get(key);
+                if (!prev) {
+                  bookingChanges = true;
+                  break;
+                }
+                if (prev.externalStatus !== b.externalStatus || prev.startTime !== b.startTime || prev.location !== b.location) {
+                  bookingChanges = true;
+                  break;
+                }
+              }
+
+              if (bookingChanges) {
+                badgeStore.setCalendarUnread(true);
+                badgeStore.setBellUnread(true);
+              }
+            }
+            localStorage.setItem('letschat_cached_bookings', JSON.stringify(freshBookings || []));
+          }
+        } catch (bErr) {
+          console.warn("[EventStorage] Bookings diff check error:", bErr);
+        }
+
         setEvents(prev => {
           const merged = { ...prev };
           Object.keys(newGrouped).forEach(k => {
@@ -88,6 +164,7 @@ export const EventStorage = ({ children }) => {
       if (!msg) return;
 
       console.log("[EventStorage] Received real-time event sync:", msg);
+      badgeStore.setCalendarUnread(true, msg.eventId ? [String(msg.eventId)] : []);
       fetchevent();
 
       // If created/updated by someone else, check collision on recipient's calendar
@@ -122,7 +199,16 @@ export const EventStorage = ({ children }) => {
       }
     };
 
+    const handleBookingSync = (e) => {
+      console.log("[EventStorage] Received real-time booking alert:", e.detail);
+      badgeStore.setCalendarUnread(true);
+      badgeStore.setBellUnread(true);
+      fetchevent();
+    };
+
     window.addEventListener('letschat_event_sync', handleEventSync);
+    window.addEventListener('letschat_booking_request', handleBookingSync);
+    window.addEventListener('letschat_booking_update', handleBookingSync);
     window.addEventListener('letschat_refresh_events', fetchevent);
 
     // Listen for simulation events (walkthrough)
@@ -142,6 +228,8 @@ export const EventStorage = ({ children }) => {
     return () => {
       window.removeEventListener('simulation_event_needed', handleSimEvent);
       window.removeEventListener('letschat_event_sync', handleEventSync);
+      window.removeEventListener('letschat_booking_request', handleBookingSync);
+      window.removeEventListener('letschat_booking_update', handleBookingSync);
       window.removeEventListener('letschat_refresh_events', fetchevent);
     };
   },[userId])

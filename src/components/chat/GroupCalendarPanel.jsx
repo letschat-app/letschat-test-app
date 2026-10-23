@@ -185,14 +185,14 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
       display: 'flex',
       flexDirection: 'column',
       height: '100%',
-      backgroundColor: '#111827',
-      color: '#f9fafb',
-      borderLeft: '1px solid rgba(255, 255, 255, 0.08)'
+      backgroundColor: 'var(--bg-secondary)',
+      color: 'var(--text-primary)',
+      borderLeft: '1px solid var(--bg-hover)'
     }}>
       {/* Header */}
       <div style={{
         padding: '18px 20px',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+        borderBottom: '1px solid var(--bg-hover)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -204,8 +204,8 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
             width: '36px',
             height: '36px',
             borderRadius: '10px',
-            backgroundColor: 'rgba(59, 130, 246, 0.15)',
-            color: '#60a5fa',
+            backgroundColor: 'var(--accent-tint)',
+            color: 'var(--accent-text)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center'
@@ -214,7 +214,7 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
           </div>
           <div>
             <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700' }}>Group Calendar</h3>
-            <span style={{ fontSize: '12px', color: '#9ca3af' }}>{groupName || 'Group Events'}</span>
+            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{groupName || 'Group Events'}</span>
           </div>
         </div>
 
@@ -228,12 +228,12 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
               padding: '8px 14px',
               borderRadius: '10px',
               border: 'none',
-              backgroundColor: '#3b82f6',
+              backgroundColor: 'var(--accent-solid)',
               color: '#ffffff',
               fontSize: '13px',
               fontWeight: '600',
               cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+              boxShadow: '0 4px 12px color-mix(in srgb, var(--accent-solid) 45%, transparent)'
             }}
           >
             <Plus size={16} /> New Event
@@ -241,7 +241,7 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
           <button
             onClick={onClose}
             style={{
-              background: 'rgba(255, 255, 255, 0.05)',
+              background: 'var(--bg-hover)',
               border: 'none',
               borderRadius: '50%',
               width: '32px',
@@ -249,7 +249,7 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#9ca3af',
+              color: 'var(--text-secondary)',
               cursor: 'pointer'
             }}
           >
@@ -263,7 +263,7 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
         display: 'flex',
         padding: '10px 16px',
         gap: '8px',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
+        borderBottom: '1px solid var(--bg-hover)'
       }}>
         {['upcoming', 'today', 'all'].map((filter) => (
           <button
@@ -276,9 +276,9 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
               fontWeight: '600',
               textTransform: 'capitalize',
               cursor: 'pointer',
-              backgroundColor: selectedFilter === filter ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
-              color: selectedFilter === filter ? '#60a5fa' : '#9ca3af',
-              border: selectedFilter === filter ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid transparent'
+              backgroundColor: selectedFilter === filter ? 'color-mix(in srgb, var(--accent-solid) 45%, transparent)' : 'transparent',
+              color: selectedFilter === filter ? 'var(--accent-text)' : 'var(--text-secondary)',
+              border: selectedFilter === filter ? '1px solid color-mix(in srgb, var(--accent-solid) 45%, transparent)' : '1px solid transparent'
             }}
           >
             {filter}
@@ -296,7 +296,7 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
         gap: '14px'
       }}>
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#9ca3af', fontSize: '14px' }}>
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)', fontSize: '14px' }}>
             Loading group calendar events...
           </div>
         ) : filteredEvents.length === 0 ? (
@@ -305,11 +305,11 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
             padding: '48px 20px',
             backgroundColor: 'rgba(255, 255, 255, 0.02)',
             borderRadius: '16px',
-            border: '1px dashed rgba(255, 255, 255, 0.1)'
+            border: '1px dashed var(--border-color)'
           }}>
-            <Calendar size={36} color="#6b7280" style={{ margin: '0 auto 12px' }} />
-            <h4 style={{ margin: '0 0 6px 0', fontSize: '15px', color: '#e5e7eb' }}>No events in this group</h4>
-            <p style={{ margin: 0, fontSize: '13px', color: '#9ca3af' }}>
+            <Calendar size={36} color="var(--text-muted)" style={{ margin: '0 auto 12px' }} />
+            <h4 style={{ margin: '0 0 6px 0', fontSize: '15px', color: 'var(--text-primary)' }}>No events in this group</h4>
+            <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)' }}>
               Events created in this group will appear here for all members.
             </p>
           </div>
@@ -322,9 +322,9 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
               <div
                 key={ev.eventId || ev.groupEventId}
                 style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.04)',
+                  backgroundColor: 'var(--bg-hover)',
                   borderRadius: '16px',
-                  border: `1px solid ${isCancelled ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.08)'}`,
+                  border: `1px solid ${isCancelled ? 'var(--danger-tint-border)' : 'var(--bg-hover)'}`,
                   padding: '16px',
                   display: 'flex',
                   flexDirection: 'column',
@@ -342,12 +342,12 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
                       fontSize: '11px',
                       fontWeight: '700',
                       textTransform: 'uppercase',
-                      backgroundColor: isCancelled ? 'rgba(239, 68, 68, 0.15)' : 'rgba(59, 130, 246, 0.15)',
-                      color: isCancelled ? '#ef4444' : '#60a5fa'
+                      backgroundColor: isCancelled ? 'var(--danger-tint)' : 'var(--accent-tint)',
+                      color: isCancelled ? 'var(--danger-color)' : 'var(--accent-text)'
                     }}>
                       {isCancelled ? 'Cancelled' : ev.scope === 'ALL' ? 'Group Event (All)' : 'Group Event'}
                     </span>
-                    <span style={{ fontSize: '12px', color: '#9ca3af', fontWeight: '500' }}>
+                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '500' }}>
                       {formatEventDate(ev.startTime)}
                     </span>
                   </div>
@@ -360,7 +360,7 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
                       background: 'none',
                       border: 'none',
                       cursor: 'pointer',
-                      color: ev.reminderEnabled ? '#f59e0b' : '#6b7280',
+                      color: ev.reminderEnabled ? 'var(--warning-color)' : 'var(--text-muted)',
                       padding: '4px',
                       display: 'flex',
                       alignItems: 'center'
@@ -376,12 +376,12 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
                     margin: '0 0 6px 0',
                     fontSize: '16px',
                     fontWeight: '700',
-                    color: '#f9fafb',
+                    color: 'var(--text-primary)',
                     textDecoration: isCancelled ? 'line-through' : 'none'
                   }}>
                     {ev.eventTitle}
                   </h4>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#60a5fa', fontSize: '13px', fontWeight: '500' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-text)', fontSize: '13px', fontWeight: '500' }}>
                     <Clock size={14} />
                     <span>
                       {formatEventTime(ev.startTime)} {ev.endTime ? `- ${formatEventTime(ev.endTime)}` : ''}
@@ -392,15 +392,15 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
                 {/* PROMINENT ONLINE / OFFLINE SECTION */}
                 {ev.meetingType === 'online' && ev.meetingLink && (
                   <div style={{
-                    backgroundColor: 'rgba(59, 130, 246, 0.12)',
-                    border: '1px solid rgba(59, 130, 246, 0.3)',
+                    backgroundColor: 'var(--accent-tint)',
+                    border: '1px solid var(--accent-tint-border)',
                     borderRadius: '10px',
                     padding: '10px 14px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between'
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#60a5fa', fontSize: '13px', fontWeight: '600' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-text)', fontSize: '13px', fontWeight: '600' }}>
                       <Video size={16} />
                       <span>Video Call</span>
                     </div>
@@ -414,7 +414,7 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
                         gap: '4px',
                         padding: '6px 12px',
                         borderRadius: '8px',
-                        backgroundColor: '#2563eb',
+                        backgroundColor: 'var(--accent-solid)',
                         color: '#ffffff',
                         textDecoration: 'none',
                         fontSize: '12px',
@@ -435,7 +435,7 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
-                    color: '#34d399',
+                    color: 'var(--success-color)',
                     fontSize: '13px'
                   }}>
                     <MapPin size={16} style={{ flexShrink: 0 }} />
@@ -457,18 +457,18 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
 
                 {/* RSVP Voting & Attendance Tally */}
                 <div style={{
-                  borderTop: '1px solid rgba(255, 255, 255, 0.06)',
+                  borderTop: '1px solid var(--bg-hover)',
                   paddingTop: '12px',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '8px'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', fontWeight: '600' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '600' }}>
                       Will you attend?
                     </span>
                     {ev.rsvpCounts && (
-                      <div style={{ display: 'flex', gap: '8px', fontSize: '11px', color: '#9ca3af' }}>
+                      <div style={{ display: 'flex', gap: '8px', fontSize: '11px', color: 'var(--text-secondary)' }}>
                         <span>✓ Going: {ev.rsvpCounts.going || 0}</span>
                         <span>✕ Can't: {ev.rsvpCounts.cant_join || 0}</span>
                       </div>
@@ -482,9 +482,9 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
                         flex: 1,
                         padding: '6px 10px',
                         borderRadius: '8px',
-                        border: ev.rsvpStatus === 'going' ? '1px solid #10b981' : '1px solid rgba(255, 255, 255, 0.1)',
+                        border: ev.rsvpStatus === 'going' ? '1px solid var(--success-color)' : '1px solid var(--border-color)',
                         backgroundColor: ev.rsvpStatus === 'going' ? 'rgba(16, 185, 129, 0.2)' : 'transparent',
-                        color: ev.rsvpStatus === 'going' ? '#34d399' : '#9ca3af',
+                        color: ev.rsvpStatus === 'going' ? 'var(--success-color)' : 'var(--text-secondary)',
                         fontSize: '12px',
                         fontWeight: '600',
                         cursor: 'pointer'
@@ -498,9 +498,9 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
                         flex: 1,
                         padding: '6px 10px',
                         borderRadius: '8px',
-                        border: ev.rsvpStatus === 'maybe' ? '1px solid #f59e0b' : '1px solid rgba(255, 255, 255, 0.1)',
+                        border: ev.rsvpStatus === 'maybe' ? '1px solid var(--warning-color)' : '1px solid var(--border-color)',
                         backgroundColor: ev.rsvpStatus === 'maybe' ? 'rgba(245, 158, 11, 0.2)' : 'transparent',
-                        color: ev.rsvpStatus === 'maybe' ? '#fbbf24' : '#9ca3af',
+                        color: ev.rsvpStatus === 'maybe' ? 'var(--warning-color)' : 'var(--text-secondary)',
                         fontSize: '12px',
                         fontWeight: '600',
                         cursor: 'pointer'
@@ -514,9 +514,9 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
                         flex: 1,
                         padding: '6px 10px',
                         borderRadius: '8px',
-                        border: ev.rsvpStatus === 'cant_join' ? '1px solid #ef4444' : '1px solid rgba(255, 255, 255, 0.1)',
-                        backgroundColor: ev.rsvpStatus === 'cant_join' ? 'rgba(239, 68, 68, 0.2)' : 'transparent',
-                        color: ev.rsvpStatus === 'cant_join' ? '#f87171' : '#9ca3af',
+                        border: ev.rsvpStatus === 'cant_join' ? '1px solid var(--danger-color)' : '1px solid var(--border-color)',
+                        backgroundColor: ev.rsvpStatus === 'cant_join' ? 'var(--danger-tint)' : 'transparent',
+                        color: ev.rsvpStatus === 'cant_join' ? 'var(--danger-color)' : 'var(--text-secondary)',
                         fontSize: '12px',
                         fontWeight: '600',
                         cursor: 'pointer'
@@ -535,9 +535,9 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
                       width: '100%',
                       padding: '8px',
                       borderRadius: '8px',
-                      backgroundColor: 'rgba(59, 130, 246, 0.15)',
-                      border: '1px solid rgba(59, 130, 246, 0.3)',
-                      color: '#60a5fa',
+                      backgroundColor: 'var(--accent-tint)',
+                      border: '1px solid var(--accent-tint-border)',
+                      color: 'var(--accent-text)',
                       fontSize: '12px',
                       fontWeight: '600',
                       cursor: 'pointer',

@@ -142,17 +142,17 @@ const ShareTargetPage = () => {
                 gap: '12px',
                 padding: '16px',
                 overflowX: 'auto',
-                background: '#1f2937',
+                background: 'var(--bg-card)',
                 borderRadius: '12px',
                 marginBottom: '24px',
-                border: '1px solid #374151'
+                border: '1px solid var(--border-color)'
             }} className="hide-scrollbar">
                 {sharedItems.map((item, i) => (
                     <div key={i} style={{
                         flexShrink: 0,
                         width: '80px',
                         height: '80px',
-                        background: '#111827',
+                        background: 'var(--bg-secondary)',
                         borderRadius: '8px',
                         display: 'flex',
                         alignItems: 'center',
@@ -168,10 +168,10 @@ const ShareTargetPage = () => {
                                     alt="preview"
                                 />
                             ) : (
-                                <FileText size={32} color="#60a5fa" />
+                                <FileText size={32} color="var(--accent-text)" />
                             )
                         ) : (
-                            <div style={{ fontSize: '10px', padding: '4px', textAlign: 'center', color: '#9ca3af' }}>
+                            <div style={{ fontSize: '10px', padding: '4px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                                 {item.text?.substring(0, 20)}...
                             </div>
                         )}
@@ -184,7 +184,7 @@ const ShareTargetPage = () => {
     return (
         <div style={{
             height: '100vh',
-            background: '#111827',
+            background: 'var(--bg-secondary)',
             color: 'white',
             display: 'flex',
             flexDirection: 'column',
@@ -192,15 +192,15 @@ const ShareTargetPage = () => {
         }}>
             <div style={{
                 padding: '16px 20px',
-                borderBottom: '1px solid #374151',
+                borderBottom: '1px solid var(--border-color)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                background: '#111827',
+                background: 'var(--bg-secondary)',
                 zIndex: 10
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <button onClick={() => navigate('/chats', { replace: true })} style={{ background: 'none', border: 'none', color: '#9ca3af', fontSize: '24px', fontWeight: '700', cursor: 'pointer' }}>
+                    <button onClick={() => navigate('/chats', { replace: true })} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '24px', fontWeight: '700', cursor: 'pointer' }}>
                         X
                     </button>
                     <h2 style={{ fontSize: '18px', fontWeight: '700', margin: 0 }}>Share to...</h2>
@@ -209,7 +209,7 @@ const ShareTargetPage = () => {
                     onClick={handleSend}
                     disabled={selectedChats.size === 0 || isProcessing}
                     style={{
-                        background: selectedChats.size > 0 ? '#3b82f6' : '#374151',
+                        background: selectedChats.size > 0 ? 'var(--accent-text)' : 'var(--border-color)',
                         color: 'white',
                         border: 'none',
                         padding: '8px 16px',
@@ -228,7 +228,7 @@ const ShareTargetPage = () => {
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }} className="hide-scrollbar">
                 {error && (
-                    <div style={{ padding: '12px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', borderRadius: '8px', color: '#ef4444', marginBottom: '16px' }}>
+                    <div style={{ padding: '12px', background: 'var(--danger-tint)', border: '1px solid var(--danger-color)', borderRadius: '8px', color: 'var(--danger-color)', marginBottom: '16px' }}>
                         {error}
                     </div>
                 )}
@@ -236,7 +236,7 @@ const ShareTargetPage = () => {
                 {sharedItems.length > 0 ? (
                     <>
                         {renderPreview()}
-                        <div style={{ marginBottom: '12px', color: '#9ca3af', fontSize: '14px', fontWeight: '600' }}>RECENT CHATS</div>
+                        <div style={{ marginBottom: '12px', color: 'var(--text-secondary)', fontSize: '14px', fontWeight: '600' }}>RECENT CHATS</div>
                     </>
                 ) : (
                     <div style={{
@@ -246,14 +246,14 @@ const ShareTargetPage = () => {
                         justifyContent: 'center',
                         padding: '60px 20px',
                         textAlign: 'center',
-                        color: '#9ca3af'
+                        color: 'var(--text-secondary)'
                     }}>
                         <div style={{ 
                             width: '80px', height: '80px', borderRadius: '50%', 
-                            background: '#1f2937', display: 'flex', alignItems: 'center', 
+                            background: 'var(--bg-card)', display: 'flex', alignItems: 'center', 
                             justifyContent: 'center', marginBottom: '20px' 
                         }}>
-                            <Send size={40} color="#3b82f6" opacity={0.5} />
+                            <Send size={40} color="var(--accent-text)" opacity={0.5} />
                         </div>
                         <h3 style={{ color: 'white', fontSize: '18px', marginBottom: '8px' }}>No items to share</h3>
                         <p style={{ fontSize: '14px', maxWidth: '300px', lineHeight: '1.5' }}>
@@ -264,7 +264,7 @@ const ShareTargetPage = () => {
                             style={{
                                 marginTop: '24px',
                                 padding: '10px 24px',
-                                background: '#3b82f6',
+                                background: 'var(--accent-solid)',
                                 color: 'white',
                                 border: 'none',
                                 borderRadius: '12px',
@@ -289,8 +289,8 @@ const ShareTargetPage = () => {
                                     gap: '12px',
                                     padding: '12px',
                                     borderRadius: '12px',
-                                    background: selectedChats.has(chat.chatId) ? 'rgba(59, 130, 246, 0.1)' : '#1f2937',
-                                    border: `1px solid ${selectedChats.has(chat.chatId) ? '#3b82f6' : '#374151'}`,
+                                    background: selectedChats.has(chat.chatId) ? 'var(--accent-tint)' : 'var(--bg-card)',
+                                    border: `1px solid ${selectedChats.has(chat.chatId) ? 'var(--accent-solid)' : 'var(--border-color)'}`,
                                     cursor: 'pointer',
                                     transition: 'all 0.15s ease'
                                 }}
@@ -299,7 +299,7 @@ const ShareTargetPage = () => {
                                     width: '48px',
                                     height: '48px',
                                     borderRadius: '14px',
-                                    background: '#374151',
+                                    background: 'var(--border-color)',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
@@ -308,22 +308,22 @@ const ShareTargetPage = () => {
                                     {chat.profile ? (
                                         <img src={`${API}/files/media/serve/${chat.profile}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
                                     ) : (
-                                        <User size={24} color="#9ca3af" />
+                                        <User size={24} color="var(--text-secondary)" />
                                     )}
                                 </div>
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ fontWeight: '600', fontSize: '15px', color: 'white' }}>{chat.chatName}</div>
-                                    <div style={{ fontSize: '12px', color: '#9ca3af' }}>Last active {new Date(lastMessages[chat.chatId]?.timestamp || 0).toLocaleDateString()}</div>
+                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Last active {new Date(lastMessages[chat.chatId]?.timestamp || 0).toLocaleDateString()}</div>
                                 </div>
                                 <div style={{
                                     width: '22px',
                                     height: '22px',
                                     borderRadius: '6px',
-                                    border: '2px solid #3b82f6',
+                                    border: '2px solid var(--accent-solid)',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    background: selectedChats.has(chat.chatId) ? '#3b82f6' : 'transparent',
+                                    background: selectedChats.has(chat.chatId) ? 'var(--accent-text)' : 'transparent',
                                     transition: 'all 0.1s ease'
                                 }}>
                                     {selectedChats.has(chat.chatId) && <Check size={14} color="white" strokeWidth={3} />}
@@ -347,15 +347,15 @@ const ShareTargetPage = () => {
                     zIndex: 100,
                     padding: '40px'
                 }}>
-                    <Loader2 size={48} className="animate-spin" color="#3b82f6" style={{ marginBottom: '20px' }} />
+                    <Loader2 size={48} className="animate-spin" color="var(--accent-text)" style={{ marginBottom: '20px' }} />
                     <div style={{ fontSize: '20px', fontWeight: '700', marginBottom: '8px' }}>Sharing content...</div>
-                    <div style={{ color: '#9ca3af' }}>{progress.label}</div>
+                    <div style={{ color: 'var(--text-secondary)' }}>{progress.label}</div>
                     
-                    <div style={{ width: '240px', height: '4px', background: '#374151', borderRadius: '2px', marginTop: '24px', overflow: 'hidden' }}>
+                    <div style={{ width: '240px', height: '4px', background: 'var(--border-color)', borderRadius: '2px', marginTop: '24px', overflow: 'hidden' }}>
                         <div style={{ 
                             width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%`, 
                             height: '100%', 
-                            background: '#3b82f6',
+                            background: 'var(--accent-solid)',
                             transition: 'width 0.3s ease'
                         }} />
                     </div>

@@ -329,10 +329,10 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
     return (
       <div style={{
         padding: isMobile ? '10px 12px' : '12px 16px',
-        backgroundColor: '#374151',
+        backgroundColor: 'var(--border-color)',
         borderRadius: '10px',
         fontSize: isMobile ? '12px' : '13px',
-        color: '#9ca3af',
+        color: 'var(--text-secondary)',
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
@@ -341,7 +341,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
           width: '14px',
           height: '14px',
           border: '2px solid #4b5563',
-          borderTop: '2px solid #3b82f6',
+          borderTop: '2px solid var(--accent-solid)',
           borderRadius: '50%',
           animation: 'spin 1s linear infinite',
         }} />
@@ -379,7 +379,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
           padding: isMobile ? '10px 12px' : '12px 16px',
           backgroundColor: '#1e3a8a',
           borderRadius: '12px',
-          border: '2px solid #3b82f6',
+          border: '2px solid var(--accent-solid)',
           maxWidth: '100%',
           cursor: isMobile ? 'pointer' : 'default',
         }}>
@@ -445,7 +445,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
               alignItems: 'center',
               gap: '4px',
               fontSize: isMobile ? '11px' : '12px',
-              color: isDeadlinePassed() ? '#fca5a5' : '#93c5fd',
+              color: isDeadlinePassed() ? '#fca5a5' : 'var(--accent-text)',
               fontWeight: '500',
             }}>
               <Clock size={isMobile ? 14 : 16} />
@@ -474,7 +474,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                   transition: 'all 0.2s',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#2563eb';
+                  e.currentTarget.style.backgroundColor = 'var(--accent-text)';
                   e.currentTarget.style.transform = 'scale(1.02)';
                 }}
                 onMouseLeave={(e) => {
@@ -525,7 +525,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                 backgroundColor: 'var(--message-bg-incoming)',
                 borderRadius: '16px',
                 boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-                border: '1px solid #374151',
+                border: '1px solid var(--border-color)',
                 zIndex: 1000,
                 width: isMobile ? '95%' : '90%',
                 maxWidth: '700px',
@@ -539,7 +539,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
             {/* Header */}
             <div style={{
               padding: isMobile ? '16px' : '20px',
-              borderBottom: '1px solid #374151',
+              borderBottom: '1px solid var(--border-color)',
               display: 'flex',
               alignItems: 'flex-start',
               gap: '12px',
@@ -573,7 +573,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                   alignItems: 'center',
                   gap: '4px',
                   fontSize: isMobile ? '12px' : '13px',
-                  color: assignment.status === 'submitted' ? '#10b981' : '#9ca3af',
+                  color: assignment.status === 'submitted' ? 'var(--success-color)' : 'var(--text-secondary)',
                   fontWeight: '500',
                 }}>
                   {assignment.status === 'active' ? <CheckCircle size={14} /> : <span style={{ fontSize: '14px', fontWeight: '700' }}>X</span>}
@@ -586,10 +586,10 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                 style={{
                   width: isMobile ? '32px' : '36px',
                   height: isMobile ? '32px' : '36px',
-                  backgroundColor: '#374151',
+                  backgroundColor: 'var(--border-color)',
                   border: 'none',
                   borderRadius: '8px',
-                  color: '#9ca3af',
+                  color: 'var(--text-secondary)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -602,8 +602,8 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                   e.currentTarget.style.color = 'var(--text-primary)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#374151';
-                  e.currentTarget.style.color = '#9ca3af';
+                  e.currentTarget.style.backgroundColor = 'var(--border-color)';
+                  e.currentTarget.style.color = 'var(--text-secondary)';
                 }}
               >
                  <span style={{ fontSize: '20px', fontWeight: '700' }}>X</span>
@@ -622,7 +622,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                   margin: '0 0 12px 0',
                   fontSize: isMobile ? '14px' : '15px',
                   fontWeight: '600',
-                  color: '#60a5fa',
+                  color: 'var(--accent-text)',
                 }}>
                   Description
                 </h4>
@@ -646,7 +646,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
               }}>
                 <div style={{
                   padding: isMobile ? '12px' : '14px',
-                  backgroundColor: '#374151',
+                  backgroundColor: 'var(--border-color)',
                   borderRadius: '10px',
                   border: '1px solid #4b5563',
                 }}>
@@ -656,10 +656,10 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                     gap: '8px',
                     marginBottom: '6px',
                   }}>
-                    <Calendar size={16} color="#60a5fa" />
+                    <Calendar size={16} color="var(--accent-text)" />
                     <span style={{
                       fontSize: isMobile ? '11px' : '12px',
-                      color: '#9ca3af',
+                      color: 'var(--text-secondary)',
                       fontWeight: '500',
                     }}>
                       Deadline
@@ -688,7 +688,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
 
                 <div style={{
                   padding: isMobile ? '12px' : '14px',
-                  backgroundColor: '#374151',
+                  backgroundColor: 'var(--border-color)',
                   borderRadius: '10px',
                   border: '1px solid #4b5563',
                 }}>
@@ -698,10 +698,10 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                     gap: '8px',
                     marginBottom: '6px',
                   }}>
-                    <Award size={16} color="#60a5fa" />
+                    <Award size={16} color="var(--accent-text)" />
                     <span style={{
                       fontSize: isMobile ? '11px' : '12px',
-                      color: '#9ca3af',
+                      color: 'var(--text-secondary)',
                       fontWeight: '500',
                     }}>
                       Maximum Marks
@@ -725,7 +725,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                     margin: '0 0 12px 0',
                     fontSize: isMobile ? '14px' : '15px',
                     fontWeight: '600',
-                    color: '#60a5fa',
+                    color: 'var(--accent-text)',
                   }}>
                     Attachments
                   </h4>
@@ -755,7 +755,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                   style={{
                     width: '100%',
                     padding: isMobile ? '12px' : '14px',
-                    backgroundColor: isDeadlinePassed() ? '#4b5563' : '#10b981',
+                    backgroundColor: isDeadlinePassed() ? '#4b5563' : 'var(--success-color)',
                     color: 'var(--text-primary)',
                     border: 'none',
                     borderRadius: '10px',
@@ -771,13 +771,13 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                   }}
                   onMouseEnter={(e) => {
                     if (!isDeadlinePassed()) {
-                      e.currentTarget.style.backgroundColor = '#059669';
+                      e.currentTarget.style.backgroundColor = 'var(--success-color)';
                       e.currentTarget.style.transform = 'translateY(-2px)';
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!isDeadlinePassed()) {
-                      e.currentTarget.style.backgroundColor = '#10b981';
+                      e.currentTarget.style.backgroundColor = 'var(--success-color)';
                       e.currentTarget.style.transform = 'translateY(0)';
                     }
                   }}
@@ -791,9 +791,9 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
               {userRole === 'student' && showSubmissionForm && (
                 <div style={{
                   padding: isMobile ? '16px' : '20px',
-                  backgroundColor: '#111827',
+                  backgroundColor: 'var(--bg-secondary)',
                   borderRadius: '12px',
-                  border: '2px solid #3b82f6',
+                  border: '2px solid var(--accent-solid)',
                 }}>
                   <h4 style={{
                     margin: '0 0 16px 0',
@@ -841,14 +841,14 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                               backgroundColor: 'var(--message-bg-incoming)',
                               borderRadius: '10px',
                               marginBottom: '8px',
-                              border: '1px solid #374151',
+                              border: '1px solid var(--border-color)',
                               display: 'flex',
                               flexDirection: 'column',
                               gap: '6px'
                             }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                              <FileText size={18} color="#60a5fa" />
+                              <FileText size={18} color="var(--accent-text)" />
                               <span style={{
                                 flex: 1,
                                 fontSize: '13px',
@@ -862,7 +862,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                               {!submitting && (
                                 <button
                                   onClick={() => removeFile(index)}
-                                  style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer' }}
+                                  style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}
                                 >
                                   <span style={{ fontSize: '16px', fontWeight: '700' }}>X</span>
                                 </button>
@@ -871,10 +871,10 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
 
                             {state && (
                               <div style={{ width: '100%' }}>
-                                <div style={{ height: '3px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
-                                  <div style={{ width: `${state.progress}%`, height: '100%', backgroundColor: state.stage === 'done' ? '#10b981' : '#3b82f6', transition: 'width 0.3s' }} />
+                                <div style={{ height: '3px', backgroundColor: 'var(--bg-hover)', borderRadius: '2px', overflow: 'hidden' }}>
+                                  <div style={{ width: `${state.progress}%`, height: '100%', backgroundColor: state.stage === 'done' ? 'var(--success-color)' : 'var(--accent-text)', transition: 'width 0.3s' }} />
                                 </div>
-                                <div style={{ fontSize: '10px', color: '#6b7280', marginTop: '4px', display: 'flex', justifyContent: 'space-between' }}>
+                                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', justifyContent: 'space-between' }}>
                                   <span>{STAGE_LABELS[state.stage] || 'Waiting...'}</span>
                                   <span>{state.progress}%</span>
                                 </div>
@@ -906,7 +906,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                         flex: 1,
                         minWidth: isMobile ? '100%' : '140px',
                         padding: isMobile ? '10px 16px' : '11px 18px',
-                        backgroundColor: '#374151',
+                        backgroundColor: 'var(--border-color)',
                         color: 'var(--text-primary)',
                         border: '1px solid #4b5563',
                         borderRadius: '8px',
@@ -921,10 +921,10 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.backgroundColor = '#4b5563';
-                        e.currentTarget.style.borderColor = '#60a5fa';
+                        e.currentTarget.style.borderColor = 'var(--accent-solid)';
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#374151';
+                        e.currentTarget.style.backgroundColor = 'var(--border-color)';
                         e.currentTarget.style.borderColor = '#4b5563';
                       }}
                     >
@@ -941,7 +941,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                         padding: isMobile ? '10px 16px' : '11px 18px',
                         backgroundColor: (submitting || (!submissionText.trim() && uploadedFiles.length === 0))
                           ? '#4b5563'
-                          : '#10b981',
+                          : 'var(--success-color)',
                         color: 'var(--text-primary)',
                         border: 'none',
                         borderRadius: '8px',
@@ -959,12 +959,12 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                       }}
                       onMouseEnter={(e) => {
                         if (!submitting && (submissionText.trim() || uploadedFiles.length > 0)) {
-                          e.currentTarget.style.backgroundColor = '#059669';
+                          e.currentTarget.style.backgroundColor = 'var(--success-color)';
                         }
                       }}
                       onMouseLeave={(e) => {
                         if (!submitting && (submissionText.trim() || uploadedFiles.length > 0)) {
-                          e.currentTarget.style.backgroundColor = '#10b981';
+                          e.currentTarget.style.backgroundColor = 'var(--success-color)';
                         }
                       }}
                     >
@@ -996,9 +996,9 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                 <div style={{
                   marginTop: '20px',
                   padding: isMobile ? '16px' : '20px',
-                  backgroundColor: '#111827',
+                  backgroundColor: 'var(--bg-secondary)',
                   borderRadius: '12px',
-                  border: '1px solid #374151',
+                  border: '1px solid var(--border-color)',
                 }}>
                   <h4 style={{
                     margin: '0 0 16px 0',
@@ -1009,7 +1009,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                     alignItems: 'center',
                     gap: '8px',
                   }}>
-                    <FileText size={18} color="#60a5fa" />
+                    <FileText size={18} color="var(--accent-text)" />
                     {userRole === 'faculty' ? 'Student Submissions' : 'Your Submitted Work'}
                   </h4>
 
@@ -1017,7 +1017,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                     <p style={{
                       margin: 0,
                       fontSize: isMobile ? '13px' : '14px',
-                      color: '#9ca3af',
+                      color: 'var(--text-secondary)',
                       textAlign: 'center',
                       padding: '20px',
                     }}>
@@ -1032,7 +1032,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                             padding: isMobile ? '12px' : '14px',
                             backgroundColor: 'var(--message-bg-incoming)',
                             borderRadius: '8px',
-                            border: '1px solid #374151',
+                            border: '1px solid var(--border-color)',
                           }}
                         >
                           <div style={{
@@ -1053,7 +1053,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                               <p style={{
                                 margin: 0,
                                 fontSize: isMobile ? '11px' : '12px',
-                                color: '#9ca3af',
+                                color: 'var(--text-secondary)',
                               }}>
                                 {submission.submittedAt ? `Submitted: ${formatDate(submission.submittedAt)}` : submission.timestamp ? `Submitted: ${formatDate(submission.timestamp)}` : 'No submission recorded'}
                               </p>
@@ -1061,12 +1061,12 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                             {submission.status === 'MISSING' ? (
                               <span style={{
                                 padding: '4px 10px',
-                                backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                                color: '#f87171',
+                                backgroundColor: 'var(--danger-tint)',
+                                color: 'var(--danger-color)',
                                 borderRadius: '6px',
                                 fontSize: '11px',
                                 fontWeight: '800',
-                                border: '1px solid rgba(239, 68, 68, 0.3)',
+                                border: '1px solid var(--danger-tint-border)',
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '4px',
@@ -1077,7 +1077,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                               <span style={{
                                 padding: '4px 10px',
                                 backgroundColor: 'rgba(16, 185, 129, 0.18)',
-                                color: '#34d399',
+                                color: 'var(--success-color)',
                                 borderRadius: '6px',
                                 fontSize: '11px',
                                 fontWeight: '800',
@@ -1096,7 +1096,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                                   : '#065f46',
                                 color: getParsedDate(submission.timestamp) > new Date(assignment.deadline)
                                   ? '#fca5a5'
-                                  : '#10b981',
+                                  : 'var(--success-color)',
                                 borderRadius: '6px',
                                 fontSize: '11px',
                                 fontWeight: '600',
@@ -1107,7 +1107,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                           </div>
                           
                           {submission.comment && (
-                            <p style={{ fontSize: '13px', color: '#e5e7eb', marginBottom: '8px', padding: '8px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '6px', whiteSpace: 'pre-wrap' }}>
+                            <p style={{ fontSize: '13px', color: 'var(--text-primary)', marginBottom: '8px', padding: '8px', backgroundColor: 'var(--bg-hover)', borderRadius: '6px', whiteSpace: 'pre-wrap' }}>
                               {submission.comment}
                             </p>
                           )}

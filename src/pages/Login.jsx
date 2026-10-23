@@ -231,7 +231,7 @@ function Login() {
                 <div style={styles.inputGroup}>
                   <label style={styles.label}>UserId or Email</label>
                   <div style={styles.inputWrapper}>
-                    <User size={18} color="var(--text-secondary, #94a3b8)" style={styles.inputIcon} />
+                    <User size={18} color="var(--text-secondary)" style={styles.inputIcon} />
                     <input
                       name="identifier"
                       required
@@ -253,7 +253,7 @@ function Login() {
                       style={{
                         background: 'none',
                         border: 'none',
-                        color: 'var(--accent-color, #3b82f6)',
+                        color: 'var(--accent-color)',
                         fontSize: '12px',
                         fontWeight: '600',
                         cursor: 'pointer',
@@ -264,7 +264,7 @@ function Login() {
                     </button>
                   </div>
                   <div style={styles.inputWrapper}>
-                    <Lock size={18} color="var(--text-secondary, #94a3b8)" style={styles.inputIcon} />
+                    <Lock size={18} color="var(--text-secondary)" style={styles.inputIcon} />
                     <input
                       name="password"
                       required
@@ -321,8 +321,8 @@ function Login() {
                     width: "48px",
                     height: "48px",
                     borderRadius: "50%",
-                    backgroundColor: "rgba(59, 130, 246, 0.15)",
-                    color: "var(--accent-color, #3b82f6)",
+                    backgroundColor: "var(--accent-tint)",
+                    color: "var(--accent-color)",
                     display: "inline-flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -348,7 +348,7 @@ function Login() {
                 <div style={styles.inputGroup}>
                   <label style={styles.label}>6-Digit 2FA Code</label>
                   <div style={styles.inputWrapper}>
-                    <KeyRound size={18} color="var(--text-secondary, #94a3b8)" style={styles.inputIcon} />
+                    <KeyRound size={18} color="var(--text-secondary)" style={styles.inputIcon} />
                     <input
                       ref={otpInputRef}
                       type="text"
@@ -437,8 +437,8 @@ const styles = {
     alignItems: "center",
     minHeight: "100vh",
     width: "100%",
-    background: "var(--bg-gradient, #0f172a)",
-    color: "var(--text-primary, #f8fafc)",
+    background: "var(--bg-gradient)",
+    color: "var(--text-primary)",
     fontFamily: "Inter, system-ui, sans-serif",
     padding: "20px",
     boxSizing: "border-box",
@@ -446,7 +446,7 @@ const styles = {
   brandName: {
     fontSize: "36px",
     fontWeight: "800",
-    color: "var(--text-primary, #f8fafc)",
+    color: "var(--text-primary)",
     marginBottom: "24px",
     letterSpacing: "1px",
     textShadow: "0 2px 10px rgba(0,0,0,0.2)",
@@ -454,10 +454,10 @@ const styles = {
   glassCard: {
     width: "100%",
     maxWidth: "420px",
-    background: "var(--bg-card, #1e293b)",
+    background: "var(--bg-card)",
     backdropFilter: "blur(12px)",
     WebkitBackdropFilter: "blur(12px)",
-    border: "1px solid var(--border-color, rgba(255,255,255,0.1))",
+    border: "1px solid var(--border-color))",
     borderRadius: "24px",
     padding: "36px 28px",
     boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
@@ -474,12 +474,12 @@ const styles = {
     margin: "0 0 8px 0",
     fontSize: "28px",
     fontWeight: "700",
-    color: "var(--text-primary, #f8fafc)",
+    color: "var(--text-primary)",
   },
   subtitle: {
     margin: "0",
     fontSize: "13px",
-    color: "var(--text-secondary, #94a3b8)",
+    color: "var(--text-secondary)",
     lineHeight: "1.4",
   },
   form: {
@@ -495,7 +495,7 @@ const styles = {
   label: {
     fontSize: "12px",
     fontWeight: "600",
-    color: "var(--text-secondary, #94a3b8)",
+    color: "var(--text-secondary)",
     textTransform: "uppercase",
     letterSpacing: "0.5px",
   },
@@ -514,10 +514,10 @@ const styles = {
     width: "100%",
     padding: "12px 14px 12px 40px",
     fontSize: "14px",
-    background: "var(--bg-secondary, #0f172a)",
-    border: "1px solid var(--border-color, #334155)",
+    background: "var(--bg-secondary)",
+    border: "1px solid var(--border-color)",
     borderRadius: "12px",
-    color: "var(--text-primary, #f8fafc)",
+    color: "var(--text-primary)",
     outline: "none",
     transition: "border-color 0.2s, box-shadow 0.2s",
     boxSizing: "border-box",
@@ -527,7 +527,7 @@ const styles = {
     right: "10px",
     background: "none",
     border: "none",
-    color: "var(--text-secondary, #94a3b8)",
+    color: "var(--text-secondary)",
     cursor: "pointer",
     padding: "4px",
     display: "flex",
@@ -540,9 +540,9 @@ const styles = {
     gap: "8px",
     padding: "10px 14px",
     borderRadius: "10px",
-    backgroundColor: "rgba(239, 68, 68, 0.15)",
-    border: "1px solid rgba(239, 68, 68, 0.3)",
-    color: "#f87171",
+    backgroundColor: "var(--danger-tint)",
+    border: "1px solid var(--danger-tint-border)",
+    color: "var(--danger-color)",
     fontSize: "13px",
     fontWeight: "500",
   },
@@ -554,7 +554,7 @@ const styles = {
     borderRadius: "10px",
     backgroundColor: "rgba(16, 185, 129, 0.15)",
     border: "1px solid rgba(16, 185, 129, 0.3)",
-    color: "#34d399",
+    color: "var(--success-color)",
     fontSize: "13px",
     fontWeight: "500",
     marginBottom: "12px",
@@ -562,7 +562,7 @@ const styles = {
   button: {
     width: "100%",
     padding: "14px",
-    background: "var(--accent-color, #3b82f6)",
+    background: "var(--accent-color)",
     color: "#ffffff",
     border: "none",
     borderRadius: "12px",
@@ -571,7 +571,7 @@ const styles = {
     cursor: "pointer",
     transition: "all 0.2s ease",
     marginTop: "6px",
-    boxShadow: "0 4px 15px rgba(59,130,246,0.3)",
+    boxShadow: "0 4px 15px color-mix(in srgb, var(--accent-solid) 45%, transparent)",
     boxSizing: "border-box",
     display: "flex",
     alignItems: "center",
@@ -581,7 +581,7 @@ const styles = {
   backBtn: {
     background: "none",
     border: "none",
-    color: "var(--text-secondary, #94a3b8)",
+    color: "var(--text-secondary)",
     fontSize: "13px",
     fontWeight: "600",
     cursor: "pointer",
@@ -592,10 +592,10 @@ const styles = {
     margin: "10px 0 0 0",
     textAlign: "center",
     fontSize: "13px",
-    color: "var(--text-secondary, #94a3b8)",
+    color: "var(--text-secondary)",
   },
   link: {
-    color: "var(--accent-color, #3b82f6)",
+    color: "var(--accent-color)",
     textDecoration: "none",
     fontWeight: "700",
   },

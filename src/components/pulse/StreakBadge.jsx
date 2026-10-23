@@ -83,10 +83,10 @@ export const getStreakTierData = (streak) => {
     colorName: 'Glowing Crimson (Red)',
     icon: '🔴🔥',
     style: {
-      backgroundColor: 'rgba(239, 68, 68, 0.2)',
+      backgroundColor: 'var(--danger-tint)',
       color: '#fca5a5',
-      border: '1px solid rgba(239, 68, 68, 0.5)',
-      boxShadow: '0 2px 8px rgba(239, 68, 68, 0.3)',
+      border: '1px solid var(--danger-tint-border)',
+      boxShadow: '0 2px 8px var(--danger-tint)',
     },
     className: 'crimson-fire-badge'
   };

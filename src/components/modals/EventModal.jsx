@@ -41,7 +41,7 @@ const EventModal = ({
     id: event?.id || event?.eventId,
     msgref: event?.msgref || event?.msgId,
     chatid: event?.chatid || event?.chatId,
-    color: event?.color || event?.eventColor || '#3b82f6',
+    color: event?.color || event?.eventColor || 'var(--accent-text)',
     isSync: event?.isSync ?? true,
     isSimulation: event?.isSimulation,
     // Group ecosystem fields
@@ -245,7 +245,7 @@ const EventModal = ({
         maxHeight: isPanel ? 'none' : '90vh',
         overflowY: 'auto',
         position: 'relative',
-        border: isPanel ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+        border: isPanel ? 'none' : '1px solid var(--border-color)',
         boxShadow: isPanel ? 'none' : '0 25px 50px -12px rgba(0, 0, 0, 0.6)',
         height: isPanel ? '100%' : 'auto',
         display: 'flex',
@@ -261,17 +261,17 @@ const EventModal = ({
           padding: '16px 24px', zIndex: 10,
           background: 'rgba(17, 24, 39, 0.95)',
           backdropFilter: 'blur(10px)',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+          borderBottom: '1px solid var(--border-color)',
           margin: '-24px -24px 20px -24px'
         }}>
-          <h3 style={{ margin: 0, color: '#f9fafb', fontSize: '18px', fontWeight: '700' }}>Event Details</h3>
+          <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '18px', fontWeight: '700' }}>Event Details</h3>
           <button
             onClick={onClose}
             style={{
-              background: 'rgba(255, 255, 255, 0.05)', border: 'none',
+              background: 'var(--bg-hover)', border: 'none',
               borderRadius: '50%', width: '36px', height: '36px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', color: '#9ca3af'
+              cursor: 'pointer', color: 'var(--text-secondary)'
             }}
           >
             <X size={18} />
@@ -285,10 +285,10 @@ const EventModal = ({
           <div style={{
             display: 'flex', alignItems: 'center', gap: '8px',
             padding: '6px 14px', borderRadius: '12px',
-            backgroundColor: 'rgba(59, 130, 246, 0.15)',
-            border: '1px solid rgba(59, 130, 246, 0.3)'
+            backgroundColor: 'var(--accent-tint)',
+            border: '1px solid var(--accent-tint-border)'
           }}>
-            <Calendar size={18} color="#60a5fa" />
+            <Calendar size={18} color="var(--accent-text)" />
             <span style={{ fontWeight: '600', color: '#f3f4f6', fontSize: '13px', textTransform: 'capitalize' }}>
               {isGroupContext ? 'Group Event' : 'Personal Event'}
             </span>
@@ -296,7 +296,7 @@ const EventModal = ({
           {formData.chatid && (() => {
             const chatName = getChatName(formData.chatid);
             return chatName ? (
-              <span style={{ fontSize: '13px', color: '#9ca3af', fontWeight: '500' }}>
+              <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '500' }}>
                 in {chatName}
               </span>
             ) : null;
@@ -307,10 +307,10 @@ const EventModal = ({
           <button
             onClick={onClose}
             style={{
-              background: 'rgba(255, 255, 255, 0.05)', border: 'none',
+              background: 'var(--bg-hover)', border: 'none',
               borderRadius: '50%', width: '36px', height: '36px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', color: '#9ca3af'
+              cursor: 'pointer', color: 'var(--text-secondary)'
             }}
           >
             <X size={18} />
@@ -323,8 +323,8 @@ const EventModal = ({
         <div style={{ marginBottom: '20px' }}>
           {formData.meetingType === 'online' && formData.meetingLink && (
             <div style={{
-              backgroundColor: 'rgba(59, 130, 246, 0.15)',
-              border: '1px solid rgba(59, 130, 246, 0.4)',
+              backgroundColor: 'var(--accent-tint)',
+              border: '1px solid var(--accent-tint-border)',
               borderRadius: '14px',
               padding: '14px 16px',
               display: 'flex',
@@ -332,9 +332,9 @@ const EventModal = ({
               justifyContent: 'space-between'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Video size={20} color="#60a5fa" />
+                <Video size={20} color="var(--accent-text)" />
                 <div>
-                  <span style={{ display: 'block', fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', fontWeight: '700' }}>
+                  <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>
                     Online Meeting
                   </span>
                   <span style={{ fontSize: '13px', color: '#f3f4f6', fontWeight: '600' }}>Google Meet / Zoom</span>
@@ -350,12 +350,12 @@ const EventModal = ({
                   gap: '6px',
                   padding: '8px 16px',
                   borderRadius: '10px',
-                  backgroundColor: '#2563eb',
+                  backgroundColor: 'var(--accent-solid)',
                   color: '#ffffff',
                   textDecoration: 'none',
                   fontSize: '13px',
                   fontWeight: '700',
-                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.4)'
+                  boxShadow: '0 4px 12px color-mix(in srgb, var(--accent-solid) 45%, transparent)'
                 }}
               >
                 Join Now <ExternalLink size={14} />
@@ -373,9 +373,9 @@ const EventModal = ({
               alignItems: 'center',
               gap: '10px'
             }}>
-              <MapPin size={20} color="#34d399" />
+              <MapPin size={20} color="var(--success-color)" />
               <div>
-                <span style={{ display: 'block', fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', fontWeight: '700' }}>
+                <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '700' }}>
                   Venue Location
                 </span>
                 <span style={{ fontSize: '13px', color: '#f3f4f6', fontWeight: '600' }}>{formData.location}</span>
@@ -395,7 +395,7 @@ const EventModal = ({
           borderRadius: '12px',
           backgroundColor: 'rgba(245, 158, 11, 0.15)',
           border: '1px solid rgba(245, 158, 11, 0.3)',
-          color: '#fbbf24',
+          color: 'var(--warning-color)',
           fontSize: '13px',
           marginBottom: '20px'
         }}>
@@ -414,7 +414,7 @@ const EventModal = ({
           placeholder="What's happening?"
           style={{
             width: '100%', padding: '14px 16px', borderRadius: '12px',
-            backgroundColor: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)',
+            backgroundColor: 'var(--bg-hover)', border: '1px solid var(--border-color)',
             color: '#f3f4f6', fontSize: '18px', fontWeight: '600', outline: 'none'
           }}
         />
@@ -429,7 +429,7 @@ const EventModal = ({
           placeholder="Add agenda or details..."
           style={{
             width: '100%', padding: '12px 16px', borderRadius: '12px',
-            backgroundColor: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)',
+            backgroundColor: 'var(--bg-hover)', border: '1px solid var(--border-color)',
             color: '#d1d5db', fontSize: '14px', outline: 'none', minHeight: '70px', resize: 'none'
           }}
         />
@@ -437,9 +437,9 @@ const EventModal = ({
 
       {/* Date & Time Section (Default 1-hr duration, 15-min strict intervals) */}
       <div style={{
-        backgroundColor: 'rgba(255, 255, 255, 0.03)',
+        backgroundColor: 'var(--bg-hover)',
         borderRadius: '16px', padding: '18px',
-        border: '1px solid rgba(255, 255, 255, 0.06)',
+        border: '1px solid var(--bg-hover)',
         marginBottom: '20px'
       }}>
         {/* Date */}
@@ -453,7 +453,7 @@ const EventModal = ({
             onChange={(e) => handleChange('date', e.target.value)}
             style={{
               width: '100%', padding: '10px 14px', borderRadius: '10px',
-              backgroundColor: 'rgba(0, 0, 0, 0.25)', border: '1px solid rgba(255, 255, 255, 0.1)',
+              backgroundColor: 'rgba(0, 0, 0, 0.25)', border: '1px solid var(--border-color)',
               color: '#f3f4f6', colorScheme: 'dark', cursor: 'pointer'
             }}
           />
@@ -463,18 +463,18 @@ const EventModal = ({
         {!isEditingTime ? (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f3f4f6', fontSize: '15px', fontWeight: '600' }}>
-              <Clock size={16} color="#60a5fa" />
+              <Clock size={16} color="var(--accent-text)" />
               <span>{formatDisplayTime(formData.startTime)}</span>
-              <ArrowRight size={14} color="#6b7280" />
+              <ArrowRight size={14} color="var(--text-muted)" />
               <span>{formatDisplayTime(formData.endTime)}</span>
-              <span style={{ fontSize: '12px', color: '#9ca3af', fontWeight: '400' }}>(1 hr default)</span>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '400' }}>(1 hr default)</span>
             </div>
             <button
               onClick={startEditingTime}
               style={{
                 padding: '6px 14px', borderRadius: '8px',
-                backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa',
-                border: '1px solid rgba(59, 130, 246, 0.3)', fontSize: '12px', fontWeight: '600', cursor: 'pointer'
+                backgroundColor: 'var(--accent-tint)', color: 'var(--accent-text)',
+                border: '1px solid var(--accent-tint-border)', fontSize: '12px', fontWeight: '600', cursor: 'pointer'
               }}
             >
               Change
@@ -485,7 +485,7 @@ const EventModal = ({
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               {/* Start time 15-min strict */}
               <div>
-                <span style={{ fontSize: '11px', color: '#9ca3af', display: 'block', marginBottom: '4px' }}>START</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>START</span>
                 <div style={{ display: 'flex', gap: '4px' }}>
                   <select
                     value={editTime.startHour}
@@ -517,7 +517,7 @@ const EventModal = ({
 
               {/* End time 15-min strict */}
               <div>
-                <span style={{ fontSize: '11px', color: '#9ca3af', display: 'block', marginBottom: '4px' }}>END</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>END</span>
                 <div style={{ display: 'flex', gap: '4px' }}>
                   <select
                     value={editTime.endHour}
@@ -549,10 +549,10 @@ const EventModal = ({
             </div>
 
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={saveTimeChanges} style={{ ...smallBtnStyle, backgroundColor: '#3b82f6', color: '#fff' }}>
+              <button onClick={saveTimeChanges} style={{ ...smallBtnStyle, backgroundColor: 'var(--accent-solid)', color: 'var(--text-on-accent)' }}>
                 Save Time
               </button>
-              <button onClick={() => setIsEditingTime(false)} style={{ ...smallBtnStyle, backgroundColor: 'rgba(255, 255, 255, 0.05)', color: '#9ca3af' }}>
+              <button onClick={() => setIsEditingTime(false)} style={{ ...smallBtnStyle, backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)' }}>
                 Cancel
               </button>
             </div>
@@ -562,24 +562,24 @@ const EventModal = ({
 
       {/* Reminder Setting (Default: 1 hr) */}
       <div style={{
-        backgroundColor: 'rgba(255, 255, 255, 0.03)',
+        backgroundColor: 'var(--bg-hover)',
         borderRadius: '16px', padding: '16px',
-        border: '1px solid rgba(255, 255, 255, 0.06)',
+        border: '1px solid var(--bg-hover)',
         marginBottom: '20px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Bell size={16} color="#f59e0b" />
-          <span style={{ fontSize: '13px', fontWeight: '600', color: '#e5e7eb' }}>Reminder</span>
+          <Bell size={16} color="var(--warning-color)" />
+          <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Reminder</span>
         </div>
         <select
           value={formData.reminderOffset}
           onChange={(e) => handleChange('reminderOffset', Number(e.target.value))}
           style={{
             padding: '6px 12px', borderRadius: '8px',
-            backgroundColor: 'rgba(0, 0, 0, 0.3)', border: '1px solid rgba(255, 255, 255, 0.1)',
+            backgroundColor: 'rgba(0, 0, 0, 0.3)', border: '1px solid var(--border-color)',
             color: '#f3f4f6', fontSize: '13px', outline: 'none'
           }}
         >
@@ -594,8 +594,8 @@ const EventModal = ({
       {/* GROUP VISIBILITY & SCOPE CONTROLS (IF CREATING IN GROUP) */}
       {isGroupContext && (
         <div style={{
-          backgroundColor: 'rgba(59, 130, 246, 0.08)',
-          border: '1px solid rgba(59, 130, 246, 0.25)',
+          backgroundColor: 'var(--accent-tint)',
+          border: '1px solid var(--accent-tint)',
           borderRadius: '16px',
           padding: '16px',
           marginBottom: '20px',
@@ -604,7 +604,7 @@ const EventModal = ({
           gap: '12px'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '13px', fontWeight: '700', color: '#60a5fa' }}>
+            <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--accent-text)' }}>
               Group Sharing & Scope
             </span>
             {/* Visibility Toggle (Default: ON) */}
@@ -618,7 +618,7 @@ const EventModal = ({
                 padding: '4px 10px',
                 borderRadius: '8px',
                 border: 'none',
-                backgroundColor: formData.isGroupVisible ? '#2563eb' : 'rgba(255, 255, 255, 0.1)',
+                backgroundColor: formData.isGroupVisible ? 'var(--accent-text)' : 'var(--border-color)',
                 color: '#ffffff',
                 fontSize: '11px',
                 fontWeight: '700',
@@ -629,7 +629,7 @@ const EventModal = ({
             </button>
           </div>
 
-          <p style={{ margin: 0, fontSize: '12px', color: '#9ca3af', lineHeight: '1.4' }}>
+          <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
             {formData.isGroupVisible
               ? 'Group members will see this in the group calendar. Toggle OFF if you want to keep it personal.'
               : 'This event will be created strictly on your personal calendar.'}
@@ -642,9 +642,9 @@ const EventModal = ({
                 onClick={() => handleScopeChange('ALL')}
                 style={{
                   flex: 1, padding: '8px', borderRadius: '10px',
-                  border: formData.scope === 'ALL' ? '1px solid #3b82f6' : '1px solid rgba(255, 255, 255, 0.1)',
-                  backgroundColor: formData.scope === 'ALL' ? 'rgba(59, 130, 246, 0.25)' : 'transparent',
-                  color: formData.scope === 'ALL' ? '#ffffff' : '#9ca3af',
+                  border: formData.scope === 'ALL' ? '1px solid var(--accent-solid)' : '1px solid var(--border-color)',
+                  backgroundColor: formData.scope === 'ALL' ? 'var(--accent-tint)' : 'transparent',
+                  color: formData.scope === 'ALL' ? '#ffffff' : 'var(--text-secondary)',
                   fontSize: '12px', fontWeight: '600', cursor: 'pointer'
                 }}
               >
@@ -655,9 +655,9 @@ const EventModal = ({
                 onClick={() => handleScopeChange('PERSONAL')}
                 style={{
                   flex: 1, padding: '8px', borderRadius: '10px',
-                  border: formData.scope === 'PERSONAL' ? '1px solid #3b82f6' : '1px solid rgba(255, 255, 255, 0.1)',
-                  backgroundColor: formData.scope === 'PERSONAL' ? 'rgba(59, 130, 246, 0.25)' : 'transparent',
-                  color: formData.scope === 'PERSONAL' ? '#ffffff' : '#9ca3af',
+                  border: formData.scope === 'PERSONAL' ? '1px solid var(--accent-solid)' : '1px solid var(--border-color)',
+                  backgroundColor: formData.scope === 'PERSONAL' ? 'var(--accent-tint)' : 'transparent',
+                  color: formData.scope === 'PERSONAL' ? '#ffffff' : 'var(--text-secondary)',
                   fontSize: '12px', fontWeight: '600', cursor: 'pointer'
                 }}
               >
@@ -669,14 +669,14 @@ const EventModal = ({
       )}
 
       {/* COLLAPSIBLE ADDITIONAL INFORMATION (PURELY OPTIONAL: ONLINE/OFFLINE, MEET LINKS, VENUE) */}
-      <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '16px', marginBottom: '24px' }}>
+      <div style={{ borderTop: '1px solid var(--bg-hover)', paddingTop: '16px', marginBottom: '24px' }}>
         <button
           type="button"
           onClick={() => setShowAdditional(!showAdditional)}
           style={{
             background: 'none',
             border: 'none',
-            color: '#60a5fa',
+            color: 'var(--accent-text)',
             fontSize: '13px',
             fontWeight: '600',
             cursor: 'pointer',
@@ -693,7 +693,7 @@ const EventModal = ({
         {showAdditional && (
           <div style={{
             marginTop: '14px',
-            backgroundColor: 'rgba(255, 255, 255, 0.03)',
+            backgroundColor: 'var(--bg-hover)',
             borderRadius: '14px',
             padding: '16px',
             display: 'flex',
@@ -708,9 +708,9 @@ const EventModal = ({
                   onClick={() => handleChange('meetingType', 'online')}
                   style={{
                     flex: 1, padding: '8px', borderRadius: '8px',
-                    border: formData.meetingType === 'online' ? '1px solid #3b82f6' : '1px solid rgba(255, 255, 255, 0.1)',
-                    backgroundColor: formData.meetingType === 'online' ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
-                    color: formData.meetingType === 'online' ? '#60a5fa' : '#9ca3af',
+                    border: formData.meetingType === 'online' ? '1px solid var(--accent-solid)' : '1px solid var(--border-color)',
+                    backgroundColor: formData.meetingType === 'online' ? 'var(--accent-tint-border)' : 'transparent',
+                    color: formData.meetingType === 'online' ? 'var(--accent-text)' : 'var(--text-secondary)',
                     fontWeight: '600', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
                   }}
                 >
@@ -721,9 +721,9 @@ const EventModal = ({
                   onClick={() => handleChange('meetingType', 'offline')}
                   style={{
                     flex: 1, padding: '8px', borderRadius: '8px',
-                    border: formData.meetingType === 'offline' ? '1px solid #10b981' : '1px solid rgba(255, 255, 255, 0.1)',
+                    border: formData.meetingType === 'offline' ? '1px solid var(--success-color)' : '1px solid var(--border-color)',
                     backgroundColor: formData.meetingType === 'offline' ? 'rgba(16, 185, 129, 0.2)' : 'transparent',
-                    color: formData.meetingType === 'offline' ? '#34d399' : '#9ca3af',
+                    color: formData.meetingType === 'offline' ? 'var(--success-color)' : 'var(--text-secondary)',
                     fontWeight: '600', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
                   }}
                 >
@@ -742,7 +742,7 @@ const EventModal = ({
                   onChange={(e) => handleChange('meetingLink', e.target.value)}
                   style={{
                     width: '100%', padding: '10px 14px', borderRadius: '10px',
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)',
+                    backgroundColor: 'var(--bg-hover)', border: '1px solid var(--border-color)',
                     color: '#f3f4f6', fontSize: '13px', outline: 'none'
                   }}
                 />
@@ -757,7 +757,7 @@ const EventModal = ({
                   onChange={(e) => handleChange('location', e.target.value)}
                   style={{
                     width: '100%', padding: '10px 14px', borderRadius: '10px',
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)',
+                    backgroundColor: 'var(--bg-hover)', border: '1px solid var(--border-color)',
                     color: '#f3f4f6', fontSize: '13px', outline: 'none'
                   }}
                 />
@@ -774,10 +774,10 @@ const EventModal = ({
             onClick={handleAddToggle}
             style={{
               width: '100%', padding: '16px', borderRadius: '14px',
-              backgroundColor: formData.isAdded ? '#059669' : '#3b82f6',
+              backgroundColor: formData.isAdded ? 'var(--success-color)' : 'var(--accent-text)',
               color: '#ffffff', border: 'none', fontWeight: '700', fontSize: '16px',
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
-              boxShadow: '0 10px 20px -5px rgba(59, 130, 246, 0.4)'
+              boxShadow: '0 10px 20px -5px color-mix(in srgb, var(--accent-solid) 45%, transparent)'
             }}
           >
             {formData.isAdded ? <><Check size={20} /> Added to Calendar</> : <><Calendar size={20} /> Add to Calendar</>}
@@ -788,8 +788,8 @@ const EventModal = ({
               onClick={onCancelEvent}
               style={{
                 flex: 1, padding: '14px', borderRadius: '12px',
-                backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#ef4444',
-                border: '1px solid rgba(239, 68, 68, 0.3)', fontWeight: '600',
+                backgroundColor: 'var(--danger-tint)', color: 'var(--danger-color)',
+                border: '1px solid var(--danger-tint-border)', fontWeight: '600',
                 cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
               }}
             >
@@ -824,7 +824,7 @@ const labelStyle = {
   display: 'block',
   fontSize: '12px',
   fontWeight: '600',
-  color: '#9ca3af',
+  color: 'var(--text-secondary)',
   marginBottom: '6px',
   textTransform: 'uppercase'
 };
@@ -834,7 +834,7 @@ const timeSelectStyle = {
   padding: '8px',
   borderRadius: '8px',
   backgroundColor: 'rgba(0, 0, 0, 0.3)',
-  border: '1px solid rgba(255, 255, 255, 0.1)',
+  border: '1px solid var(--border-color)',
   color: '#f3f4f6',
   outline: 'none',
   fontSize: '13px'

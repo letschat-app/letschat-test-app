@@ -437,12 +437,139 @@ export default function LandingPage() {
             flex-direction: row-reverse;
           }
         }
+        .landing-nav {
+          position: sticky;
+          top: 0;
+          z-index: 100;
+          background: rgba(248, 250, 252, 0.85);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          border-bottom: 1px solid #e2e8f0;
+          padding: 12px 24px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          box-sizing: border-box;
+          width: 100%;
+        }
+        .landing-nav-logo {
+          font-size: 20px;
+          font-weight: 800;
+          background: linear-gradient(135deg, #6366f1, #8b5cf6);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          flex-shrink: 0;
+          user-select: none;
+        }
+        .landing-nav-actions {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex-shrink: 0;
+          flex-wrap: nowrap;
+        }
+        .landing-nav-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          border-radius: 10px;
+          padding: 8px 16px;
+          font-size: 13.5px;
+          font-weight: 600;
+          cursor: pointer;
+          white-space: nowrap;
+          flex-shrink: 0;
+          transition: all 0.15s ease;
+          text-decoration: none;
+        }
+        .landing-nav-download {
+          background: linear-gradient(135deg, #6366f1, #8b5cf6);
+          color: #ffffff;
+          border: none;
+          box-shadow: 0 2px 10px rgba(99, 102, 241, 0.25);
+        }
+        .landing-nav-download:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+        }
+        .landing-nav-login {
+          background: #ffffff;
+          color: #374151;
+          border: 1.5px solid #e2e8f0;
+        }
+        .landing-nav-login:hover {
+          background: #f1f5f9;
+        }
+        @media (max-width: 640px) {
+          .landing-nav {
+            padding: 10px 16px;
+            gap: 10px;
+          }
+          .landing-nav-logo {
+            font-size: 18px;
+          }
+          .landing-nav-actions {
+            gap: 8px;
+          }
+          .landing-nav-btn {
+            padding: 6px 12px;
+            font-size: 12.5px;
+          }
+        }
+        @media (max-width: 380px) {
+          .landing-nav {
+            padding: 8px 12px;
+            gap: 6px;
+          }
+          .landing-nav-logo {
+            font-size: 16.5px;
+          }
+          .landing-nav-actions {
+            gap: 6px;
+          }
+          .landing-nav-btn {
+            padding: 5px 9px;
+            font-size: 11.5px;
+            gap: 4px;
+          }
+        }
+        @media (max-width: 330px) {
+          .landing-nav {
+            padding: 6px 8px;
+          }
+          .landing-nav-btn {
+            padding: 5px 7px;
+            font-size: 11px;
+          }
+        }
       `}</style>
 
       {/* ── Nav ── */}
-      <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(248,250,252,0.85)', backdropFilter: 'blur(16px)', borderBottom: '1px solid #e2e8f0', padding: '14px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 20, fontWeight: 800, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>LetsChat</span>
-        <button onClick={() => navigate('/login')} style={{ background: 'none', border: '1.5px solid #e2e8f0', borderRadius: 10, padding: '7px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#374151' }}>Log in</button>
+      <nav className="landing-nav">
+        <span className="landing-nav-logo">LetsChat</span>
+        <div className="landing-nav-actions">
+          <button
+            onClick={handleInstall}
+            className="landing-nav-btn landing-nav-download"
+            title="Download LetsChat"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            <span>Download</span>
+          </button>
+          <button
+            onClick={() => navigate('/login')}
+            className="landing-nav-btn landing-nav-login"
+            title="Log in to LetsChat"
+          >
+            Log in
+          </button>
+        </div>
       </nav>
 
       {/* ── Hero ── */}
@@ -548,7 +675,7 @@ export default function LandingPage() {
               Get Started →
             </button>
             <button onClick={() => { if (deferredPrompt && !isInstalled) installApp(); navigate('/signin'); }} style={{ background: 'rgba(255,255,255,0.15)', color: '#fff', border: '1.5px solid rgba(255,255,255,0.3)', borderRadius: 14, padding: '14px 28px', fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>
-              ⬇ Install App
+              Download LetsChat
             </button>
           </div>
         </div>

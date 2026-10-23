@@ -43,7 +43,7 @@ export const DisplayNamePolicyModal = ({ isOpen, onClose }) => {
             {/* Header */}
             <div style={styles.header}>
               <div style={styles.iconBadge}>
-                <ShieldCheck size={22} color="#60a5fa" />
+                <ShieldCheck size={22} color="var(--accent-text)" />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <h3 style={styles.title}>Why Display Names Are Protected</h3>
@@ -75,7 +75,7 @@ export const DisplayNamePolicyModal = ({ isOpen, onClose }) => {
 
               <div style={styles.item}>
                 <div style={styles.itemIconWrap}>
-                  <ShieldAlert size={16} color="#f59e0b" />
+                  <ShieldAlert size={16} color="var(--warning-color)" />
                 </div>
                 <div>
                   <h4 style={styles.itemTitle}>Display Name (24h Cooldown)</h4>
@@ -87,7 +87,7 @@ export const DisplayNamePolicyModal = ({ isOpen, onClose }) => {
 
               <div style={styles.item}>
                 <div style={styles.itemIconWrap}>
-                  <UserCheck size={16} color="#10b981" />
+                  <UserCheck size={16} color="var(--success-color)" />
                 </div>
                 <div>
                   <h4 style={styles.itemTitle}>Custom Per-Chat Names</h4>
@@ -129,12 +129,12 @@ const styles = {
   },
   card: {
     backgroundColor: "#0d1527",
-    border: "1px solid rgba(59, 130, 246, 0.25)",
+    border: "1px solid var(--accent-tint)",
     borderRadius: "18px",
     width: "100%",
     maxWidth: "400px",
     padding: "20px 22px",
-    boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05)",
+    boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 0 1px var(--bg-hover)",
     boxSizing: "border-box",
     color: "#f8fafc",
     fontFamily: "Inter, system-ui, sans-serif",
@@ -145,14 +145,14 @@ const styles = {
     gap: "12px",
     marginBottom: "18px",
     paddingBottom: "14px",
-    borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+    borderBottom: "1px solid var(--bg-hover)",
   },
   iconBadge: {
     width: "40px",
     height: "40px",
     borderRadius: "12px",
-    backgroundColor: "rgba(59, 130, 246, 0.12)",
-    border: "1px solid rgba(59, 130, 246, 0.3)",
+    backgroundColor: "var(--accent-tint)",
+    border: "1px solid var(--accent-tint-border)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -168,12 +168,12 @@ const styles = {
   subtitle: {
     margin: "2px 0 0 0",
     fontSize: "12px",
-    color: "#94a3b8",
+    color: "var(--text-secondary)",
   },
   closeBtn: {
     background: "transparent",
     border: "none",
-    color: "#94a3b8",
+    color: "var(--text-secondary)",
     cursor: "pointer",
     padding: "4px",
     display: "flex",
@@ -198,7 +198,7 @@ const styles = {
     width: "28px",
     height: "28px",
     borderRadius: "8px",
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    backgroundColor: "var(--bg-hover)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -213,7 +213,7 @@ const styles = {
   itemText: {
     margin: 0,
     fontSize: "12px",
-    color: "#94a3b8",
+    color: "var(--text-secondary)",
     lineHeight: "1.45",
   },
   primaryBtn: {
@@ -222,7 +222,7 @@ const styles = {
     fontSize: "13px",
     fontWeight: "600",
     color: "#ffffff",
-    backgroundColor: "#2563eb",
+    backgroundColor: "var(--accent-solid)",
     border: "none",
     borderRadius: "10px",
     cursor: "pointer",

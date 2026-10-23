@@ -314,7 +314,7 @@ const InAppToast = () => {
         left: '16px',
         right: '16px',
         backgroundColor: 'var(--bg-card)',
-        border: `1.5px solid ${isEvent || isDaily || isAssignment ? '#fbbf24' : 'var(--accent-color)'}`,
+        border: `1.5px solid ${isEvent || isDaily || isAssignment ? 'var(--warning-color)' : 'var(--accent-color)'}`,
         borderRadius: '16px',
         padding: '14px 18px',
         display: 'flex',
@@ -340,9 +340,9 @@ const InAppToast = () => {
           justifyContent: 'center',
           flexShrink: 0
         }}>
-          {isDaily ? <Calendar size={24} color="#fbbf24" /> : 
-           isAssignment ? <ClipboardList size={24} color="#fbbf24" /> :
-           isEvent ? <Clock size={24} color="#fbbf24" /> : 
+          {isDaily ? <Calendar size={24} color="var(--warning-color)" /> : 
+           isAssignment ? <ClipboardList size={24} color="var(--warning-color)" /> :
+           isEvent ? <Clock size={24} color="var(--warning-color)" /> : 
            <MessageSquare size={24} color="white" />}
         </div>
 
@@ -364,7 +364,7 @@ const InAppToast = () => {
                 width: '14px',
                 height: '14px',
                 borderRadius: '50%',
-                backgroundColor: '#2563eb',
+                backgroundColor: 'var(--accent-solid)',
                 color: '#ffffff',
                 flexShrink: 0
               }}>
@@ -377,7 +377,7 @@ const InAppToast = () => {
               <span style={{ 
                 fontSize: '11px', 
                 backgroundColor: '#fbbf2420', 
-                color: '#fbbf24', 
+                color: 'var(--warning-color)', 
                 padding: '2px 8px', 
                 borderRadius: '10px',
                 fontWeight: '600'
@@ -426,7 +426,7 @@ const InAppToast = () => {
         </div>
 
         {(isDaily || isAssignment) && (
-          <div style={{ color: '#fbbf24' }}>
+          <div style={{ color: 'var(--warning-color)' }}>
             {isMaximized ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
           </div>
         )}
@@ -465,7 +465,7 @@ const InAppToast = () => {
             return (
               <div key={id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: '14px', color: 'var(--text-primary)', fontWeight: '500' }}>{ev.title}</span>
-                <span style={{ fontSize: '12px', color: '#fbbf24', fontWeight: '600' }}>{ev.startTime}</span>
+                <span style={{ fontSize: '12px', color: 'var(--warning-color)', fontWeight: '600' }}>{ev.startTime}</span>
               </div>
             );
           }) : (notification.assignments?.length > 0 ? (
@@ -473,7 +473,7 @@ const InAppToast = () => {
               <div key={ass.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '14px', color: 'var(--text-primary)', fontWeight: '500' }}>{ass.title}</span>
-                  <span style={{ fontSize: '12px', color: '#fbbf24', fontWeight: '600' }}>{getRelativeTimeText(ass, true)}</span>
+                  <span style={{ fontSize: '12px', color: 'var(--warning-color)', fontWeight: '600' }}>{getRelativeTimeText(ass, true)}</span>
                 </div>
                 <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{ass.chatName}</span>
               </div>

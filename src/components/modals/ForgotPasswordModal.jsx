@@ -218,7 +218,7 @@ export default function ForgotPasswordModal({ isOpen, onClose, onResetComplete, 
         {/* Header */}
         <div style={styles.header}>
           <div style={styles.iconCircle}>
-            {step === 1 ? <KeyRound size={22} color="#60a5fa" /> : step === 2 ? <ShieldCheck size={22} color="#60a5fa" /> : <Lock size={22} color="#10b981" />}
+            {step === 1 ? <KeyRound size={22} color="var(--accent-text)" /> : step === 2 ? <ShieldCheck size={22} color="var(--accent-text)" /> : <Lock size={22} color="var(--success-color)" />}
           </div>
           <h2 style={styles.title}>
             {step === 1 ? 'Forgot Password' : step === 2 ? 'Verify Reset Code' : 'Set New Password'}
@@ -234,11 +234,11 @@ export default function ForgotPasswordModal({ isOpen, onClose, onResetComplete, 
 
         {/* Step Progress Dots */}
         <div style={styles.progressRow}>
-          <div style={{ ...styles.progressDot, backgroundColor: step >= 1 ? '#3b82f6' : '#475569' }} />
-          <div style={{ ...styles.progressLine, backgroundColor: step >= 2 ? '#3b82f6' : '#334155' }} />
-          <div style={{ ...styles.progressDot, backgroundColor: step >= 2 ? '#3b82f6' : '#475569' }} />
-          <div style={{ ...styles.progressLine, backgroundColor: step >= 3 ? '#3b82f6' : '#334155' }} />
-          <div style={{ ...styles.progressDot, backgroundColor: step >= 3 ? '#10b981' : '#475569' }} />
+          <div style={{ ...styles.progressDot, backgroundColor: step >= 1 ? 'var(--accent-text)' : 'var(--text-muted)' }} />
+          <div style={{ ...styles.progressLine, backgroundColor: step >= 2 ? 'var(--accent-text)' : 'var(--border-color)' }} />
+          <div style={{ ...styles.progressDot, backgroundColor: step >= 2 ? 'var(--accent-text)' : 'var(--text-muted)' }} />
+          <div style={{ ...styles.progressLine, backgroundColor: step >= 3 ? 'var(--accent-text)' : 'var(--border-color)' }} />
+          <div style={{ ...styles.progressDot, backgroundColor: step >= 3 ? 'var(--success-color)' : 'var(--text-muted)' }} />
         </div>
 
         {/* Info / Success banner */}
@@ -263,7 +263,7 @@ export default function ForgotPasswordModal({ isOpen, onClose, onResetComplete, 
             <div style={styles.inputGroup}>
               <label style={styles.label}>UserId or Email</label>
               <div style={styles.inputWrapper}>
-                <Mail size={18} color="#94a3b8" style={styles.inputIcon} />
+                <Mail size={18} color="var(--text-secondary)" style={styles.inputIcon} />
                 <input
                   type="text"
                   required
@@ -327,7 +327,7 @@ export default function ForgotPasswordModal({ isOpen, onClose, onResetComplete, 
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: resendCooldown > 0 ? '#64748b' : '#60a5fa',
+                  color: resendCooldown > 0 ? 'var(--text-secondary)' : 'var(--accent-text)',
                   fontSize: '13px',
                   fontWeight: '600',
                   cursor: resendCooldown > 0 ? 'not-allowed' : 'pointer',
@@ -349,7 +349,7 @@ export default function ForgotPasswordModal({ isOpen, onClose, onResetComplete, 
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: '#94a3b8',
+                  color: 'var(--text-secondary)',
                   fontSize: '13px',
                   cursor: 'pointer'
                 }}
@@ -384,7 +384,7 @@ export default function ForgotPasswordModal({ isOpen, onClose, onResetComplete, 
             <div style={styles.inputGroup}>
               <label style={styles.label}>New Password</label>
               <div style={styles.inputWrapper}>
-                <Lock size={18} color="#94a3b8" style={styles.inputIcon} />
+                <Lock size={18} color="var(--text-secondary)" style={styles.inputIcon} />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
@@ -401,7 +401,7 @@ export default function ForgotPasswordModal({ isOpen, onClose, onResetComplete, 
                   onClick={() => setShowPassword(!showPassword)}
                   style={styles.eyeBtn}
                 >
-                  {showPassword ? <EyeOff size={18} color="#94a3b8" /> : <Eye size={18} color="#94a3b8" />}
+                  {showPassword ? <EyeOff size={18} color="var(--text-secondary)" /> : <Eye size={18} color="var(--text-secondary)" />}
                 </button>
               </div>
             </div>
@@ -409,7 +409,7 @@ export default function ForgotPasswordModal({ isOpen, onClose, onResetComplete, 
             <div style={styles.inputGroup}>
               <label style={styles.label}>Confirm New Password</label>
               <div style={styles.inputWrapper}>
-                <Lock size={18} color="#94a3b8" style={styles.inputIcon} />
+                <Lock size={18} color="var(--text-secondary)" style={styles.inputIcon} />
                 <input
                   type={showConfirmPassword ? 'text' : 'password'}
                   required
@@ -426,12 +426,12 @@ export default function ForgotPasswordModal({ isOpen, onClose, onResetComplete, 
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   style={styles.eyeBtn}
                 >
-                  {showConfirmPassword ? <EyeOff size={18} color="#94a3b8" /> : <Eye size={18} color="#94a3b8" />}
+                  {showConfirmPassword ? <EyeOff size={18} color="var(--text-secondary)" /> : <Eye size={18} color="var(--text-secondary)" />}
                 </button>
               </div>
             </div>
 
-            <button type="submit" disabled={loading || !newPassword || !confirmPassword} style={{ ...styles.primaryBtn, backgroundColor: '#10b981', opacity: (loading || !newPassword || !confirmPassword) ? 0.6 : 1 }}>
+            <button type="submit" disabled={loading || !newPassword || !confirmPassword} style={{ ...styles.primaryBtn, backgroundColor: 'var(--success-color)', opacity: (loading || !newPassword || !confirmPassword) ? 0.6 : 1 }}>
               {loading ? (
                 <>
                   <Loader2 size={18} className="animate-spin" />
@@ -472,8 +472,8 @@ const styles = {
   modal: {
     width: '100%',
     maxWidth: '440px',
-    backgroundColor: 'var(--bg-card, #1e293b)',
-    border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
+    backgroundColor: 'var(--bg-card)',
+    border: '1px solid var(--border-color))',
     borderRadius: '24px',
     padding: '32px 28px',
     boxShadow: '0 20px 40px rgba(0, 0, 0, 0.6)',
@@ -493,7 +493,7 @@ const styles = {
     width: '50px',
     height: '50px',
     borderRadius: '50%',
-    backgroundColor: 'rgba(59, 130, 246, 0.12)',
+    backgroundColor: 'var(--accent-tint)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -503,12 +503,12 @@ const styles = {
     margin: 0,
     fontSize: '22px',
     fontWeight: '700',
-    color: 'var(--text-primary, #f8fafc)'
+    color: 'var(--text-primary)'
   },
   subtitle: {
     margin: 0,
     fontSize: '13px',
-    color: 'var(--text-secondary, #94a3b8)',
+    color: 'var(--text-secondary)',
     lineHeight: '1.4'
   },
   progressRow: {
@@ -542,7 +542,7 @@ const styles = {
   label: {
     fontSize: '12px',
     fontWeight: '600',
-    color: 'var(--text-secondary, #94a3b8)',
+    color: 'var(--text-secondary)',
     textTransform: 'uppercase',
     letterSpacing: '0.5px'
   },
@@ -560,10 +560,10 @@ const styles = {
     width: '100%',
     padding: '12px 14px 12px 40px',
     fontSize: '14px',
-    background: 'var(--bg-secondary, #0f172a)',
-    border: '1px solid var(--border-color, #334155)',
+    background: 'var(--bg-secondary)',
+    border: '1px solid var(--border-color)',
     borderRadius: '12px',
-    color: 'var(--text-primary, #f8fafc)',
+    color: 'var(--text-primary)',
     outline: 'none',
     boxSizing: 'border-box'
   },
@@ -574,10 +574,10 @@ const styles = {
     fontWeight: '700',
     letterSpacing: '8px',
     textAlign: 'center',
-    background: 'var(--bg-secondary, #0f172a)',
-    border: '1px solid var(--border-color, #334155)',
+    background: 'var(--bg-secondary)',
+    border: '1px solid var(--border-color)',
     borderRadius: '12px',
-    color: 'var(--text-primary, #f8fafc)',
+    color: 'var(--text-primary)',
     outline: 'none',
     boxSizing: 'border-box'
   },
@@ -602,7 +602,7 @@ const styles = {
     fontSize: '15px',
     fontWeight: '600',
     borderRadius: '12px',
-    backgroundColor: 'var(--accent-color, #3b82f6)',
+    backgroundColor: 'var(--accent-color)',
     color: '#ffffff',
     border: 'none',
     cursor: 'pointer',
@@ -612,7 +612,7 @@ const styles = {
   cancelBtn: {
     background: 'none',
     border: 'none',
-    color: 'var(--text-secondary, #94a3b8)',
+    color: 'var(--text-secondary)',
     fontSize: '13px',
     fontWeight: '500',
     cursor: 'pointer',
@@ -627,7 +627,7 @@ const styles = {
     borderRadius: '10px',
     backgroundColor: 'rgba(16, 185, 129, 0.1)',
     border: '1px solid rgba(16, 185, 129, 0.25)',
-    color: '#34d399',
+    color: 'var(--success-color)',
     fontSize: '13px'
   },
   errorBox: {
@@ -636,9 +636,9 @@ const styles = {
     gap: '8px',
     padding: '10px 14px',
     borderRadius: '10px',
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    border: '1px solid rgba(239, 68, 68, 0.25)',
-    color: '#f87171',
+    backgroundColor: 'var(--danger-tint)',
+    border: '1px solid var(--danger-tint)',
+    color: 'var(--danger-color)',
     fontSize: '13px'
   }
 };

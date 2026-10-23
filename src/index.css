@@ -18,16 +18,24 @@
   
   --accent-color: #6366f1;
   --accent-color-hover: #4f46e5;
-  --accent-gradient: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+  --accent-gradient: linear-gradient(135deg, #5b5fee 0%, #4f46e5 100%); /* theme v2 */
+  --accent-solid: #5b5fee; /* theme v2 */
+  --accent-text: #8b8ff8; /* theme v2 */
   
   --text-primary: #f9fafb;
   --text-secondary: #9ca3af;
-  --text-muted: #6b7280;
+  --text-muted: #8a909b; /* theme v2 */
+  --text-on-accent: #ffffff; /* theme v2 */
   
   --nav-active-bg: rgba(99, 102, 241, 0.15);
   --danger-color: #f43f5e;
   --success-color: #10b981;
   --warning-color: #f59e0b;
+  
+  --accent-tint: color-mix(in srgb, var(--accent-solid) 14%, transparent); /* theme v2 */
+  --accent-tint-border: color-mix(in srgb, var(--accent-solid) 35%, transparent); /* theme v2 */
+  --danger-tint: color-mix(in srgb, var(--danger-color) 15%, transparent); /* theme v2 */
+  --danger-tint-border: color-mix(in srgb, var(--danger-color) 30%, transparent); /* theme v2 */
   
   --message-bg-outgoing: linear-gradient(135deg, #4f46e5 0%, #2563eb 100%);
   --message-bg-incoming: #1f2937;
@@ -52,11 +60,13 @@
   
   --accent-color: #6366f1;
   --accent-color-hover: #4f46e5;
-  --accent-gradient: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+  --accent-gradient: linear-gradient(135deg, #5b5fee 0%, #4f46e5 100%); /* theme v2 */
+  --accent-solid: #5b5fee; /* theme v2 */
+  --accent-text: #8b8ff8; /* theme v2 */
   
   --text-primary: #f9fafb;
   --text-secondary: #9ca3af;
-  --text-muted: #6b7280;
+  --text-muted: #8a909b; /* theme v2 */
   
   --nav-active-bg: rgba(99, 102, 241, 0.15);
   --danger-color: #f43f5e;
@@ -85,11 +95,13 @@
   
   --accent-color: #818cf8;
   --accent-color-hover: #6366f1;
-  --accent-gradient: linear-gradient(135deg, #818cf8 0%, #4f46e5 100%);
+  --accent-gradient: linear-gradient(135deg, #5a60e8 0%, #4338ca 100%); /* theme v2 */
+  --accent-solid: #5a60e8; /* theme v2 */
+  --accent-text: #818cf8; /* theme v2 */
   
   --text-primary: #fafafa;
   --text-secondary: #a1a1aa;
-  --text-muted: #71717a;
+  --text-muted: #818189; /* theme v2 */
   
   --nav-active-bg: rgba(129, 140, 248, 0.18);
   --danger-color: #fb7185;
@@ -118,11 +130,13 @@
   
   --accent-color: #2563eb;
   --accent-color-hover: #1d4ed8;
-  --accent-gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  --accent-gradient: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); /* theme v2 */
+  --accent-solid: #2563eb; /* theme v2 */
+  --accent-text: #2563eb; /* theme v2 */
   
   --text-primary: #0f172a;
-  --text-secondary: #64748b;
-  --text-muted: #94a3b8;
+  --text-secondary: #4b5768; /* theme v2 */
+  --text-muted: #697483; /* theme v2 */
   
   --nav-active-bg: rgba(37, 99, 235, 0.1);
   --danger-color: #e11d48;
@@ -151,18 +165,20 @@
   
   --accent-color: #ec4899;
   --accent-color-hover: #db2777;
-  --accent-gradient: linear-gradient(135deg, #ec4899 0%, #f43f5e 100%);
+  --accent-gradient: linear-gradient(135deg, #d02a7c 0%, #be123c 100%); /* theme v2 */
+  --accent-solid: #d02a7c; /* theme v2 */
+  --accent-text: #f06aa8; /* theme v2 */
   
   --text-primary: #fdf2f8;
-  --text-secondary: #f472b6;
-  --text-muted: #9d174d;
+  --text-secondary: #cf98b5; /* theme v2 */
+  --text-muted: #ab7492; /* theme v2 */
   
   --nav-active-bg: rgba(236, 72, 153, 0.2);
   --danger-color: #f43f5e;
   --success-color: #10b981;
   --warning-color: #f59e0b;
   
-  --message-bg-outgoing: linear-gradient(135deg, #ec4899 0%, #e11d48 100%);
+  --message-bg-outgoing: linear-gradient(135deg, #d62a7e 0%, #be123c 100%); /* theme v2 */
   --message-bg-incoming: #2e1528;
   --glass-effect: blur(16px) saturate(180%);
 

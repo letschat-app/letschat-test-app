@@ -175,7 +175,7 @@ const QuickAccessWheel = ({ currentChatId }) => {
             backdropFilter: 'blur(12px)',
             border: '1.5px solid rgba(255, 255, 255, 0.35)',
             borderRight: 'none',
-            boxShadow: '0 4px 18px rgba(99, 102, 241, 0.5), 0 2px 8px rgba(0, 0, 0, 0.35)',
+            boxShadow: '0 4px 18px color-mix(in srgb, var(--accent-solid) 45%, transparent), 0 2px 8px rgba(0, 0, 0, 0.35)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -197,7 +197,7 @@ const QuickAccessWheel = ({ currentChatId }) => {
                 top: 0,
                 left: '25%',
                 transform: 'translate(-50%, -50%)',
-                background: 'linear-gradient(135deg, #ef4444, #f97316)',
+                background: 'linear-gradient(135deg, var(--danger-color), #f97316)',
                 color: 'white',
                 fontSize: '10px',
                 fontWeight: '800',
@@ -208,7 +208,7 @@ const QuickAccessWheel = ({ currentChatId }) => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 2px 8px rgba(239, 68, 68, 0.7), 0 0 0 2px rgba(15, 23, 42, 0.9)',
+                boxShadow: '0 2px 8px var(--danger-tint), 0 0 0 2px rgba(15, 23, 42, 0.9)',
                 lineHeight: 1,
                 pointerEvents: 'none',
                 zIndex: 901
@@ -256,7 +256,7 @@ const QuickAccessWheel = ({ currentChatId }) => {
               zIndex: 10
             }}
           >
-            <X size={25} color="#ef4444" style={{ strokeWidth: 2.5 }} />
+            <X size={25} color="var(--danger-color)" style={{ strokeWidth: 2.5 }} />
           </div>
 
           {/* Surrounding Floating Chat Bubbles */}
@@ -291,7 +291,7 @@ const QuickAccessWheel = ({ currentChatId }) => {
                       size={48}
                       style={{
                         border: item.unreadCount > 0 
-                          ? '2.5px solid #ef4444' 
+                          ? '2.5px solid var(--danger-color)' 
                           : '2px solid rgba(255, 255, 255, 0.35)',
                         boxShadow: '0 4px 15px rgba(0, 0, 0, 0.5)',
                         transition: 'transform 0.2s'
@@ -304,7 +304,7 @@ const QuickAccessWheel = ({ currentChatId }) => {
                         position: 'absolute',
                         top: -2,
                         right: -4,
-                        background: '#ef4444',
+                        background: 'var(--danger-color)',
                         color: 'white',
                         fontSize: '10px',
                         fontWeight: '800',
@@ -315,8 +315,8 @@ const QuickAccessWheel = ({ currentChatId }) => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        border: '2px solid #0f172a',
-                        boxShadow: '0 2px 6px rgba(239, 68, 68, 0.6)'
+                        border: '2px solid var(--bg-primary)',
+                        boxShadow: '0 2px 6px var(--danger-tint)'
                       }}>
                         {item.unreadCount}
                       </div>
@@ -335,7 +335,7 @@ const QuickAccessWheel = ({ currentChatId }) => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        border: '1.5px solid #0f172a'
+                        border: '1.5px solid var(--bg-primary)'
                       }}>
                         <Sparkles size={10} color="white" />
                       </div>

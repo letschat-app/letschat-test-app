@@ -43,7 +43,7 @@ function injectStyles() {
       transition: background 0.15s ease;
     }
     .sw-dismiss-btn:not(:disabled):hover {
-      background: rgba(255, 255, 255, 0.1) !important;
+      background: var(--border-color) !important;
     }
     .sw-toast-spinner {
       width: 10px;
@@ -143,9 +143,9 @@ const UpdateToast = () => {
         background: 'rgba(15, 23, 42, 0.92)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
-        border: '1px solid rgba(96, 165, 250, 0.25)',
+        border: '1px solid var(--accent-tint)',
         borderRadius: '16px',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(96,165,250,0.1)',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px color-mix(in srgb, var(--accent-solid) 45%, transparent)',
         minWidth: '280px',
         maxWidth: '90vw',
       }}
@@ -159,7 +159,7 @@ const UpdateToast = () => {
         width: '36px',
         height: '36px',
         borderRadius: '10px',
-        background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+        background: 'var(--accent-gradient)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -173,7 +173,7 @@ const UpdateToast = () => {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
           fontFamily: 'Inter, system-ui, sans-serif',
-          color: '#f1f5f9',
+          color: 'var(--text-primary)',
           fontSize: '14px',
           fontWeight: '600',
           letterSpacing: '-0.01em',
@@ -182,7 +182,7 @@ const UpdateToast = () => {
         </div>
         {currentVersion && (
           <div style={{
-            color: '#64748b',
+            color: 'var(--text-secondary)',
             fontSize: '11px',
             marginTop: '1px',
             fontFamily: 'monospace',
@@ -203,8 +203,8 @@ const UpdateToast = () => {
           aria-label="Dismiss update notification"
           style={{
             background: 'transparent',
-            border: '1px solid rgba(255,255,255,0.1)',
-            color: isUpdating ? '#475569' : '#94a3b8',
+            border: '1px solid var(--border-color)',
+            color: isUpdating ? 'var(--text-muted)' : 'var(--text-secondary)',
             padding: '6px 12px',
             borderRadius: '8px',
             fontSize: '13px',
@@ -225,8 +225,8 @@ const UpdateToast = () => {
           aria-label={isUpdating ? 'Applying update, please wait' : 'Apply update now'}
           style={{
             background: isUpdating
-              ? 'linear-gradient(135deg, #334155, #1e293b)' // Muted, distinct "in progress" state
-              : 'linear-gradient(135deg, #3b82f6, #2563eb)', // Active blue
+              ? 'linear-gradient(135deg, var(--border-color), var(--bg-secondary))' // Muted, distinct "in progress" state
+              : 'var(--accent-gradient)', // Active blue
             border: 'none',
             color: '#fff',
             padding: '6px 14px',

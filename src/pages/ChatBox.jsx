@@ -110,8 +110,8 @@ const PulseQuoteCard = ({ repliedtoStr, isReceived }) => {
   return (
     <div
       style={{
-        backgroundColor: isReceived ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.18)",
-        borderLeft: "3px solid var(--accent-color, #3b82f6)",
+        backgroundColor: isReceived ? "rgba(0,0,0,0.12)" : "var(--border-color)",
+        borderLeft: "3px solid var(--accent-color)",
         padding: '6px 10px',
         borderRadius: "6px",
         marginBottom: "8px",
@@ -123,7 +123,7 @@ const PulseQuoteCard = ({ repliedtoStr, isReceived }) => {
       }}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: "700", color: 'var(--accent-color, #3b82f6)', marginBottom: "2px", display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <div style={{ fontWeight: "700", color: 'var(--accent-color)', marginBottom: "2px", display: 'flex', alignItems: 'center', gap: '4px' }}>
           <span>{isPulseReply ? '💬 ' : '🏷️ '}{headerTitle}</span>
         </div>
         <div style={{ opacity: 0.9, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -327,8 +327,8 @@ const ReactorsModal = ({ reactionInfo, onClose, onSendReaction, isMobile }) => {
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     padding: '8px 12px', borderRadius: '14px',
-                    backgroundColor: isMine ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
-                    border: isMine ? '1px solid rgba(59, 130, 246, 0.25)' : '1px solid transparent',
+                    backgroundColor: isMine ? 'var(--accent-tint)' : 'transparent',
+                    border: isMine ? '1px solid var(--accent-tint)' : '1px solid transparent',
                     cursor: isMine ? 'pointer' : 'default',
                     transition: 'background 0.15s ease'
                   }}
@@ -353,7 +353,7 @@ const ReactorsModal = ({ reactionInfo, onClose, onSendReaction, isMobile }) => {
                         {isMine ? 'You' : (item.username || item.userId)}
                       </div>
                       {isMine && (
-                        <div style={{ fontSize: '10px', color: '#ef4444', fontWeight: '600', marginTop: '1px' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--danger-color)', fontWeight: '600', marginTop: '1px' }}>
                           Tap to remove your reaction
                         </div>
                       )}
@@ -399,23 +399,14 @@ const ChatBox = () => {
   const isSimulation = chatid === SIMULATION_ID;
 
   const [chat, setChat] = useState(() => {
-    if (chatid === SIMULATION_ID) {
+    if (chatid === SIMULATION_ID || chatid === "BROADCAST_SYSTEM") {
       return {
         id: SIMULATION_ID,
         chatId: SIMULATION_ID,
         chatName: "LetsChat",
         type: "guide",
         role: "student",
-        isSystem: true,
-        profile: `${import.meta.env.BASE_URL}icon.png`
-      };
-    }
-    if (chatid === "BROADCAST_SYSTEM") {
-      return {
-        id: "BROADCAST_SYSTEM",
-        chatId: "BROADCAST_SYSTEM",
-        chatName: "Letschat (System)",
-        type: "broadcast",
+        isSimulation: true,
         isSystem: true,
         verified: true,
         profile: `${import.meta.env.BASE_URL}icon.png`
@@ -426,6 +417,10 @@ const ChatBox = () => {
   });
 
   useEffect(() => {
+    if (chatid === "BROADCAST_SYSTEM") {
+      navigate(`/chat/${SIMULATION_ID}`, { replace: true });
+      return;
+    }
     if (chatid === SIMULATION_ID) {
       setChat({
         id: SIMULATION_ID,
@@ -433,17 +428,7 @@ const ChatBox = () => {
         chatName: "LetsChat",
         type: "guide",
         role: "student",
-        isSystem: true,
-        profile: `${import.meta.env.BASE_URL}icon.png`
-      });
-      return;
-    }
-    if (chatid === "BROADCAST_SYSTEM") {
-      setChat({
-        id: "BROADCAST_SYSTEM",
-        chatId: "BROADCAST_SYSTEM",
-        chatName: "Letschat (System)",
-        type: "broadcast",
+        isSimulation: true,
         isSystem: true,
         verified: true,
         profile: `${import.meta.env.BASE_URL}icon.png`
@@ -834,8 +819,8 @@ const ChatBox = () => {
               style={{
                 margin: '8px 0',
                 borderRadius: '10px',
-                backgroundColor: '#0f172a',
-                border: '1px solid rgba(255,255,255,0.12)',
+                backgroundColor: 'var(--bg-primary)',
+                border: '1px solid var(--border-color)',
                 overflow: 'hidden',
                 fontFamily: 'Consolas, Monaco, "Andale Mono", monospace',
                 fontSize: '13px'
@@ -847,10 +832,10 @@ const ChatBox = () => {
                   alignItems: 'center',
                   justify: 'space-between',
                   padding: '6px 12px',
-                  backgroundColor: 'rgba(255,255,255,0.06)',
-                  borderBottom: '1px solid rgba(255,255,255,0.08)',
+                  backgroundColor: 'var(--bg-hover)',
+                  borderBottom: '1px solid var(--bg-hover)',
                   fontSize: '11px',
-                  color: '#94a3b8',
+                  color: 'var(--text-secondary)',
                   fontWeight: '700',
                   letterSpacing: '0.05em'
                 }}
@@ -867,7 +852,7 @@ const ChatBox = () => {
                   style={{
                     background: 'none',
                     border: 'none',
-                    color: '#60a5fa',
+                    color: 'var(--accent-text)',
                     cursor: 'pointer',
                     fontSize: '11px',
                     fontWeight: '600',
@@ -910,14 +895,14 @@ const ChatBox = () => {
               });
             }}
             style={{
-              color: '#60a5fa',
+              color: 'var(--accent-text)',
               textDecoration: 'underline',
               cursor: 'pointer',
               wordBreak: 'break-all',
               transition: 'color 0.2s ease',
             }}
-            onMouseEnter={(e) => e.currentTarget.style.color = '#93c5fd'}
-            onMouseLeave={(e) => e.currentTarget.style.color = '#60a5fa'}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-text)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-text)'}
           >
             {part}
           </span>
@@ -932,9 +917,9 @@ const ChatBox = () => {
             <span
               key={i}
               style={{
-                color: isMe ? '#f59e0b' : '#3b82f6', // Orange if me, Blue if someone else
+                color: isMe ? 'var(--warning-color)' : 'var(--accent-text)', // Orange if me, Blue if someone else
                 fontWeight: isMe ? 'bold' : '600',
-                backgroundColor: isMe ? 'rgba(245, 158, 11, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                backgroundColor: isMe ? 'rgba(245, 158, 11, 0.15)' : 'var(--accent-tint)',
                 padding: '2px 6px',
                 borderRadius: '6px',
                 margin: '0 2px'
@@ -2154,9 +2139,9 @@ const ChatBox = () => {
                 type="button"
                 onClick={handleEnableReplyNotify}
                 style={{
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  color: 'var(--text-primary, #ffffff)',
-                  border: '1px solid var(--border-color, rgba(255,255,255,0.15))',
+                  background: 'var(--border-color)',
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border-color))',
                   borderRadius: '8px',
                   padding: '4px 12px',
                   fontSize: '12.5px',
@@ -2168,8 +2153,8 @@ const ChatBox = () => {
                   transition: 'background 0.15s ease',
                   lineHeight: '1.2'
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.18)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--border-color)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'var(--border-color)'}
               >
                 Notify
               </button>
@@ -2179,7 +2164,7 @@ const ChatBox = () => {
                 style={{
                   background: 'transparent',
                   border: 'none',
-                  color: '#ef4444',
+                  color: 'var(--danger-color)',
                   cursor: 'pointer',
                   padding: '4px',
                   display: 'flex',
@@ -2189,12 +2174,12 @@ const ChatBox = () => {
                   lineHeight: 1,
                   transition: 'background 0.15s ease'
                 }}
-                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.15)'}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--danger-tint)'}
                 onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                 title="Dismiss"
                 aria-label="Close"
               >
-                <X size={16} color="#ef4444" strokeWidth={2.5} />
+                <X size={16} color="var(--danger-color)" strokeWidth={2.5} />
               </button>
             </div>
           </div>
@@ -2253,8 +2238,8 @@ const ChatBox = () => {
           flex: 1,
           minWidth: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          background: 'rgba(239, 68, 68, 0.1)',
-          border: '1px solid rgba(239, 68, 68, 0.2)',
+          background: 'var(--danger-tint)',
+          border: '1px solid var(--danger-tint-border)',
           borderRadius: '24px',
           padding: '2px 14px',
           minHeight: '44px',
@@ -2262,10 +2247,10 @@ const ChatBox = () => {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{
-              width: '10px', height: '10px', backgroundColor: '#ef4444',
+              width: '10px', height: '10px', backgroundColor: 'var(--danger-color)',
               borderRadius: '50%', animation: 'recordBlink 1s infinite'
             }} />
-            <span style={{ color: '#ef4444', fontSize: '14.5px', fontWeight: '600', fontFamily: 'monospace' }}>
+            <span style={{ color: 'var(--danger-color)', fontSize: '14.5px', fontWeight: '600', fontFamily: 'monospace' }}>
               {formatRecordingTime(recordingTime)}
             </span>
           </div>
@@ -2273,7 +2258,7 @@ const ChatBox = () => {
           <button
             onClick={() => stopRecording(true)}
             style={{
-              background: 'transparent', border: 'none', color: '#ef4444',
+              background: 'transparent', border: 'none', color: 'var(--danger-color)',
               cursor: 'pointer', display: 'flex', alignItems: 'center',
               padding: '6px'
             }}
@@ -2303,7 +2288,7 @@ const ChatBox = () => {
               cursor: 'pointer', flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               width: isMobile ? '32px' : '36px', height: isMobile ? '32px' : '36px', borderRadius: '50%',
-              color: showEmojiPicker ? 'var(--accent-color, #60a5fa)' : 'var(--text-secondary)',
+              color: showEmojiPicker ? 'var(--accent-color)' : 'var(--text-secondary)',
               transition: 'all 0.2s ease',
             }}
             onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
@@ -2371,10 +2356,10 @@ const ChatBox = () => {
                 >
                   <div style={{
                     width: '38px', height: '38px', borderRadius: '50%',
-                    background: 'rgba(59, 130, 246, 0.15)',
-                    border: '1.5px solid rgba(59, 130, 246, 0.3)',
+                    background: 'var(--accent-tint)',
+                    border: '1.5px solid var(--accent-tint)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: '#60a5fa', flexShrink: 0, fontSize: '14px', fontWeight: 'bold'
+                    color: 'var(--accent-text)', flexShrink: 0, fontSize: '14px', fontWeight: 'bold'
                   }}>
                     {(member.chatName || member.userName || member.username || '?').charAt(0).toUpperCase()}
                   </div>
@@ -2410,7 +2395,7 @@ const ChatBox = () => {
       <button
         onClick={isRecording ? () => stopRecording(false) : (input.trim() ? handleSendMessageClick : startRecording)}
         style={{
-          background: isRecording ? '#10b981' : (input.trim() ? '#2563eb' : '#10b981'),
+          background: isRecording ? 'var(--success-color)' : (input.trim() ? 'var(--accent-text)' : 'var(--success-color)'),
           color: 'white',
           border: 'none',
           padding: 0,
@@ -2441,7 +2426,7 @@ const ChatBox = () => {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '8px 14px',
           backgroundColor: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)',
-          borderRadius: '14px', fontSize: '13px', color: '#f59e0b', backdropFilter: 'blur(8px)',
+          borderRadius: '14px', fontSize: '13px', color: 'var(--warning-color)', backdropFilter: 'blur(8px)',
           boxShadow: '0 4px 14px rgba(0,0,0,0.3)', zIndex: 101
         }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '600' }}>
@@ -2451,7 +2436,7 @@ const ChatBox = () => {
             type="button"
             onClick={flushQueuedTextMessages}
             style={{
-              background: '#f59e0b', border: 'none', borderRadius: '8px', color: '#000',
+              background: 'var(--warning-color)', border: 'none', borderRadius: '8px', color: '#000',
               padding: '4px 12px', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
               boxShadow: '0 2px 8px rgba(245, 158, 11, 0.3)'
             }}
@@ -2494,7 +2479,7 @@ const ChatBox = () => {
               <div style={{
                 width: '42px', height: '42px', borderRadius: '50%',
                 backgroundColor: 'rgba(245, 158, 11, 0.15)',
-                color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--warning-color)', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 flexShrink: 0
               }}>
                 <Clock size={22} />
@@ -2582,7 +2567,7 @@ const ChatBox = () => {
               >
                 <div style={{
                   width: '36px', height: '36px', borderRadius: '50%',
-                  backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa',
+                  backgroundColor: 'var(--accent-tint)', color: 'var(--accent-text)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
                 }}>
                   <Clock size={18} />
@@ -2609,11 +2594,11 @@ const ChatBox = () => {
                 style={{
                   display: 'flex', alignItems: 'center', gap: '12px',
                   padding: '14px 16px', borderRadius: '14px',
-                  backgroundColor: 'var(--accent-color, #2563eb)',
+                  backgroundColor: 'var(--accent-color)',
                   border: 'none',
                   color: '#ffffff', cursor: 'pointer',
                   textAlign: 'left', transition: 'all 0.2s ease',
-                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)'
+                  boxShadow: '0 4px 14px color-mix(in srgb, var(--accent-solid) 45%, transparent)'
                 }}
               >
                 <div style={{
@@ -2667,7 +2652,7 @@ const ChatBox = () => {
               <div style={{
                 width: '42px', height: '42px', borderRadius: '50%',
                 backgroundColor: 'rgba(245, 158, 11, 0.15)',
-                color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--warning-color)', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 flexShrink: 0
               }}>
                 <Clock size={22} />
@@ -2705,11 +2690,11 @@ const ChatBox = () => {
                 style={{
                   display: 'flex', alignItems: 'center', gap: '12px',
                   padding: '14px 16px', borderRadius: '14px',
-                  backgroundColor: 'var(--accent-color, #2563eb)',
+                  backgroundColor: 'var(--accent-color)',
                   border: 'none',
                   color: '#ffffff', cursor: 'pointer',
                   textAlign: 'left', transition: 'all 0.2s ease',
-                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)'
+                  boxShadow: '0 4px 14px color-mix(in srgb, var(--accent-solid) 45%, transparent)'
                 }}
               >
                 <div style={{
@@ -2734,15 +2719,15 @@ const ChatBox = () => {
                 style={{
                   display: 'flex', alignItems: 'center', gap: '12px',
                   padding: '14px 16px', borderRadius: '14px',
-                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                  border: '1px solid rgba(239, 68, 68, 0.25)',
-                  color: '#ef4444', cursor: 'pointer',
+                  backgroundColor: 'var(--danger-tint)',
+                  border: '1px solid var(--danger-tint)',
+                  color: 'var(--danger-color)', cursor: 'pointer',
                   textAlign: 'left', transition: 'all 0.2s ease'
                 }}
               >
                 <div style={{
                   width: '36px', height: '36px', borderRadius: '50%',
-                  backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#ef4444',
+                  backgroundColor: 'var(--danger-tint)', color: 'var(--danger-color)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
                 }}>
                   <Trash2 size={18} />
@@ -2940,7 +2925,7 @@ const ChatBox = () => {
 
         // Inline highlight
         const originalBg = element.style.backgroundColor;
-        element.style.backgroundColor = "rgba(137, 180, 245, 0.66)";
+        element.style.backgroundColor = "var(--accent-tint)";
         element.style.transition = "background-color 2s ease";
 
         // Restore after 2s
@@ -3924,8 +3909,8 @@ const ChatBox = () => {
               width: '56px',
               height: '56px',
               borderRadius: '50%',
-              backgroundColor: 'rgba(239, 68, 68, 0.1)',
-              color: '#ef4444',
+              backgroundColor: 'var(--danger-tint)',
+              color: 'var(--danger-color)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -3958,9 +3943,9 @@ const ChatBox = () => {
                 style={{
                   padding: '12px',
                   borderRadius: '10px',
-                  border: '1px solid #ef4444',
+                  border: '1px solid var(--danger-color)',
                   background: 'transparent',
-                  color: '#ef4444',
+                  color: 'var(--danger-color)',
                   fontWeight: '600',
                   cursor: 'pointer'
                 }}
@@ -4006,7 +3991,7 @@ const ChatBox = () => {
             color: 'white',
             padding: '12px 24px',
             borderRadius: '16px',
-            boxShadow: '0 10px 30px rgba(59, 130, 246, 0.4)',
+            boxShadow: '0 10px 30px color-mix(in srgb, var(--accent-solid) 45%, transparent)',
             zIndex: 2000,
             maxWidth: '90%',
             width: 'max-content',
@@ -4094,7 +4079,7 @@ const ChatBox = () => {
                   alignItems: 'center',
                   gap: '8px'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#374151'}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--border-color)'}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               >
                 <Copy size={16} /> Copy Link
@@ -4117,7 +4102,7 @@ const ChatBox = () => {
                   alignItems: 'center',
                   gap: '8px'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#374151'}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--border-color)'}
                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
               >
                 <Bird size={16} /> Open in New Tab
@@ -4153,7 +4138,7 @@ const ChatBox = () => {
               borderRadius: '8px',
               transition: 'background-color 0.2s',
             }}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.03)'}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
             onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
           >
             {isMobile && (
@@ -4166,17 +4151,17 @@ const ChatBox = () => {
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  color: '#9ca3af',
+                  color: 'var(--text-secondary)',
                   borderRadius: '8px',
                   transition: 'all 0.2s ease',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#374151';
+                  e.currentTarget.style.backgroundColor = 'var(--border-color)';
                   e.currentTarget.style.color = 'var(--text-primary)';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = '#9ca3af';
+                  e.currentTarget.style.color = 'var(--text-secondary)';
                 }}
               >
                 ←
@@ -4193,8 +4178,8 @@ const ChatBox = () => {
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ color: 'var(--text-primary)', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                  {chatid === "BROADCAST_SYSTEM" ? "Letschat (System)" : (chat?.chatName || "Chat")}
-                  {(chatid === "BROADCAST_SYSTEM" || chatid === SIMULATION_ID || chat?.id === SIMULATION_ID || chat?.isSimulation || chat?.isSystem || chat?.verified || /letschat/i.test(chat?.chatName || '')) && (
+                  {chatid === SIMULATION_ID ? "LetsChat" : (chat?.chatName || "Chat")}
+                  {(chatid === SIMULATION_ID || chat?.id === SIMULATION_ID || chat?.isSimulation || chat?.isSystem || chat?.verified || /letschat/i.test(chat?.chatName || '')) && (
                     <span title="Official Verified Channel" style={{
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -4202,7 +4187,7 @@ const ChatBox = () => {
                       width: '16px',
                       height: '16px',
                       borderRadius: '50%',
-                      backgroundColor: '#2563eb',
+                      backgroundColor: 'var(--accent-solid)',
                       color: '#ffffff',
                       flexShrink: 0
                     }}>
@@ -4220,7 +4205,7 @@ const ChatBox = () => {
                     title="Messages in this room are temporarily cached for 30 minutes and then automatically deleted."
                     style={{
                       fontSize: '10px',
-                      backgroundColor: '#fbbf24', // Amber/Yellow for temporary status
+                      backgroundColor: 'var(--warning-color)', // Amber/Yellow for temporary status
                       color: '#000',
                       padding: '2px 6px',
                       borderRadius: '4px',
@@ -4234,7 +4219,7 @@ const ChatBox = () => {
                 )}
               </div>
               {chat.type === 'private' && (
-                <div style={{ fontSize: '11px', color: isOnline ? '#10b981' : 'var(--text-secondary)', fontWeight: '500' }}>
+                <div style={{ fontSize: '11px', color: isOnline ? 'var(--success-color)' : 'var(--text-secondary)', fontWeight: '500' }}>
                   {isOnline ? 'Online' : (() => {
                     const presenceId = chat.userId || chat.id || chatid;
                     const lastSeen = localStorage.getItem(`lastSeen_${presenceId}`);
@@ -4273,11 +4258,15 @@ const ChatBox = () => {
                   {activeSpace !== 0 && chat?.type !== 'classroom' && <Pencil size={10} />}
                 </span>
               )}
-              {(chat?.motto || chat?.description) && (
-                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', opacity: 0.85, maxWidth: isMobile ? '130px' : '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={chat.motto || chat.description}>
-                  {chat.motto || chat.description}
-                </span>
-              )}
+              {(() => {
+                const headerSubtext = chat?.motto || chat?.description;
+                if (!headerSubtext || headerSubtext.toLowerCase() === 'allowed' || headerSubtext.toLowerCase() === 'blocked') return null;
+                return (
+                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', opacity: 0.85, maxWidth: isMobile ? '130px' : '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={headerSubtext}>
+                    {headerSubtext}
+                  </span>
+                );
+              })()}
             </div>
           </div>
 
@@ -4303,13 +4292,13 @@ const ChatBox = () => {
                 style={{
                   padding: '4px 10px',
                   borderRadius: '6px',
-                  backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                  color: '#60a5fa',
+                  backgroundColor: 'var(--accent-tint)',
+                  color: 'var(--accent-text)',
                   fontSize: isMobile ? '11px' : '12px',
                   fontWeight: '700',
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
-                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                  border: '1px solid var(--accent-tint-border)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
@@ -4317,7 +4306,7 @@ const ChatBox = () => {
                 }}
                 title={(activeSpace !== 0 && chat?.type !== 'classroom') ? "Click to rename space" : ""}
               >
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#60a5fa' }} />
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--accent-solid)' }} />
                 {spaceName}
                 {activeSpace !== 0 && chat?.type !== 'classroom' && <Pencil size={12} />}
               </div>
@@ -4332,12 +4321,12 @@ const ChatBox = () => {
                 title="View Assignment Analytics & Export Matrix Report"
                 style={{
                   padding: isMobile ? '6px 10px' : '8px 14px',
-                  backgroundColor: 'rgba(59, 130, 246, 0.18)',
-                  color: '#60a5fa',
+                  backgroundColor: 'var(--accent-tint)',
+                  color: 'var(--accent-text)',
                   borderRadius: '8px',
                   fontSize: isMobile ? '12px' : '13px',
                   fontWeight: '700',
-                  border: '1px solid rgba(59, 130, 246, 0.35)',
+                  border: '1px solid var(--accent-tint)',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
                   display: 'flex',
@@ -4360,12 +4349,12 @@ const ChatBox = () => {
                   }}
                   style={{
                     padding: isMobile ? '6px 10px' : '8px 14px',
-                    backgroundColor: copiedId ? '#10b981' : '#374151',
+                    backgroundColor: copiedId ? 'var(--success-color)' : 'var(--border-color)',
                     color: 'var(--text-primary)',
                     borderRadius: '8px',
                   fontSize: isMobile ? '12px' : '14px',
                   fontWeight: '600',
-                  border: copiedId ? '1px solid #059669' : '1px solid #4b5563',
+                  border: copiedId ? '1px solid var(--success-color)' : '1px solid #4b5563',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
                   display: 'flex',
@@ -4376,12 +4365,12 @@ const ChatBox = () => {
                 onMouseEnter={(e) => {
                   if (!copiedId) {
                     e.currentTarget.style.backgroundColor = '#4b5563';
-                    e.currentTarget.style.borderColor = '#6b7280';
+                    e.currentTarget.style.borderColor = 'var(--text-muted)';
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!copiedId) {
-                    e.currentTarget.style.backgroundColor = '#374151';
+                    e.currentTarget.style.backgroundColor = 'var(--border-color)';
                     e.currentTarget.style.borderColor = '#4b5563';
                   }
                 }}
@@ -4457,9 +4446,9 @@ const ChatBox = () => {
               onClick={() => setShowGroupCalendar(!showGroupCalendar)}
               title="Group Calendar"
               style={{
-                background: showGroupCalendar ? 'rgba(59, 130, 246, 0.2)' : 'none',
-                border: showGroupCalendar ? '1px solid rgba(59, 130, 246, 0.4)' : 'none',
-                color: showGroupCalendar ? '#60a5fa' : 'var(--text-secondary)',
+                background: showGroupCalendar ? 'var(--accent-tint-border)' : 'none',
+                border: showGroupCalendar ? '1px solid var(--accent-tint-border)' : 'none',
+                color: showGroupCalendar ? 'var(--accent-text)' : 'var(--text-secondary)',
                 cursor: 'pointer',
                 padding: '8px',
                 borderRadius: '8px',
@@ -4468,8 +4457,8 @@ const ChatBox = () => {
                 justifyContent: 'center',
                 transition: 'background-color 0.2s'
               }}
-              onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.15)'}
-              onMouseLeave={e => e.currentTarget.style.backgroundColor = showGroupCalendar ? 'rgba(59, 130, 246, 0.2)' : 'transparent'}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--accent-tint)'}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = showGroupCalendar ? 'var(--accent-tint-border)' : 'transparent'}
             >
               <Calendar size={20} />
             </button>
@@ -4488,7 +4477,7 @@ const ChatBox = () => {
                 justifyContent: 'center',
                 transition: 'background-color 0.2s'
               }}
-              onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
               onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
             >
               <MoreVertical size={20} />
@@ -4531,7 +4520,7 @@ const ChatBox = () => {
                       gap: '10px',
                       transition: 'background-color 0.2s'
                     }}
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
                     onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                   >
                     {isCurrentChatPinned ? <PinOff size={16} /> : <Pin size={16} />}
@@ -4554,7 +4543,7 @@ const ChatBox = () => {
                       gap: '10px',
                       transition: 'background-color 0.2s'
                     }}
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
                     onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                   >
                     {isQuickAccessPinned ? <Zap size={16} fill="var(--text-primary)" /> : <Zap size={16} />}
@@ -4574,7 +4563,7 @@ const ChatBox = () => {
                       textAlign: 'left',
                       background: 'transparent',
                       border: 'none',
-                      color: isMuted ? '#ef4444' : 'var(--text-primary)',
+                      color: isMuted ? 'var(--danger-color)' : 'var(--text-primary)',
                       cursor: 'pointer',
                       borderRadius: '8px',
                       fontSize: '14px',
@@ -4583,10 +4572,10 @@ const ChatBox = () => {
                       gap: '10px',
                       transition: 'background-color 0.2s'
                     }}
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
                     onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                   >
-                    {isMuted ? <BellOff size={16} color="#ef4444" /> : <Bell size={16} />}
+                    {isMuted ? <BellOff size={16} color="var(--danger-color)" /> : <Bell size={16} />}
                     {isMuted ? 'Unmute Notifications' : 'Mute Notifications'}
                   </button>
 
@@ -4627,7 +4616,7 @@ const ChatBox = () => {
                       textAlign: 'left',
                       background: 'transparent',
                       border: 'none',
-                      color: '#ef4444',
+                      color: 'var(--danger-color)',
                       cursor: 'pointer',
                       borderRadius: '8px',
                       fontSize: '14px',
@@ -4636,7 +4625,7 @@ const ChatBox = () => {
                       gap: '10px',
                       transition: 'background-color 0.2s'
                     }}
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--danger-tint)'}
                     onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                   >
                     <Trash2 size={16} />
@@ -4662,7 +4651,7 @@ const ChatBox = () => {
                       gap: '10px',
                       transition: 'background-color 0.2s'
                     }}
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
                     onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                   >
                     <Star size={16} /> View Starred
@@ -4688,7 +4677,7 @@ const ChatBox = () => {
                       gap: '10px',
                       transition: 'background-color 0.2s'
                     }}
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
                     onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                   >
                     <Calendar size={16} /> Group Calendar
@@ -4710,7 +4699,7 @@ const ChatBox = () => {
                       gap: '10px',
                       transition: 'background-color 0.2s'
                     }}
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
                     onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                   >
                     <Info size={16} /> Contact Info
@@ -4725,9 +4714,9 @@ const ChatBox = () => {
           <div
             onClick={() => setShowScheduledList(true)}
             style={{
-              padding: '6px 12px', background: '#064e3b', color: '#34d399',
+              padding: '6px 12px', background: '#064e3b', color: 'var(--success-color)',
               fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-              borderBottom: '1px solid #047857', cursor: 'pointer', transition: '0.2s', zIndex: 10
+              borderBottom: '1px solid var(--success-color)', cursor: 'pointer', transition: '0.2s', zIndex: 10
             }}
             onMouseEnter={(e) => e.currentTarget.style.background = '#065f46'}
             onMouseLeave={(e) => e.currentTarget.style.background = '#064e3b'}
@@ -4745,7 +4734,7 @@ const ChatBox = () => {
               backgroundColor: "rgba(10, 17, 32, 0.96)",
               backdropFilter: "blur(10px)",
               WebkitBackdropFilter: "blur(10px)",
-              borderBottom: "1px solid rgba(59, 130, 246, 0.3)",
+              borderBottom: "1px solid var(--accent-tint-border)",
               boxShadow: "0 4px 16px rgba(0, 0, 0, 0.35)",
               zIndex: 15,
               position: "relative",
@@ -4776,7 +4765,7 @@ const ChatBox = () => {
                   <span style={{
                     fontSize: isMobile ? "12px" : "13px",
                     fontWeight: "600",
-                    color: "var(--text-primary, #f8fafc)",
+                    color: "var(--text-primary)",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
@@ -4794,9 +4783,9 @@ const ChatBox = () => {
                         setIsBannerPinsExpanded(true);
                       }}
                       style={{
-                        background: "rgba(59, 130, 246, 0.2)",
-                        border: "1px solid rgba(59, 130, 246, 0.4)",
-                        color: "#93c5fd",
+                        background: "var(--accent-tint-border)",
+                        border: "1px solid var(--accent-tint-border)",
+                        color: 'var(--accent-text)',
                         fontSize: "11px",
                         fontWeight: "700",
                         padding: "2px 8px",
@@ -4813,8 +4802,8 @@ const ChatBox = () => {
 
                   <span style={{
                     fontSize: "11px",
-                    color: "#94a3b8",
-                    background: "rgba(255, 255, 255, 0.06)",
+                    color: "var(--text-secondary)",
+                    background: "var(--bg-hover)",
                     padding: "2px 6px",
                     borderRadius: "6px",
                     fontWeight: "500",
@@ -4831,11 +4820,11 @@ const ChatBox = () => {
                   justifyContent: "space-between",
                   marginBottom: "8px",
                   paddingBottom: "6px",
-                  borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+                  borderBottom: "1px solid var(--bg-hover)",
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                     <span style={{ fontSize: "14px" }}>📌</span>
-                    <span style={{ fontSize: "12px", fontWeight: "700", color: "#93c5fd", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    <span style={{ fontSize: "12px", fontWeight: "700", color: 'var(--accent-text)', textTransform: "uppercase", letterSpacing: "0.5px" }}>
                       Pinned Name Changes ({activeBannerPins.length})
                     </span>
                   </div>
@@ -4845,7 +4834,7 @@ const ChatBox = () => {
                     style={{
                       background: "transparent",
                       border: "none",
-                      color: "#60a5fa",
+                      color: 'var(--accent-text)',
                       fontSize: "11px",
                       fontWeight: "600",
                       cursor: "pointer",
@@ -4868,20 +4857,20 @@ const ChatBox = () => {
                         alignItems: "center",
                         justifyContent: "space-between",
                         padding: "6px 10px",
-                        backgroundColor: "rgba(255, 255, 255, 0.04)",
+                        backgroundColor: "var(--bg-hover)",
                         borderRadius: "8px",
                         cursor: "pointer",
                         transition: "background 0.15s ease",
                         gap: "10px",
                       }}
-                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.12)")}
-                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.04)")}
+                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--accent-tint)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "var(--bg-hover)")}
                     >
                       <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, flex: 1 }}>
-                        <span style={{ fontSize: "12px", color: "#60a5fa" }}>•</span>
+                        <span style={{ fontSize: "12px", color: 'var(--accent-text)' }}>•</span>
                         <span style={{
                           fontSize: "12px",
-                          color: "var(--text-primary, #f8fafc)",
+                          color: "var(--text-primary)",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
@@ -4889,7 +4878,7 @@ const ChatBox = () => {
                           {formatBannerText(pin)}
                         </span>
                       </div>
-                      <span style={{ fontSize: "10px", color: "#94a3b8", flexShrink: 0 }}>
+                      <span style={{ fontSize: "10px", color: "var(--text-secondary)", flexShrink: 0 }}>
                         {formatTimeRemaining(pin.timestamp)}
                       </span>
                     </div>
@@ -5034,7 +5023,7 @@ const ChatBox = () => {
                 width: '64px',
                 height: '64px',
                 borderRadius: '18px',
-                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                backgroundColor: 'var(--accent-tint)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -5069,7 +5058,7 @@ const ChatBox = () => {
                       cursor: 'pointer',
                       transition: 'all 0.2s ease'
                     }}
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.15)'}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--accent-tint)'}
                     onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--bg-secondary)'}
                   >
                     {chip.text}
@@ -5193,19 +5182,19 @@ const ChatBox = () => {
                             ? "rgba(30, 58, 95, 0.4)"
                             : "var(--bg-card)",
                           color: (msg.type === "banner-pin" && isWithin24Hours(msg.timestamp))
-                            ? "var(--text-primary, #f8fafc)"
+                            ? "var(--text-primary)"
                             : "var(--text-secondary)",
                           padding: isMobile ? '6px 12px' : '8px 16px',
                           borderRadius: '16px',
                           fontSize: isMobile ? '12px' : '13px',
                           border: (msg.type === "banner-pin" && isWithin24Hours(msg.timestamp))
-                            ? "1px solid rgba(59, 130, 246, 0.4)"
+                            ? "1px solid var(--accent-tint-border)"
                             : "1px solid var(--border-color)",
                           display: "flex",
                           alignItems: "center",
                           gap: "8px",
                           boxShadow: (msg.type === "banner-pin" && isWithin24Hours(msg.timestamp))
-                            ? "0 4px 12px rgba(59, 130, 246, 0.15)"
+                            ? "0 4px 12px var(--accent-tint)"
                             : undefined,
                           transition: "all 0.3s ease",
                         }}
@@ -5218,9 +5207,9 @@ const ChatBox = () => {
                           <span style={{
                             fontSize: "10px",
                             fontWeight: "700",
-                            color: "#60a5fa",
-                            backgroundColor: "rgba(59, 130, 246, 0.18)",
-                            border: "1px solid rgba(59, 130, 246, 0.3)",
+                            color: 'var(--accent-text)',
+                            backgroundColor: "var(--accent-tint)",
+                            border: "1px solid var(--accent-tint-border)",
                             padding: "1px 6px",
                             borderRadius: "6px",
                             letterSpacing: "0.02em"
@@ -5341,7 +5330,7 @@ const ChatBox = () => {
                                   top: "50%",
                                   transform: "translateY(-50%)",
                                   opacity: Math.min((swipeOffset[msg.msgid] || 0) / 70, 1),
-                                  color: "#60a5fa",
+                                  color: 'var(--accent-text)',
                                   fontSize: "20px",
                                   transition: "opacity 0.1s ease",
                                 }}
@@ -5375,7 +5364,7 @@ const ChatBox = () => {
                               return repliedMsg ? (
                                 <div
                                   style={{
-                                    backgroundColor: isReceived ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.18)",
+                                    backgroundColor: isReceived ? "rgba(0,0,0,0.12)" : "var(--border-color)",
                                     borderLeft: "3px solid var(--accent-color)",
                                     padding: '6px 10px',
                                     borderRadius: "6px",
@@ -5390,7 +5379,7 @@ const ChatBox = () => {
                                     if (element) {
                                       element.scrollIntoView({ behavior: "smooth", block: "center" });
                                       const originalBg = element.style.backgroundColor;
-                                      element.style.backgroundColor = "rgba(137, 180, 245, 0.66)";
+                                      element.style.backgroundColor = "var(--accent-tint)";
                                       element.style.transition = "background-color 2s ease";
                                       setTimeout(() => {
                                         element.style.backgroundColor = originalBg || "";
@@ -5522,13 +5511,13 @@ const ChatBox = () => {
                                         cursor: 'pointer',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        color: msg.isStarred ? '#fbbf24' : (isReceived ? "var(--text-secondary)" : "rgba(255, 255, 255, 0.75)"),
+                                        color: msg.isStarred ? 'var(--warning-color)' : (isReceived ? "var(--text-secondary)" : "rgba(255, 255, 255, 0.75)"),
                                         transition: 'transform 0.2s ease',
                                       }}
                                       onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.2)'}
                                       onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                                     >
-                                      <Star size={14} fill={msg.isStarred ? "#fbbf24" : "none"} />
+                                      <Star size={14} fill={msg.isStarred ? "var(--warning-color)" : "none"} />
                                     </button>
                                   </div>
                                 )}
@@ -5544,7 +5533,7 @@ const ChatBox = () => {
                                         e.stopPropagation();
                                         setSelectedQueuedMsg(msg);
                                       }}
-                                      style={{ color: '#f59e0b', fontWeight: '600', cursor: 'pointer' }}
+                                      style={{ color: 'var(--warning-color)', fontWeight: '600', cursor: 'pointer' }}
                                       title="Click to Send Now or Delete"
                                     >
                                       Waiting for upload ⏳
@@ -5554,7 +5543,7 @@ const ChatBox = () => {
                               {msg.revived && (
                                   <span style={{
                                     fontSize: '10px',
-                                    color: "#10b981",
+                                    color: "var(--success-color)",
                                     fontWeight: "500",
                                     backgroundColor: "#065f46",
                                     padding: "2px 6px",
@@ -5580,7 +5569,7 @@ const ChatBox = () => {
                                   left: isReceived ? "8px" : "auto",
                                   width: isMobile ? '18px' : '20px',
                                   height: isMobile ? '18px' : '20px',
-                                  backgroundColor: event.isAdded ? "#10b981" : "#ef4444",
+                                  backgroundColor: event.isAdded ? "var(--success-color)" : "var(--danger-color)",
                                   borderRadius: "50%",
                                   display: "flex",
                                   alignItems: "center",
@@ -5624,7 +5613,7 @@ const ChatBox = () => {
                       style={{
                         alignSelf: "flex-start",
                         backgroundColor: "rgba(31, 41, 55, 0.4)",
-                        color: "#9ca3af",
+                        color: "var(--text-secondary)",
                         padding: isMobile ? '6px 12px' : '8px 16px',
                         borderRadius: '16px 16px 16px 4px',
                         fontSize: isMobile ? '12px' : '13px',
@@ -5637,7 +5626,7 @@ const ChatBox = () => {
                         animation: 'fadeIn 0.3s ease-out'
                       }}
                     >
-                      <div style={{ fontWeight: '600', color: '#60a5fa' }}>
+                      <div style={{ fontWeight: '600', color: 'var(--accent-text)' }}>
                         {chat.type === 'private' ? (chat.chatName || "Other") : ind.sendername}
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -5650,9 +5639,9 @@ const ChatBox = () => {
                           </span>
                         )}
                         {ind.content === 'recording' && (
-                          <span style={{ display: 'flex', gap: '6px', alignItems: 'center', color: '#ef4444' }}>
+                          <span style={{ display: 'flex', gap: '6px', alignItems: 'center', color: 'var(--danger-color)' }}>
                             recording audio
-                            <div className="rec-pulse" style={{ width: '8px', height: '8px', background: '#ef4444', borderRadius: '50%' }} />
+                            <div className="rec-pulse" style={{ width: '8px', height: '8px', background: 'var(--danger-color)', borderRadius: '50%' }} />
                           </span>
                         )}
                         {ind.content === 'in-chat' && (
@@ -5691,12 +5680,12 @@ const ChatBox = () => {
         }
         
         .hide-scrollbar::-webkit-scrollbar-track {
-          background: #111827;
+          background: var(--bg-secondary);
           border-radius: 10px;
         }
         
         .hide-scrollbar::-webkit-scrollbar-thumb {
-          background: #374151;
+          background: var(--border-color);
           border-radius: 10px;
         }
         
@@ -5718,7 +5707,7 @@ const ChatBox = () => {
               width: '42px',
               height: '42px',
               borderRadius: '50%',
-              background: '#f59e0b',
+              background: 'var(--warning-color)',
               backdropFilter: 'blur(8px)',
               border: '1px solid rgba(255, 255, 255, 0.2)',
               color: '#fff',
@@ -5753,8 +5742,8 @@ const ChatBox = () => {
                     borderRadius: '50%',
                     background: 'rgba(30, 41, 59, 0.8)',
                     backdropFilter: 'blur(8px)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    color: '#60a5fa',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--accent-text)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -5772,7 +5761,7 @@ const ChatBox = () => {
                       position: 'absolute',
                       top: '-5px',
                       right: '-5px',
-                      background: '#ef4444',
+                      background: 'var(--danger-color)',
                       color: 'white',
                       fontSize: '10px',
                       fontWeight: '800',
@@ -5783,7 +5772,7 @@ const ChatBox = () => {
                       alignItems: 'center',
                       justifyContent: 'center',
                       padding: '0 4px',
-                      border: '2px solid #1e293b',
+                      border: '2px solid var(--bg-secondary)',
                     }}>
                       {unreadSinceScrolled > 99 ? '99+' : unreadSinceScrolled}
                     </div>
@@ -5819,7 +5808,7 @@ const ChatBox = () => {
                     borderRadius: "4px",
                     border: "none",
                     background: "#dbeafe",
-                    color: "#1d1d1dff",
+                    color: "var(--bg-card)",
 
                   }} onClick={(e) => { e.stopPropagation(); reply() }}
                   >Reply</button>
@@ -5829,7 +5818,7 @@ const ChatBox = () => {
                     borderRadius: "4px",
                     border: "none",
                     background: "#dbeafe",
-                    color: "#1d1d1dff",
+                    color: "var(--bg-card)",
                   }} onClick={(e) => { e.stopPropagation(); forward() }}
                   >Forward</button>
                   <button style={{
@@ -5838,7 +5827,7 @@ const ChatBox = () => {
                     borderRadius: "4px",
                     border: "none",
                     background: "#dbeafe",
-                    color: "#1d1d1dff",
+                    color: "var(--bg-card)",
                   }} onClick={(e) => { e.stopPropagation(); delet() }}
                   >Delete</button>
                 </div>
@@ -5909,9 +5898,9 @@ const ChatBox = () => {
                     <button
                       onClick={clearSelection}
                       style={{
-                        background: "rgba(239,68,68,0.12)",
+                        background: "var(--danger-tint)",
                         color: "var(--danger-color)",
-                        border: "1px solid rgba(239,68,68,0.3)",
+                        border: "1px solid var(--danger-tint-border)",
                         borderRadius: "20px",
                         padding: "5px 14px",
                         cursor: "pointer",
@@ -5945,9 +5934,9 @@ const ChatBox = () => {
                           <button
                             onClick={handleCancelUploads}
                             style={{
-                              background: "rgba(239, 68, 68, 0.1)",
+                              background: "var(--danger-tint)",
                               color: "var(--danger-color)",
-                              border: "1px solid rgba(239, 68, 68, 0.3)",
+                              border: "1px solid var(--danger-tint-border)",
                               padding: "8px 16px",
                               borderRadius: "20px",
                               cursor: "pointer",
@@ -6014,9 +6003,9 @@ const ChatBox = () => {
                                 toggleStar(e, msg);
                                 clearSelection();
                               }}
-                              style={actionBtnStyle(items[0]?.isStarred ? "#fbbf24" : "var(--accent-color)")}
+                              style={actionBtnStyle(items[0]?.isStarred ? "var(--warning-color)" : "var(--accent-color)")}
                             >
-                              <Star size={isMobile ? 19 : 16} fill={items[0]?.isStarred ? "#fbbf24" : "none"} />
+                              <Star size={isMobile ? 19 : 16} fill={items[0]?.isStarred ? "var(--warning-color)" : "none"} />
                               <span style={labelStyle}>{items[0]?.isStarred ? "Unstar" : "Star"}</span>
                             </button>
                           )}
@@ -6199,9 +6188,9 @@ const ChatBox = () => {
                   <button
                     onClick={() => setFilterMember(null)}
                     style={{
-                      background: 'rgba(239, 68, 68, 0.12)',
+                      background: 'var(--danger-tint)',
                       color: 'var(--danger-color)',
-                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      border: '1px solid var(--danger-tint-border)',
                       borderRadius: '16px',
                       padding: '3px 12px',
                       fontSize: '12px',
@@ -6281,7 +6270,7 @@ const ChatBox = () => {
                           style={{
                             background: "none",
                             border: "none",
-                            color: "#f54d4dff",
+                            color: "var(--danger-color)",
                             fontSize: "16px",
                             cursor: "pointer",
                           }}
@@ -6327,7 +6316,7 @@ const ChatBox = () => {
                         style={{
                           background: "none",
                           border: "none",
-                          color: "#f54d4d",
+                          color: "var(--danger-color)",
                           fontSize: "18px",
                           cursor: "pointer",
                           padding: "2px 6px"
@@ -6339,7 +6328,7 @@ const ChatBox = () => {
                     </div>
                   )}
 
-                  {chatid === "BROADCAST_SYSTEM" || chat?.isSystem || chat?.type === "broadcast" ? (
+                  {!isSimulation && chatid !== SIMULATION_ID && (chatid === "BROADCAST_SYSTEM" || chat?.type === "broadcast") ? (
                     <div style={{
                       display: "flex",
                       alignItems: "center",
@@ -6368,7 +6357,7 @@ const ChatBox = () => {
                               display: "flex",
                               justifyContent: "center",
                               padding: "10px",
-                              background: "#1e1e1e",
+                              background: "var(--bg-card)",
                               borderTop: "1px solid #333",
                               position: "sticky",
                               bottom: 0,
@@ -6378,7 +6367,7 @@ const ChatBox = () => {
                           >
                             <button
                               style={{
-                                background: "#16a34a",
+                                background: "var(--success-color)",
                                 color: "white",
                                 border: "none",
                                 borderRadius: "20px",
@@ -6400,7 +6389,7 @@ const ChatBox = () => {
                         <div
                           style={{
                             padding: "10px",
-                            background: "#1e1e1e",
+                            background: "var(--bg-card)",
                             color: "#aaa",
                             textAlign: "center",
                             borderTop: "1px solid #333",
@@ -6421,7 +6410,7 @@ const ChatBox = () => {
                     <div
                       style={{
                         padding: "10px",
-                        background: "#1e1e1e",
+                        background: "var(--bg-card)",
                         color: "#aaa",
                         textAlign: "center",
                         borderTop: "1px solid #333",
@@ -6753,7 +6742,7 @@ const ChatBox = () => {
                       color: 'var(--text-primary)'
                     }}>
                       <div style={{ marginBottom: '12px' }}>
-                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ margin: '0 auto' }}>
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--danger-color)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ margin: '0 auto' }}>
                           <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
                           <line x1="12" y1="20" x2="12.01" y2="20"></line>
                           <path d="M4.93 10.93a10 10 0 0 1 14.14 0"></path>
@@ -6836,7 +6825,7 @@ const ChatBox = () => {
                           fontSize: '20px',
                           fontWeight: 'bold'
                         }}
-                        onMouseEnter={(e) => e.currentTarget.style.color = '#dc2626'}
+                        onMouseEnter={(e) => e.currentTarget.style.color = 'var(--danger-color)'}
                         onMouseLeave={(e) => e.currentTarget.style.color = 'var(--danger-color)'}
                       >
                         ✕
@@ -6879,7 +6868,7 @@ const ChatBox = () => {
                             fontWeight: '500',
                             transition: 'background-color 0.2s'
                           }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--danger-color)'}
                           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--danger-color)'}
                         >
                           Delete for Everyone
@@ -6900,7 +6889,7 @@ const ChatBox = () => {
                             fontWeight: '500',
                             transition: 'background-color 0.2s'
                           }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--danger-color)'}
                           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--danger-color)'}
                         >
                           Delete
@@ -6963,7 +6952,7 @@ const ChatBox = () => {
                           fontSize: '20px',
                           fontWeight: 'bold'
                         }}
-                        onMouseEnter={(e) => e.currentTarget.style.color = '#dc2626'}
+                        onMouseEnter={(e) => e.currentTarget.style.color = 'var(--danger-color)'}
                         onMouseLeave={(e) => e.currentTarget.style.color = 'var(--danger-color)'}
                       >
                         ✕
@@ -6998,7 +6987,7 @@ const ChatBox = () => {
                           style={{
                             width: '100%',
                             padding: '12px 16px',
-                            backgroundColor: '#10b981',
+                            backgroundColor: 'var(--success-color)',
                             color: '#ffffff',
                             border: 'none',
                             borderRadius: '8px',
@@ -7006,8 +6995,8 @@ const ChatBox = () => {
                             fontWeight: '500',
                             transition: 'background-color 0.2s'
                           }}
-                          onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
-                          onMouseLeave={(e) => e.target.style.backgroundColor = '#10b981'}
+                          onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--success-color)'}
+                          onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--success-color)'}
                         >
                           Revive for Everyone
                         </button>
@@ -7019,7 +7008,7 @@ const ChatBox = () => {
                           style={{
                             width: '100%',
                             padding: '12px 16px',
-                            backgroundColor: '#10b981',
+                            backgroundColor: 'var(--success-color)',
                             color: '#ffffff',
                             border: 'none',
                             borderRadius: '8px',
@@ -7027,8 +7016,8 @@ const ChatBox = () => {
                             fontWeight: '500',
                             transition: 'background-color 0.2s'
                           }}
-                          onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
-                          onMouseLeave={(e) => e.target.style.backgroundColor = '#10b981'}
+                          onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--success-color)'}
+                          onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--success-color)'}
                         >
                           Revive
                         </button>
@@ -7122,7 +7111,7 @@ const ChatBox = () => {
                               display: "flex",
                               alignItems: "center",
                               gap: "6px",
-                              background: "rgba(255, 255, 255, 0.15)",
+                              background: "var(--border-color)",
                               border: "none",
                               color: "#fff",
                               padding: "6px 14px",
@@ -7133,7 +7122,7 @@ const ChatBox = () => {
                               transition: "background 0.2s",
                             }}
                             onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.25)")}
-                            onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.15)")}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = "var(--border-color)")}
                             title="Edit Image"
                           >
                             <Pencil size={16} />
@@ -7180,7 +7169,7 @@ const ChatBox = () => {
                           display: "flex",
                           alignItems: "center",
                           gap: "8px",
-                          background: "rgba(255, 255, 255, 0.1)",
+                          background: "var(--border-color)",
                           color: "#fff",
                           padding: "8px 16px",
                           borderRadius: "6px",
@@ -7194,7 +7183,7 @@ const ChatBox = () => {
                           e.currentTarget.style.background = "rgba(255, 255, 255, 0.2)";
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.background = "rgba(255, 255, 255, 0.1)";
+                          e.currentTarget.style.background = "var(--border-color)";
                         }}
                       >
                         <Download size={18} />
@@ -7233,7 +7222,7 @@ const ChatBox = () => {
             display: 'flex',
             flexDirection: 'column',
             animation: 'slideInRight 0.3s ease-out',
-            zIndex: 50,
+            zIndex: 1000,
             boxShadow: '-4px 0 15px rgba(0,0,0,0.5)'
           }}>
             {showGroupCalendar && (
@@ -7324,7 +7313,7 @@ const ChatBox = () => {
               <p style={{ margin: '0 0 20px 0', color: 'var(--text-secondary)', fontSize: '14px' }}>You have unsaved changes. Do you want to save them before closing?</p>
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button onClick={() => { setShowSaveDialog(false); setShowEventModal(false); setHasChanges(false); saveChanges(); }} style={{ flex: 1, padding: '12px', backgroundColor: 'var(--accent-color)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Save</button>
-                <button onClick={() => { setShowSaveDialog(false); setShowEventModal(false); setHasChanges(false); }} style={{ flex: 1, padding: '12px', backgroundColor: '#dc2626', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Discard</button>
+                <button onClick={() => { setShowSaveDialog(false); setShowEventModal(false); setHasChanges(false); }} style={{ flex: 1, padding: '12px', backgroundColor: 'var(--danger-color)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Discard</button>
                 <button onClick={() => setShowSaveDialog(false)} style={{ flex: 1, padding: '12px', backgroundColor: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
               </div>
             </div>
@@ -7337,7 +7326,7 @@ const ChatBox = () => {
               <h3 style={{ margin: '0 0 12px 0', color: 'var(--text-primary)', fontSize: '18px' }}>Cancel Event?</h3>
               <p style={{ margin: '0 0 20px 0', color: 'var(--text-secondary)', fontSize: '14px' }}>Are you sure you want to cancel this event? This action cannot be undone.</p>
               <div style={{ display: 'flex', gap: '12px' }}>
-                <button onClick={() => { setShowCancelDialog(false); setShowEventModal(false); setHasChanges(false); }} style={{ flex: 1, padding: '12px', backgroundColor: '#dc2626', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Yes, Cancel Event</button>
+                <button onClick={() => { setShowCancelDialog(false); setShowEventModal(false); setHasChanges(false); }} style={{ flex: 1, padding: '12px', backgroundColor: 'var(--danger-color)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Yes, Cancel Event</button>
                 <button onClick={() => setShowCancelDialog(false)} style={{ flex: 1, padding: '12px', backgroundColor: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Go Back</button>
               </div>
             </div>
@@ -7377,7 +7366,7 @@ const ChatBox = () => {
             position: 'fixed',
             inset: 0,
             zIndex: 10000,
-            backgroundColor: '#111827'
+            backgroundColor: 'var(--bg-secondary)'
           }}>
             <GroupCalendarPanel
               chatId={chatid}
@@ -7503,8 +7492,8 @@ const ChatBox = () => {
           opacity: copiedId ? 1 : 0,
           pointerEvents: 'none',
           background: 'rgba(31, 41, 55, 0.95)',
-          border: '1px solid #374151',
-          color: '#60a5fa',
+          border: '1px solid var(--border-color)',
+          color: 'var(--accent-text)',
           padding: '10px 24px',
           borderRadius: '24px',
           fontSize: '14px',

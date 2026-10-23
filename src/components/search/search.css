@@ -108,7 +108,7 @@
 }
 
 .search-clear-btn:hover {
-  background-color: var(--bg-hover, var(--bg-secondary));
+  background-color: var(--bg-hover));
   color: var(--text-primary);
 }
 
@@ -166,7 +166,7 @@
 .search-recents-clear-link {
   background: none;
   border: none;
-  color: var(--danger-color, #ef4444);
+  color: var(--danger-color);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -304,7 +304,7 @@
 
 .search-status-icon.muted { color: var(--text-secondary); }
 .search-status-icon.accent { color: var(--accent-color); }
-.search-status-icon.danger { color: var(--danger-color, #ef4444); }
+.search-status-icon.danger { color: var(--danger-color); }
 
 .search-status-title {
   font-size: 16px;
@@ -362,7 +362,7 @@
 
 .search-selected-close-btn:hover {
   color: var(--text-primary);
-  background-color: var(--bg-hover, var(--border-color));
+  background-color: var(--bg-hover));
 }
 
 .search-selected-card-body {

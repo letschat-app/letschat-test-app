@@ -117,12 +117,12 @@ const MemberActionsPopup = ({ member, chat, currentUserId, myDisplayName, API, o
         backgroundColor: 'rgba(30, 41, 59, 0.98)',
         width: '100%', maxWidth: '360px',
         borderRadius: '20px', padding: '24px',
-        border: '1px solid rgba(255, 255, 255, 0.1)',
+        border: '1px solid var(--border-color)',
         boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)',
         animation: 'slideUp 0.2s ease-out'
       }}>
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', paddingBottom: '16px', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', paddingBottom: '16px', borderBottom: '1px solid var(--bg-hover)' }}>
           <Avatar 
             chat={{ ...member, profile: member.profile, id: member.userId, type: 'private' }} 
             size={56} 
@@ -131,9 +131,9 @@ const MemberActionsPopup = ({ member, chat, currentUserId, myDisplayName, API, o
             <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#f3f4f6', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {member.userName}
             </h3>
-            <p style={{ fontSize: '12px', color: '#9ca3af', margin: '2px 0 0' }}>{member.role || 'Member'}</p>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '2px 0 0' }}>{member.role || 'Member'}</p>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '18px', fontWeight: '700' }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '18px', fontWeight: '700' }}>
             X
           </button>
         </div>
@@ -144,7 +144,7 @@ const MemberActionsPopup = ({ member, chat, currentUserId, myDisplayName, API, o
             icon={<User size={18} />} 
             label="View Profile / Info" 
             onClick={handleViewProfile} 
-            color="#60a5fa"
+            color="var(--accent-text)"
           />
           <ActionItem 
             icon={<MessageSquare size={18} />} 
@@ -158,7 +158,7 @@ const MemberActionsPopup = ({ member, chat, currentUserId, myDisplayName, API, o
               icon={<ShieldCheck size={18} />} 
               label="Make Admin" 
               onClick={handleMakeAdmin} 
-              color="#fbbf24"
+              color="var(--warning-color)"
             />
           )}
 
@@ -167,7 +167,7 @@ const MemberActionsPopup = ({ member, chat, currentUserId, myDisplayName, API, o
               icon={<Award size={18} />} 
               label="Make Faculty" 
               onClick={handleMakeFaculty} 
-              color="#60a5fa"
+              color="var(--accent-text)"
             />
           )}
 
@@ -176,7 +176,7 @@ const MemberActionsPopup = ({ member, chat, currentUserId, myDisplayName, API, o
               icon={<UserMinus size={18} />} 
               label="Remove from group" 
               onClick={handleRemoveMember} 
-              color="#ef4444"
+              color="var(--danger-color)"
               isDanger
             />
           )}
@@ -203,7 +203,7 @@ const ActionItem = ({ icon, label, onClick, color, isDanger }) => (
       cursor: 'pointer', transition: 'all 0.2s',
       textAlign: 'left'
     }}
-    onMouseEnter={e => e.currentTarget.style.backgroundColor = isDanger ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255, 255, 255, 0.05)'}
+    onMouseEnter={e => e.currentTarget.style.backgroundColor = isDanger ? 'var(--danger-tint)' : 'var(--bg-hover)'}
     onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
   >
     <span style={{ flexShrink: 0 }}>{icon}</span>

@@ -56,7 +56,11 @@ import BookingRequestModal from "./components/modals/BookingRequestModal";
 
 const PublicBookingPage = lazyWithSplash(() => import("./pages/PublicBookingPage"));
 const PublicBookingView = lazyWithSplash(() => import("./pages/PublicBookingView"));
+const LabsPage = lazyWithSplash(() => import("./pages/LabsPage"));
+const BatchMessagingPage = lazyWithSplash(() => import("./pages/BatchMessagingPage"));
 import { initSystemBroadcastSync } from "./service/SystemBroadcastService";
+import { getPulseFeed } from "./service/PulseService";
+import { badgeStore } from "./service/BadgeStore";
 
 function App() {
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -86,6 +90,26 @@ function App() {
     }, 5 * 60 * 1000);
 
     return () => clearInterval(interval);
+  }, []);
+
+  // Check for unseen pulses on app start
+  useEffect(() => {
+    const uid = localStorage.getItem("userid");
+    if (!uid) return;
+
+    const checkPulses = async () => {
+      try {
+        const feedList = await getPulseFeed();
+        if (Array.isArray(feedList)) {
+          const hasUnseen = feedList.some(item => item && !item.allSeen);
+          badgeStore.setPulsesUnread(hasUnseen);
+        }
+      } catch (err) {
+        console.warn("[App] Pulse startup check error:", err);
+      }
+    };
+
+    checkPulses();
   }, []);
 
   const location = useLocation();
@@ -175,7 +199,7 @@ function App() {
       display:"flex",
       flexDirection:"column",
       overflow:"hidden",
-      paddingTop: (showNavbar && isMobile && !location.pathname.startsWith('/chat/')) ? '60px' : '0',
+      paddingTop: (showNavbar && isMobile && !location.pathname.startsWith('/chat/') && !location.pathname.startsWith('/batch-message')) ? '60px' : '0',
       paddingBottom: '0',
       boxSizing: 'border-box',
       background: 'var(--bg-primary)'
@@ -202,6 +226,8 @@ function App() {
               <Route path="/profile/:targetUserId?" element={<ProfilePage/>}/>
               <Route path="/profileupdate" element={<Profileupdate/>}/>
               <Route path="/starred" element={<StarredMessages />} />
+              <Route path="/labs" element={<LabsPage />} />
+              <Route path="/batch-message" element={<BatchMessagingPage />} />
             </Route>
 
             <Route path="/communities" element={<Communities />}>

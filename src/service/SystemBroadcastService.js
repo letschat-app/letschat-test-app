@@ -1,5 +1,6 @@
 import { API } from './UserAuth';
 import messageStore from '../pages/MessageStore';
+import { SIMULATION_ID } from './SimulationScript';
 
 const LAST_TIMESTAMP_KEY = 'system_broadcast_last_timestamp';
 
@@ -7,7 +8,7 @@ const LAST_TIMESTAMP_KEY = 'system_broadcast_last_timestamp';
  * SystemBroadcastService
  * Syncs System Broadcast Messages from REST API check endpoint,
  * applies 1-week alert suppression rule, and maps system messages
- * to the dedicated "Letschat" read-only chatbox (ID: BROADCAST_SYSTEM).
+ * directly to the unified "LetsChat" chatbox (SIMULATION_ID).
  */
 export const checkSystemBroadcasts = async () => {
   const userId = localStorage.getItem('userid');
@@ -48,23 +49,35 @@ export const checkSystemBroadcasts = async () => {
 
     if (!res.ok) return;
 
-    // Ensure BROADCAST_SYSTEM chat entry exists in chatsMap
+    // Ensure SIMULATION_ID exists in chatsMap and purge obsolete BROADCAST_SYSTEM
     const cachedMap = JSON.parse(localStorage.getItem('chatsMap') || '{}');
-    if (!cachedMap['BROADCAST_SYSTEM']) {
-      cachedMap['BROADCAST_SYSTEM'] = {
-        id: 'BROADCAST_SYSTEM',
-        chatId: 'BROADCAST_SYSTEM',
-        chatName: 'Letschat (System)',
-        type: 'broadcast',
+    let mapChanged = false;
+    if (cachedMap['BROADCAST_SYSTEM']) {
+      delete cachedMap['BROADCAST_SYSTEM'];
+      mapChanged = true;
+    }
+    if (!cachedMap[SIMULATION_ID]) {
+      cachedMap[SIMULATION_ID] = {
+        id: SIMULATION_ID,
+        chatId: SIMULATION_ID,
+        chatName: 'LetsChat',
+        type: 'guide',
+        isSimulation: true,
         isSystem: true,
         verified: true,
         profile: `${import.meta.env.BASE_URL}icon.png`
       };
-      localStorage.setItem('chatsMap', JSON.stringify(cachedMap));
+      mapChanged = true;
     } else {
-      cachedMap['BROADCAST_SYSTEM'].profile = `${import.meta.env.BASE_URL}icon.png`;
-      cachedMap['BROADCAST_SYSTEM'].chatName = 'Letschat (System)';
-      cachedMap['BROADCAST_SYSTEM'].isSystem = true;
+      if (cachedMap[SIMULATION_ID].chatName !== 'LetsChat' || !cachedMap[SIMULATION_ID].verified) {
+        cachedMap[SIMULATION_ID].profile = `${import.meta.env.BASE_URL}icon.png`;
+        cachedMap[SIMULATION_ID].chatName = 'LetsChat';
+        cachedMap[SIMULATION_ID].isSystem = true;
+        cachedMap[SIMULATION_ID].verified = true;
+        mapChanged = true;
+      }
+    }
+    if (mapChanged) {
       localStorage.setItem('chatsMap', JSON.stringify(cachedMap));
     }
 
@@ -93,8 +106,8 @@ export const checkSystemBroadcasts = async () => {
 
       const formattedMsg = {
         msgid: msg.msgId || msg.msgid || `SYS_BCAST_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        chatid: "BROADCAST_SYSTEM",
-        sendername: "Letschat",
+        chatid: SIMULATION_ID,
+        sendername: "LetsChat",
         userid: "SYSTEM_ADMIN",
         type: msg.type || "text",
         content: msg.type === "text" ? (msg.content || "") : (msg.content || ""),
@@ -103,10 +116,11 @@ export const checkSystemBroadcasts = async () => {
         timestamp: msg.createdAt || msg.created_at || new Date().toISOString(),
         status: "delivered",
         isSystemBroadcast: true,
-        isold: false
+        isold: false,
+        spaceid: 0
       };
 
-      // Add message to MessageStore & IndexedDB
+      // Add message to MessageStore & IndexedDB under SIMULATION_ID
       messageStore.addMessage(formattedMsg);
 
       if (!isOlderThan7Days) {
@@ -115,11 +129,11 @@ export const checkSystemBroadcasts = async () => {
       }
     });
 
-    // Update unread count for BROADCAST_SYSTEM if recent messages exist and chat is not open
+    // Update unread count for SIMULATION_ID if recent messages exist and chat is not open
     const currentActiveChat = messageStore.getActivechat();
-    if (hasRecentUnread && currentActiveChat !== 'BROADCAST_SYSTEM') {
-      const existingCount = messageStore.getSpaceCount('BROADCAST_SYSTEM', 0);
-      messageStore.setCount('BROADCAST_SYSTEM', 0, existingCount + recentUnreadCount);
+    if (hasRecentUnread && currentActiveChat !== SIMULATION_ID) {
+      const existingCount = messageStore.getSpaceCount(SIMULATION_ID, 0);
+      messageStore.setCount(SIMULATION_ID, 0, existingCount + recentUnreadCount);
     }
 
   } catch (err) {
@@ -130,16 +144,25 @@ export const checkSystemBroadcasts = async () => {
 export const initSystemBroadcastSync = () => {
   try {
     const cachedMap = JSON.parse(localStorage.getItem('chatsMap') || '{}');
-    if (!cachedMap['BROADCAST_SYSTEM']) {
-      cachedMap['BROADCAST_SYSTEM'] = {
-        id: 'BROADCAST_SYSTEM',
-        chatId: 'BROADCAST_SYSTEM',
-        chatName: 'Letschat (System)',
-        type: 'broadcast',
+    let mapChanged = false;
+    if (cachedMap['BROADCAST_SYSTEM']) {
+      delete cachedMap['BROADCAST_SYSTEM'];
+      mapChanged = true;
+    }
+    if (!cachedMap[SIMULATION_ID]) {
+      cachedMap[SIMULATION_ID] = {
+        id: SIMULATION_ID,
+        chatId: SIMULATION_ID,
+        chatName: 'LetsChat',
+        type: 'guide',
+        isSimulation: true,
         isSystem: true,
         verified: true,
         profile: `${import.meta.env.BASE_URL}icon.png`
       };
+      mapChanged = true;
+    }
+    if (mapChanged) {
       localStorage.setItem('chatsMap', JSON.stringify(cachedMap));
     }
   } catch (e) {}

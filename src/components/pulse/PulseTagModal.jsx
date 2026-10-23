@@ -27,7 +27,7 @@ const PulseTagModal = ({ isOpen, onClose, pulse, pulseOwnerUserId }) => {
   const availableChats = useMemo(() => {
     try {
       const cachedMap = JSON.parse(localStorage.getItem('chatsMap') || '{}');
-      let chatsList = Object.values(cachedMap).filter(c => c && c.chatId && c.chatId !== 'BROADCAST_SYSTEM');
+      let chatsList = Object.values(cachedMap).filter(c => c && c.chatId && c.chatId !== 'BROADCAST_SYSTEM' && c.chatId !== 'simulation_guide' && !c.isSimulation);
 
       // Privacy Filtering Rule:
       // If visibility == "chats_only" or "contacts":
@@ -129,8 +129,8 @@ const PulseTagModal = ({ isOpen, onClose, pulse, pulseOwnerUserId }) => {
               width: '36px',
               height: '36px',
               borderRadius: '10px',
-              backgroundColor: 'rgba(59, 130, 246, 0.15)',
-              color: '#3b82f6',
+              backgroundColor: 'var(--accent-tint)',
+              color: 'var(--accent-text)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
@@ -205,7 +205,7 @@ const PulseTagModal = ({ isOpen, onClose, pulse, pulseOwnerUserId }) => {
                     padding: '10px 12px',
                     borderRadius: '14px',
                     cursor: 'pointer',
-                    backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
+                    backgroundColor: isSelected ? 'var(--accent-tint)' : 'transparent',
                     marginBottom: '4px',
                     transition: 'background-color 0.15s ease'
                   }}
@@ -227,11 +227,11 @@ const PulseTagModal = ({ isOpen, onClose, pulse, pulseOwnerUserId }) => {
                     height: '22px',
                     borderRadius: '50%',
                     border: isSelected ? 'none' : '2px solid var(--border-color)',
-                    backgroundColor: isSelected ? '#3b82f6' : 'transparent',
+                    backgroundColor: isSelected ? 'var(--accent-solid)' : 'transparent',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: '#ffffff'
+                    color: 'var(--text-on-accent)'
                   }}>
                     {isSelected && <Check size={14} strokeWidth={3} />}
                   </div>
@@ -263,8 +263,8 @@ const PulseTagModal = ({ isOpen, onClose, pulse, pulseOwnerUserId }) => {
               gap: '8px',
               padding: '8px 20px',
               borderRadius: '20px',
-              backgroundColor: selectedChatIds.length > 0 ? '#3b82f6' : 'var(--border-color)',
-              color: '#ffffff',
+              backgroundColor: selectedChatIds.length > 0 ? 'var(--accent-solid)' : 'var(--border-color)',
+              color: 'var(--text-on-accent)',
               fontSize: '14px',
               fontWeight: '700',
               border: 'none',
@@ -284,8 +284,8 @@ const PulseTagModal = ({ isOpen, onClose, pulse, pulseOwnerUserId }) => {
             bottom: '20px',
             left: '50%',
             transform: 'translateX(-50%)',
-            backgroundColor: '#10b981',
-            color: '#ffffff',
+            backgroundColor: 'var(--success-color)',
+            color: 'var(--text-on-accent)',
             padding: '8px 18px',
             borderRadius: '20px',
             fontSize: '13px',

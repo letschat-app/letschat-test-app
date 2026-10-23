@@ -114,20 +114,20 @@ const MessageStatusInfoModal = ({ isOpen, onClose, message, chat, members = [] }
 
     const status = message.status;
     let primaryStatusText = 'Sent';
-    let primaryColor = 'var(--text-secondary, #94a3b8)';
+    let primaryColor = 'var(--text-secondary)';
 
     if (status === 'media-opened') {
       primaryStatusText = isAudio ? 'Played' : 'Opened';
       primaryColor = '#a855f7';
     } else if (status === 'read') {
       primaryStatusText = isAudio ? 'Played' : (isMedia ? 'Opened' : 'Read');
-      primaryColor = '#3b82f6';
+      primaryColor = 'var(--accent-text)';
     } else if (status === 'delivered') {
       primaryStatusText = 'Delivered';
-      primaryColor = 'var(--text-secondary, #94a3b8)';
+      primaryColor = 'var(--text-secondary)';
     } else if (status === 'pending') {
       primaryStatusText = 'Pending';
-      primaryColor = '#f59e0b';
+      primaryColor = 'var(--warning-color)';
     }
 
     const actionTime = mediaOpenedTime || readTime;
@@ -139,7 +139,7 @@ const MessageStatusInfoModal = ({ isOpen, onClose, message, chat, members = [] }
           {/* Header */}
           <div style={headerStyle}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Info size={20} color="var(--accent-color, #3b82f6)" />
+              <Info size={20} color="var(--accent-color)" />
               <h3 style={titleStyle}>Message Info</h3>
             </div>
             <button onClick={onClose} style={closeButtonStyle}><X size={18} /></button>
@@ -158,13 +158,13 @@ const MessageStatusInfoModal = ({ isOpen, onClose, message, chat, members = [] }
             <div style={partnerCardStyle}>
               <Avatar chat={{ profile: partnerProfile, userName: partnerName }} size={46} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary, #ffffff)' }}>
+                <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>
                   {partnerName}
                 </div>
                 <div style={{ fontSize: '12px', color: primaryColor, fontWeight: '700', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                   {status === 'media-opened' && <Eye size={13} color="#a855f7" />}
                   {(status === 'read' || status === 'delivered') && <CheckCheck size={14} color={primaryColor} />}
-                  {status === 'pending' && <Clock size={13} color="#f59e0b" />}
+                  {status === 'pending' && <Clock size={13} color="var(--warning-color)" />}
                   {primaryStatusText}
                 </div>
               </div>
@@ -174,11 +174,11 @@ const MessageStatusInfoModal = ({ isOpen, onClose, message, chat, members = [] }
             <div style={timestampBoxStyle}>
               {(status === 'read' || status === 'media-opened') && actionTime && (
                 <div style={timestampRowStyle}>
-                  <span style={{ color: status === 'media-opened' ? '#a855f7' : '#3b82f6', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ color: status === 'media-opened' ? '#a855f7' : 'var(--accent-text)', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     {status === 'media-opened' ? <Eye size={14} /> : <CheckCheck size={14} />}
                     {isMedia ? (isAudio ? 'Played at' : 'Opened at') : 'Read at'}
                   </span>
-                  <span style={{ color: 'var(--text-primary, #ffffff)', fontWeight: '700' }}>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: '700' }}>
                     {formatTime(actionTime)}
                   </span>
                 </div>
@@ -186,10 +186,10 @@ const MessageStatusInfoModal = ({ isOpen, onClose, message, chat, members = [] }
 
               {(deliverTime || status === 'delivered' || status === 'read' || status === 'media-opened') && (
                 <div style={timestampRowStyle}>
-                  <span style={{ color: 'var(--text-secondary, #94a3b8)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <CheckCheck size={14} /> Delivered at
                   </span>
-                  <span style={{ color: 'var(--text-primary, #ffffff)', fontWeight: '600' }}>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>
                     {formatTime(deliverTime || sentTime)}
                   </span>
                 </div>
@@ -197,10 +197,10 @@ const MessageStatusInfoModal = ({ isOpen, onClose, message, chat, members = [] }
 
               {sentTime && (
                 <div style={timestampRowStyle}>
-                  <span style={{ color: 'var(--text-secondary, #94a3b8)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Clock size={13} /> Sent at
                   </span>
-                  <span style={{ color: 'var(--text-secondary, #94a3b8)', fontWeight: '500' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>
                     {formatTime(sentTime)}
                   </span>
                 </div>
@@ -282,7 +282,7 @@ const MessageStatusInfoModal = ({ isOpen, onClose, message, chat, members = [] }
         {/* Modal Header */}
         <div style={headerStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Info size={20} color="var(--accent-color, #3b82f6)" />
+            <Info size={20} color="var(--accent-color)" />
             <h3 style={titleStyle}>Message Info</h3>
           </div>
           <button onClick={onClose} style={closeButtonStyle}><X size={18} /></button>
@@ -295,7 +295,7 @@ const MessageStatusInfoModal = ({ isOpen, onClose, message, chat, members = [] }
             {message.content || message.caption || (message.type ? `[${message.type}]` : 'Message')}
           </div>
           {message.timestamp && (
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary, #94a3b8)', marginTop: '2px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
               Sent at {formatTime(message.timestamp)}
             </div>
           )}
@@ -321,11 +321,11 @@ const MessageStatusInfoModal = ({ isOpen, onClose, message, chat, members = [] }
                   <div key={item.userId} style={userRowStyle}>
                     <Avatar chat={{ profile: item.profile, userName: item.userName }} size={38} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary, #ffffff)', truncate: 'true' }}>
+                      <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)', truncate: 'true' }}>
                         {item.userName}
                       </div>
                       {item.deliverTime && item.deliverTime !== item.mainTime && (
-                        <div style={{ fontSize: '11px', color: 'var(--text-secondary, #94a3b8)', marginTop: '1px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '1px' }}>
                           Delivered at {formatTime(item.deliverTime)}
                         </div>
                       )}
@@ -345,8 +345,8 @@ const MessageStatusInfoModal = ({ isOpen, onClose, message, chat, members = [] }
           {!isMedia && (
             <div style={{ marginBottom: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-                <CheckCheck size={16} color="#3b82f6" />
-                <span style={{ fontSize: '13px', fontWeight: '800', color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                <CheckCheck size={16} color="var(--accent-text)" />
+                <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--accent-text)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   Read by ({readList.length})
                 </span>
               </div>
@@ -358,17 +358,17 @@ const MessageStatusInfoModal = ({ isOpen, onClose, message, chat, members = [] }
                   <div key={item.userId} style={userRowStyle}>
                     <Avatar chat={{ profile: item.profile, userName: item.userName }} size={38} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary, #ffffff)', truncate: 'true' }}>
+                      <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)', truncate: 'true' }}>
                         {item.userName}
                       </div>
                       {item.deliverTime && item.deliverTime !== item.mainTime && (
-                        <div style={{ fontSize: '11px', color: 'var(--text-secondary, #94a3b8)', marginTop: '1px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '1px' }}>
                           Delivered at {formatTime(item.deliverTime)}
                         </div>
                       )}
                     </div>
                     {item.mainTime && (
-                      <div style={{ fontSize: '12px', color: '#3b82f6', fontWeight: '700', textAlign: 'right' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--accent-text)', fontWeight: '700', textAlign: 'right' }}>
                         Read at {formatTime(item.mainTime)}
                       </div>
                     )}
@@ -381,8 +381,8 @@ const MessageStatusInfoModal = ({ isOpen, onClose, message, chat, members = [] }
           {/* SECTION 3: DELIVERED */}
           <div style={{ marginBottom: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-              <CheckCheck size={16} color="var(--text-secondary, #94a3b8)" />
-              <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-secondary, #94a3b8)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              <CheckCheck size={16} color="var(--text-secondary)" />
+              <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Delivered to ({deliveredList.length})
               </span>
             </div>
@@ -394,12 +394,12 @@ const MessageStatusInfoModal = ({ isOpen, onClose, message, chat, members = [] }
                 <div key={item.userId} style={userRowStyle}>
                   <Avatar chat={{ profile: item.profile, userName: item.userName }} size={38} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary, #ffffff)', truncate: 'true' }}>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)', truncate: 'true' }}>
                       {item.userName}
                     </div>
                   </div>
                   {item.deliverTime && (
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary, #94a3b8)', fontWeight: '600' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600' }}>
                       Delivered at {formatTime(item.deliverTime)}
                     </div>
                   )}
@@ -411,8 +411,8 @@ const MessageStatusInfoModal = ({ isOpen, onClose, message, chat, members = [] }
           {/* SECTION 4: PENDING */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-              <Clock size={16} color="#f59e0b" />
-              <span style={{ fontSize: '13px', fontWeight: '800', color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              <Clock size={16} color="var(--warning-color)" />
+              <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--warning-color)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Pending ({pendingList.length})
               </span>
             </div>
@@ -424,12 +424,12 @@ const MessageStatusInfoModal = ({ isOpen, onClose, message, chat, members = [] }
                 <div key={item.userId} style={userRowStyle}>
                   <Avatar chat={{ profile: item.profile, userName: item.userName }} size={38} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary, #ffffff)', truncate: 'true' }}>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)', truncate: 'true' }}>
                       {item.userName}
                     </div>
                   </div>
                   {item.sentTime && (
-                    <div style={{ fontSize: '12px', color: '#f59e0b', fontWeight: '600' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--warning-color)', fontWeight: '600' }}>
                       Sent at {formatTime(item.sentTime)}
                     </div>
                   )}
@@ -463,8 +463,8 @@ const modalContainerStyle = {
   width: '100%',
   maxWidth: '440px',
   maxHeight: '85vh',
-  backgroundColor: 'var(--bg-secondary, #111b21)',
-  border: '1px solid var(--border-color, rgba(255,255,255,0.1))',
+  backgroundColor: 'var(--bg-secondary)',
+  border: '1px solid var(--border-color))',
   borderRadius: '20px',
   overflow: 'hidden',
   display: 'flex',
@@ -475,24 +475,24 @@ const modalContainerStyle = {
 
 const headerStyle = {
   padding: '16px 20px',
-  borderBottom: '1px solid var(--border-color, rgba(255,255,255,0.1))',
+  borderBottom: '1px solid var(--border-color))',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
-  backgroundColor: 'var(--bg-card, #1e293b)'
+  backgroundColor: 'var(--bg-card)'
 };
 
 const titleStyle = {
   fontSize: '17px',
   fontWeight: '800',
-  color: 'var(--text-primary, #ffffff)',
+  color: 'var(--text-primary)',
   margin: 0
 };
 
 const closeButtonStyle = {
   background: 'none',
   border: 'none',
-  color: 'var(--text-secondary, #94a3b8)',
+  color: 'var(--text-secondary)',
   cursor: 'pointer',
   padding: '4px',
   borderRadius: '50%',
@@ -503,8 +503,8 @@ const closeButtonStyle = {
 
 const previewBoxStyle = {
   padding: '14px 20px',
-  backgroundColor: 'rgba(255, 255, 255, 0.03)',
-  borderBottom: '1px solid var(--border-color, rgba(255,255,255,0.1))',
+  backgroundColor: 'var(--bg-hover)',
+  borderBottom: '1px solid var(--border-color))',
   display: 'flex',
   flexDirection: 'column',
   gap: '4px'
@@ -512,14 +512,14 @@ const previewBoxStyle = {
 
 const previewLabelStyle = {
   fontSize: '11px',
-  color: 'var(--text-secondary, #94a3b8)',
+  color: 'var(--text-secondary)',
   fontWeight: '700',
   textTransform: 'uppercase'
 };
 
 const previewTextStyle = {
   fontSize: '14px',
-  color: 'var(--text-primary, #ffffff)',
+  color: 'var(--text-primary)',
   fontWeight: '600',
   overflow: 'hidden',
   textOverflow: 'ellipsis',
@@ -531,9 +531,9 @@ const partnerCardStyle = {
   alignItems: 'center',
   gap: '14px',
   padding: '14px',
-  backgroundColor: 'rgba(255, 255, 255, 0.03)',
+  backgroundColor: 'var(--bg-hover)',
   borderRadius: '16px',
-  border: '1px solid rgba(255, 255, 255, 0.06)'
+  border: '1px solid var(--bg-hover)'
 };
 
 const timestampBoxStyle = {
@@ -544,7 +544,7 @@ const timestampBoxStyle = {
   padding: '14px',
   backgroundColor: 'rgba(255, 255, 255, 0.02)',
   borderRadius: '14px',
-  border: '1px solid rgba(255, 255, 255, 0.04)'
+  border: '1px solid var(--bg-hover)'
 };
 
 const timestampRowStyle = {
@@ -560,17 +560,17 @@ const userRowStyle = {
   gap: '12px',
   padding: '8px 10px',
   borderRadius: '12px',
-  backgroundColor: 'rgba(255, 255, 255, 0.03)',
+  backgroundColor: 'var(--bg-hover)',
   marginBottom: '6px'
 };
 
 const emptySectionStyle = {
   fontSize: '12px',
-  color: 'var(--text-secondary, #94a3b8)',
+  color: 'var(--text-secondary)',
   padding: '10px',
   borderRadius: '10px',
   backgroundColor: 'rgba(255, 255, 255, 0.02)',
-  border: '1px dashed rgba(255, 255, 255, 0.08)',
+  border: '1px dashed var(--bg-hover)',
   textAlign: 'center'
 };
 

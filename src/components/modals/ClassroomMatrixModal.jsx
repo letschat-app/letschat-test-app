@@ -112,25 +112,25 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
       >
         <div
           style={{
-            backgroundColor: 'var(--bg-card, #1e293b)',
+            backgroundColor: 'var(--bg-card)',
             padding: '24px',
             borderRadius: '16px',
             textAlign: 'center',
             maxWidth: '400px',
-            color: 'var(--text-primary, #f8fafc)',
+            color: 'var(--text-primary)',
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          <XCircle size={48} color="#ef4444" style={{ margin: '0 auto 12px' }} />
+          <XCircle size={48} color="var(--danger-color)" style={{ margin: '0 auto 12px' }} />
           <h3 style={{ margin: '0 0 8px', fontSize: '18px', fontWeight: '700' }}>Access Restricted</h3>
-          <p style={{ margin: '0 0 16px', fontSize: '14px', color: 'var(--text-secondary, #94a3b8)' }}>
+          <p style={{ margin: '0 0 16px', fontSize: '14px', color: 'var(--text-secondary)' }}>
             Classroom Assignment Analytics and Matrix Reports are available exclusively to faculty members and instructors.
           </p>
           <button
             onClick={onClose}
             style={{
               padding: '10px 20px',
-              backgroundColor: 'var(--accent-color, #3b82f6)',
+              backgroundColor: 'var(--accent-color)',
               color: '#ffffff',
               border: 'none',
               borderRadius: '10px',
@@ -188,8 +188,8 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
       >
         <div
           style={{
-            backgroundColor: 'var(--bg-card, #1e293b)',
-            border: '1px solid var(--border-color, #334155)',
+            backgroundColor: 'var(--bg-card)',
+            border: '1px solid var(--border-color)',
             borderRadius: '20px',
             width: '100%',
             maxWidth: '1100px',
@@ -198,7 +198,7 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
             flexDirection: 'column',
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
             overflow: 'hidden',
-            color: 'var(--text-primary, #f8fafc)',
+            color: 'var(--text-primary)',
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -206,13 +206,13 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
           <div
             style={{
               padding: '18px 24px',
-              borderBottom: '1px solid var(--border-color, #334155)',
+              borderBottom: '1px solid var(--border-color)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               flexWrap: 'wrap',
               gap: '12px',
-              background: 'linear-gradient(90deg, rgba(59, 130, 246, 0.12), transparent)',
+              background: 'linear-gradient(90deg, var(--accent-tint), transparent)',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -221,11 +221,11 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
                   width: '42px',
                   height: '42px',
                   borderRadius: '12px',
-                  backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                  backgroundColor: 'var(--accent-tint-border)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color: '#60a5fa',
+                  color: 'var(--accent-text)',
                 }}
               >
                 <BarChart3 size={24} />
@@ -239,7 +239,7 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
                       padding: '2px 8px',
                       borderRadius: '6px',
                       backgroundColor: 'rgba(16, 185, 129, 0.2)',
-                      color: '#34d399',
+                      color: 'var(--success-color)',
                       fontWeight: '700',
                       textTransform: 'uppercase',
                     }}
@@ -247,7 +247,7 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
                     Faculty View
                   </span>
                 </div>
-                <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary, #94a3b8)' }}>
+                <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)' }}>
                   {classroomName || `Room #${roomId}`} • Submission tracking & completion stats
                 </p>
               </div>
@@ -261,7 +261,7 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
                   padding: '10px 16px',
                   borderRadius: '10px',
                   border: 'none',
-                  backgroundColor: 'var(--accent-color, #3b82f6)',
+                  backgroundColor: 'var(--accent-color)',
                   color: '#ffffff',
                   fontWeight: '700',
                   fontSize: '13px',
@@ -269,7 +269,7 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
+                  boxShadow: '0 4px 12px color-mix(in srgb, var(--accent-solid) 45%, transparent)',
                   transition: 'all 0.2s ease',
                 }}
               >
@@ -282,7 +282,7 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: 'var(--text-secondary, #94a3b8)',
+                  color: 'var(--text-secondary)',
                   cursor: 'pointer',
                   padding: '8px',
                   borderRadius: '10px',
@@ -303,23 +303,23 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
               gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
               gap: '12px',
               padding: '16px 24px',
-              borderBottom: '1px solid var(--border-color, #334155)',
-              backgroundColor: 'var(--bg-secondary, #0f172a)',
+              borderBottom: '1px solid var(--border-color)',
+              backgroundColor: 'var(--bg-secondary)',
             }}
           >
-            <div style={{ padding: '12px 16px', borderRadius: '12px', backgroundColor: 'var(--bg-card, #1e293b)', border: '1px solid var(--border-color, #334155)' }}>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary, #94a3b8)', marginBottom: '4px' }}>Enrolled Students</div>
-              <div style={{ fontSize: '22px', fontWeight: '800', color: 'var(--text-primary, #f8fafc)' }}>{totalStudents}</div>
+            <div style={{ padding: '12px 16px', borderRadius: '12px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Enrolled Students</div>
+              <div style={{ fontSize: '22px', fontWeight: '800', color: 'var(--text-primary)' }}>{totalStudents}</div>
             </div>
 
-            <div style={{ padding: '12px 16px', borderRadius: '12px', backgroundColor: 'var(--bg-card, #1e293b)', border: '1px solid var(--border-color, #334155)' }}>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary, #94a3b8)', marginBottom: '4px' }}>Total Assignments</div>
-              <div style={{ fontSize: '22px', fontWeight: '800', color: '#60a5fa' }}>{totalClassAssignments}</div>
+            <div style={{ padding: '12px 16px', borderRadius: '12px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Total Assignments</div>
+              <div style={{ fontSize: '22px', fontWeight: '800', color: 'var(--accent-text)' }}>{totalClassAssignments}</div>
             </div>
 
-            <div style={{ padding: '12px 16px', borderRadius: '12px', backgroundColor: 'var(--bg-card, #1e293b)', border: '1px solid var(--border-color, #334155)' }}>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary, #94a3b8)', marginBottom: '4px' }}>Class Completion Rate</div>
-              <div style={{ fontSize: '22px', fontWeight: '800', color: avgCompletion >= 75 ? '#34d399' : '#f59e0b' }}>
+            <div style={{ padding: '12px 16px', borderRadius: '12px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Class Completion Rate</div>
+              <div style={{ fontSize: '22px', fontWeight: '800', color: avgCompletion >= 75 ? 'var(--success-color)' : 'var(--warning-color)' }}>
                 {avgCompletion}%
               </div>
             </div>
@@ -334,19 +334,19 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
               justifyContent: 'space-between',
               flexWrap: 'wrap',
               gap: '12px',
-              borderBottom: '1px solid var(--border-color, #334155)',
+              borderBottom: '1px solid var(--border-color)',
             }}
           >
             {/* View Switcher Tabs */}
-            <div style={{ display: 'flex', gap: '6px', backgroundColor: 'var(--bg-secondary, #0f172a)', padding: '4px', borderRadius: '10px' }}>
+            <div style={{ display: 'flex', gap: '6px', backgroundColor: 'var(--bg-secondary)', padding: '4px', borderRadius: '10px' }}>
               <button
                 onClick={() => setActiveTab('matrix')}
                 style={{
                   padding: '6px 14px',
                   borderRadius: '8px',
                   border: 'none',
-                  backgroundColor: activeTab === 'matrix' ? 'var(--accent-color, #3b82f6)' : 'transparent',
-                  color: activeTab === 'matrix' ? '#ffffff' : 'var(--text-secondary, #94a3b8)',
+                  backgroundColor: activeTab === 'matrix' ? 'var(--accent-color)' : 'transparent',
+                  color: activeTab === 'matrix' ? '#ffffff' : 'var(--text-secondary)',
                   fontWeight: '700',
                   fontSize: '12px',
                   cursor: 'pointer',
@@ -360,8 +360,8 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
                   padding: '6px 14px',
                   borderRadius: '8px',
                   border: 'none',
-                  backgroundColor: activeTab === 'stats' ? 'var(--accent-color, #3b82f6)' : 'transparent',
-                  color: activeTab === 'stats' ? '#ffffff' : 'var(--text-secondary, #94a3b8)',
+                  backgroundColor: activeTab === 'stats' ? 'var(--accent-color)' : 'transparent',
+                  color: activeTab === 'stats' ? '#ffffff' : 'var(--text-secondary)',
                   fontWeight: '700',
                   fontSize: '12px',
                   cursor: 'pointer',
@@ -374,7 +374,7 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
             {/* Search & Refresh */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{ position: 'relative' }}>
-                <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
                 <input
                   type="text"
                   placeholder="Search student..."
@@ -383,9 +383,9 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
                   style={{
                     padding: '8px 12px 8px 32px',
                     borderRadius: '10px',
-                    border: '1px solid var(--border-color, #334155)',
-                    backgroundColor: 'var(--bg-secondary, #0f172a)',
-                    color: 'var(--text-primary, #f8fafc)',
+                    border: '1px solid var(--border-color)',
+                    backgroundColor: 'var(--bg-secondary)',
+                    color: 'var(--text-primary)',
                     fontSize: '13px',
                     outline: 'none',
                     width: '200px',
@@ -400,9 +400,9 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
                 style={{
                   padding: '8px',
                   borderRadius: '10px',
-                  border: '1px solid var(--border-color, #334155)',
-                  backgroundColor: 'var(--bg-secondary, #0f172a)',
-                  color: 'var(--text-secondary, #94a3b8)',
+                  border: '1px solid var(--border-color)',
+                  backgroundColor: 'var(--bg-secondary)',
+                  color: 'var(--text-secondary)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -417,34 +417,34 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
           {/* Main Content Area */}
           <div style={{ flex: 1, overflow: 'auto', padding: '20px' }}>
             {loading ? (
-              <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary, #94a3b8)' }}>
-                <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px', color: '#60a5fa' }} />
+              <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px', color: 'var(--accent-text)' }} />
                 <p style={{ margin: 0, fontWeight: '600' }}>Loading assignment matrix analytics...</p>
               </div>
             ) : filteredStudents.length === 0 ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary, #94a3b8)' }}>
+              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                 <Users size={36} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
                 <p style={{ margin: 0, fontWeight: '600' }}>No student record data found matching filters.</p>
               </div>
             ) : activeTab === 'matrix' ? (
               /* Green Tick (✔) & Red Cross (✘) Matrix View Table */
-              <div style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid var(--border-color, #334155)' }}>
+              <div style={{ overflowX: 'auto', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
                   <thead>
-                    <tr style={{ backgroundColor: 'var(--bg-secondary, #0f172a)', borderBottom: '1px solid var(--border-color, #334155)' }}>
-                      <th style={{ padding: '12px 16px', fontWeight: '700', minWidth: '180px', position: 'sticky', left: 0, backgroundColor: 'var(--bg-secondary, #0f172a)', zIndex: 2 }}>
+                    <tr style={{ backgroundColor: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)' }}>
+                      <th style={{ padding: '12px 16px', fontWeight: '700', minWidth: '180px', position: 'sticky', left: 0, backgroundColor: 'var(--bg-secondary)', zIndex: 2 }}>
                         Student Name
                       </th>
                       {assignments.map((assign, idx) => (
                         <th key={assign.id || idx} style={{ padding: '12px 16px', fontWeight: '700', minWidth: '140px', textAlign: 'center' }}>
-                          <div style={{ fontSize: '12px', color: '#60a5fa', fontWeight: '700' }}>{assign.title || `Assignment ${idx + 1}`}</div>
-                          <div style={{ fontSize: '10px', color: 'var(--text-secondary, #94a3b8)', fontWeight: 'normal' }}>
+                          <div style={{ fontSize: '12px', color: 'var(--accent-text)', fontWeight: '700' }}>{assign.title || `Assignment ${idx + 1}`}</div>
+                          <div style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 'normal' }}>
                             {assign.marks ? `${assign.marks} pts` : 'Task'}
                           </div>
                         </th>
                       ))}
                       {assignments.length === 0 && (
-                        <th style={{ padding: '12px 16px', fontWeight: '700', textAlign: 'center', color: 'var(--text-secondary, #94a3b8)' }}>
+                        <th style={{ padding: '12px 16px', fontWeight: '700', textAlign: 'center', color: 'var(--text-secondary)' }}>
                           No Assignments Posted Yet
                         </th>
                       )}
@@ -460,7 +460,7 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
                         <tr
                           key={student.userId}
                           style={{
-                            borderBottom: '1px solid var(--border-color, #334155)',
+                            borderBottom: '1px solid var(--border-color)',
                             transition: 'background-color 0.15s ease',
                           }}
                         >
@@ -470,7 +470,7 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
                               padding: '12px 16px',
                               position: 'sticky',
                               left: 0,
-                              backgroundColor: 'var(--bg-card, #1e293b)',
+                              backgroundColor: 'var(--bg-card)',
                               zIndex: 1,
                             }}
                           >
@@ -480,8 +480,8 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
                                 size={32}
                               />
                               <div>
-                                <div style={{ fontWeight: '700', color: 'var(--text-primary, #f8fafc)' }}>{student.userName}</div>
-                                <div style={{ fontSize: '11px', color: 'var(--text-secondary, #94a3b8)' }}>ID: {student.userId}</div>
+                                <div style={{ fontWeight: '700', color: 'var(--text-primary)' }}>{student.userName}</div>
+                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>ID: {student.userId}</div>
                               </div>
                             </div>
                           </td>
@@ -504,7 +504,7 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
                                       padding: '4px 10px',
                                       borderRadius: '12px',
                                       backgroundColor: 'rgba(16, 185, 129, 0.18)',
-                                      color: '#34d399',
+                                      color: 'var(--success-color)',
                                       fontWeight: '800',
                                       fontSize: '11px',
                                       border: '1px solid rgba(16, 185, 129, 0.3)',
@@ -520,11 +520,11 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
                                       gap: '4px',
                                       padding: '4px 10px',
                                       borderRadius: '12px',
-                                      backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                                      color: '#f87171',
+                                      backgroundColor: 'var(--danger-tint)',
+                                      color: 'var(--danger-color)',
                                       fontWeight: '800',
                                       fontSize: '11px',
-                                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                                      border: '1px solid var(--danger-tint-border)',
                                     }}
                                   >
                                     <XCircle size={13} /> MISSING
@@ -535,14 +535,14 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
                           })}
 
                           {assignments.length === 0 && (
-                            <td style={{ padding: '12px 16px', textAlign: 'center', color: 'var(--text-secondary, #94a3b8)' }}>
+                            <td style={{ padding: '12px 16px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                               -
                             </td>
                           )}
 
                           {/* Progress Cell */}
                           <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                            <span style={{ fontWeight: '800', color: pct >= 80 ? '#34d399' : pct >= 50 ? '#f59e0b' : '#f87171' }}>
+                            <span style={{ fontWeight: '800', color: pct >= 80 ? 'var(--success-color)' : pct >= 50 ? 'var(--warning-color)' : 'var(--danger-color)' }}>
                               {pct}%
                             </span>
                           </td>
@@ -563,8 +563,8 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
                       style={{
                         padding: '16px',
                         borderRadius: '14px',
-                        backgroundColor: 'var(--bg-secondary, #0f172a)',
-                        border: '1px solid var(--border-color, #334155)',
+                        backgroundColor: 'var(--bg-secondary)',
+                        border: '1px solid var(--border-color)',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '12px',
@@ -574,14 +574,14 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
                         <Avatar chat={{ profile: student.profilePic, userName: student.userName }} size={44} />
                         <div>
                           <h4 style={{ margin: 0, fontSize: '15px', fontWeight: '700' }}>{student.userName}</h4>
-                          <span style={{ fontSize: '12px', color: 'var(--text-secondary, #94a3b8)' }}>ID: {student.userId}</span>
+                          <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>ID: {student.userId}</span>
                         </div>
                       </div>
 
                       {/* Stats numbers */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary, #94a3b8)' }}>
-                        <span>Completed: <strong style={{ color: '#34d399' }}>{student.completedAssignments || 0}</strong></span>
-                        <span>Pending: <strong style={{ color: '#f87171' }}>{student.pendingAssignments || 0}</strong></span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        <span>Completed: <strong style={{ color: 'var(--success-color)' }}>{student.completedAssignments || 0}</strong></span>
+                        <span>Pending: <strong style={{ color: 'var(--danger-color)' }}>{student.pendingAssignments || 0}</strong></span>
                         <span>Total: <strong>{student.totalAssignments || 0}</strong></span>
                       </div>
 
@@ -589,14 +589,14 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
                       <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px', fontWeight: '700' }}>
                           <span>Completion Rate</span>
-                          <span style={{ color: pct >= 80 ? '#34d399' : '#f59e0b' }}>{pct}%</span>
+                          <span style={{ color: pct >= 80 ? 'var(--success-color)' : 'var(--warning-color)' }}>{pct}%</span>
                         </div>
-                        <div style={{ width: '100%', height: '8px', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--border-color)', borderRadius: '4px', overflow: 'hidden' }}>
                           <div
                             style={{
                               width: `${pct}%`,
                               height: '100%',
-                              backgroundColor: pct >= 80 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444',
+                              backgroundColor: pct >= 80 ? 'var(--success-color)' : pct >= 50 ? 'var(--warning-color)' : 'var(--danger-color)',
                               transition: 'width 0.4s ease',
                             }}
                           />

@@ -28,10 +28,10 @@ export default function MediaViewer({ media, onClose, onEdit }) {
     <div 
       onClick={onClose}
       style={{
-        position: 'absolute',
+        position: 'fixed',
         top: 0, left: 0, right: 0, bottom: 0,
         backgroundColor: 'rgba(0, 0, 0, 0.95)',
-        zIndex: 2000,
+        zIndex: 100000,
         display: 'flex',
         flexDirection: 'column',
         animation: 'viewerFadeIn 0.25s ease-out',

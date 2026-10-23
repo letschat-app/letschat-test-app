@@ -46,8 +46,8 @@ class ErrorBoundary extends React.Component {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: 'var(--bg-primary, #0f172a)',
-          color: 'var(--text-primary, #ffffff)',
+          backgroundColor: 'var(--bg-primary)',
+          color: 'var(--text-primary)',
           padding: '24px',
           boxSizing: 'border-box',
           textAlign: 'center',
@@ -57,21 +57,21 @@ class ErrorBoundary extends React.Component {
             width: '72px',
             height: '72px',
             borderRadius: '50%',
-            backgroundColor: 'rgba(239, 68, 68, 0.15)',
-            border: '2px solid rgba(239, 68, 68, 0.4)',
+            backgroundColor: 'var(--danger-tint)',
+            border: '2px solid var(--danger-tint-border)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             marginBottom: '20px'
           }}>
-            <AlertTriangle size={36} color="#ef4444" />
+            <AlertTriangle size={36} color="var(--danger-color)" />
           </div>
 
-          <h2 style={{ fontSize: '22px', fontWeight: '800', margin: '0 0 10px 0', color: 'var(--text-primary, #ffffff)' }}>
+          <h2 style={{ fontSize: '22px', fontWeight: '800', margin: '0 0 10px 0', color: 'var(--text-primary)' }}>
             This Page is Currently Down
           </h2>
 
-          <p style={{ fontSize: '14px', color: 'var(--text-secondary, #94a3b8)', maxWidth: '420px', margin: '0 0 24px 0', lineHeight: '1.6' }}>
+          <p style={{ fontSize: '14px', color: 'var(--text-secondary)', maxWidth: '420px', margin: '0 0 24px 0', lineHeight: '1.6' }}>
             An unexpected error occurred while rendering this page. You can safely go back to your previous page or return to your chats.
           </p>
 
@@ -84,13 +84,13 @@ class ErrorBoundary extends React.Component {
                 gap: '8px',
                 padding: '12px 20px',
                 borderRadius: '12px',
-                backgroundColor: 'var(--accent-color, #3b82f6)',
+                backgroundColor: 'var(--accent-color)',
                 color: '#ffffff',
                 border: 'none',
                 fontWeight: '700',
                 fontSize: '14px',
                 cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(59, 130, 246, 0.35)'
+                boxShadow: '0 4px 14px color-mix(in srgb, var(--accent-solid) 45%, transparent)'
               }}
             >
               <ArrowLeft size={18} /> Go Back to Previous Page
@@ -104,9 +104,9 @@ class ErrorBoundary extends React.Component {
                 gap: '8px',
                 padding: '12px 20px',
                 borderRadius: '12px',
-                backgroundColor: 'var(--bg-secondary, #1e293b)',
-                color: 'var(--text-primary, #ffffff)',
-                border: '1px solid var(--border-color, #334155)',
+                backgroundColor: 'var(--bg-secondary)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-color)',
                 fontWeight: '700',
                 fontSize: '14px',
                 cursor: 'pointer'
@@ -118,7 +118,7 @@ class ErrorBoundary extends React.Component {
 
           <button
             onClick={() => this.setState(prev => ({ showDetails: !prev.showDetails }))}
-            style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '12px', textDecoration: 'underline', cursor: 'pointer' }}
+            style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '12px', textDecoration: 'underline', cursor: 'pointer' }}
           >
             {this.state.showDetails ? 'Hide technical details' : 'Show technical details'}
           </button>
@@ -129,10 +129,10 @@ class ErrorBoundary extends React.Component {
               padding: '12px 16px',
               borderRadius: '10px',
               backgroundColor: 'rgba(0,0,0,0.4)',
-              border: '1px solid rgba(255,255,255,0.1)',
+              border: '1px solid var(--border-color)',
               fontSize: '12px',
               fontFamily: 'monospace',
-              color: '#f87171',
+              color: 'var(--danger-color)',
               maxWidth: '500px',
               wordBreak: 'break-all',
               textAlign: 'left'

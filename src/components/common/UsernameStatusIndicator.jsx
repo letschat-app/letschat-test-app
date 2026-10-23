@@ -15,7 +15,7 @@ export const UsernameStatusBadge = ({ checkResult }) => {
 
   if (isChecking) {
     return (
-      <span style={{ fontSize: '12px', color: 'var(--accent-color, #3b82f6)', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+      <span style={{ fontSize: '12px', color: 'var(--accent-text)', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
         <Loader2 size={13} className="animate-spin" />
         Checking availability...
       </span>
@@ -24,7 +24,7 @@ export const UsernameStatusBadge = ({ checkResult }) => {
 
   if (status === 'allow') {
     return (
-      <span style={{ fontSize: '12px', color: '#10b981', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+      <span style={{ fontSize: '12px', color: 'var(--success-color)', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
         ✓ Available
       </span>
     );
@@ -32,7 +32,7 @@ export const UsernameStatusBadge = ({ checkResult }) => {
 
   if (status === 'warn') {
     return (
-      <span style={{ fontSize: '12px', color: '#f59e0b', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+      <span style={{ fontSize: '12px', color: 'var(--warning-color)', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
         ⚠️ Available (similar)
       </span>
     );
@@ -40,7 +40,7 @@ export const UsernameStatusBadge = ({ checkResult }) => {
 
   if (status === 'block') {
     return (
-      <span style={{ fontSize: '12px', color: '#ef4444', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+      <span style={{ fontSize: '12px', color: 'var(--danger-color)', fontWeight: '700', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
         ✕ Username is taken
       </span>
     );
@@ -78,18 +78,18 @@ export const UsernameStatusIndicator = ({
         <Loader2
           size={16}
           className="animate-spin"
-          style={{ color: 'var(--accent-color, #3b82f6)', flexShrink: 0 }}
+          style={{ color: 'var(--accent-text)', flexShrink: 0 }}
         />
       );
     }
     if (status === 'allow') {
-      return <CheckCircle2 size={16} color="#10b981" style={{ flexShrink: 0 }} />;
+      return <CheckCircle2 size={16} color="var(--success-color)" style={{ flexShrink: 0 }} />;
     }
     if (status === 'warn') {
-      return <AlertTriangle size={16} color="#f59e0b" style={{ flexShrink: 0 }} />;
+      return <AlertTriangle size={16} color="var(--warning-color)" style={{ flexShrink: 0 }} />;
     }
     if (status === 'block') {
-      return <AlertCircle size={16} color="#ef4444" style={{ flexShrink: 0 }} />;
+      return <AlertCircle size={16} color="var(--danger-color)" style={{ flexShrink: 0 }} />;
     }
     return null;
   }
@@ -97,20 +97,20 @@ export const UsernameStatusIndicator = ({
   // Text message display below the input
   if (status === 'idle' && !isChecking) return null;
 
-  let color = '#9ca3af';
+  let color = 'var(--text-muted)';
   let IconComponent = null;
 
   if (isChecking) {
-    color = 'var(--accent-color, #3b82f6)';
+    color = 'var(--accent-text)';
     IconComponent = Loader2;
   } else if (status === 'allow') {
-    color = '#10b981';
+    color = 'var(--success-color)';
     IconComponent = CheckCircle2;
   } else if (status === 'warn') {
-    color = '#f59e0b';
+    color = 'var(--warning-color)';
     IconComponent = AlertTriangle;
   } else if (status === 'block') {
-    color = '#ef4444';
+    color = 'var(--danger-color)';
     IconComponent = AlertCircle;
   }
 

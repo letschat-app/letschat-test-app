@@ -105,7 +105,7 @@ const StarredMessages = () => {
                                 padding: '6px 14px',
                                 borderRadius: '20px',
                                 border: filter === tab.id ? '1px solid var(--accent-color)' : '1px solid var(--border-color)',
-                                backgroundColor: filter === tab.id ? 'rgba(59, 130, 246, 0.15)' : 'transparent',
+                                backgroundColor: filter === tab.id ? 'color-mix(in srgb, var(--accent-solid) 45%, transparent)' : 'transparent',
                                 color: filter === tab.id ? 'var(--accent-color)' : 'var(--text-secondary)',
                                 fontSize: '13px',
                                 fontWeight: filter === tab.id ? '600' : '500',

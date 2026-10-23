@@ -680,7 +680,7 @@ const ProfilePage = () => {
                                 border: 'none',
                                 background: existingChatId 
                                     ? 'var(--accent-gradient)'
-                                    : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                    : 'linear-gradient(135deg, var(--success-color) 0%, var(--success-color) 100%)',
                                 color: '#ffffff',
                                 fontSize: '16px',
                                 fontWeight: '700',
@@ -721,7 +721,7 @@ const ProfilePage = () => {
                                     transition: 'all 0.2s ease'
                                 }}
                             >
-                                <Calendar size={19} color="#6366f1" />
+                                <Calendar size={19} color="var(--accent-text)" />
                                 Book Meeting
                             </button>
                         </div>
@@ -849,7 +849,7 @@ const ProfilePage = () => {
                                     fontSize: '10px',
                                     padding: '2px 8px',
                                     borderRadius: '6px',
-                                    background: 'rgba(255, 255, 255, 0.05)',
+                                    background: 'var(--bg-hover)',
                                     color: 'var(--text-secondary)',
                                     fontWeight: '600',
                                     border: '1px solid var(--border-color)',
@@ -873,7 +873,7 @@ const ProfilePage = () => {
                                             alignItems: 'center',
                                             gap: '4px',
                                             fontSize: '11px',
-                                            color: '#f59e0b',
+                                            color: 'var(--warning-color)',
                                             background: 'rgba(245, 158, 11, 0.1)',
                                             padding: '3px 8px',
                                             borderRadius: '8px',
@@ -921,9 +921,9 @@ const ProfilePage = () => {
                                                 borderRadius: '10px',
                                                 border: `1px solid ${
                                                     displayNameError
-                                                        ? '#ef4444'
+                                                        ? 'var(--danger-color)'
                                                         : (newDisplayName.trim() && computeSelfSimilarity(username, newDisplayName) >= 3.0)
-                                                            ? '#10b981'
+                                                            ? 'var(--success-color)'
                                                             : 'var(--border-color)'
                                                 }`,
                                                 background: 'var(--bg-primary)',
@@ -941,7 +941,7 @@ const ProfilePage = () => {
                                             display: 'flex',
                                             alignItems: 'center',
                                             gap: '6px',
-                                            color: computeSelfSimilarity(username, newDisplayName) >= 3.0 ? '#10b981' : '#ef4444'
+                                            color: computeSelfSimilarity(username, newDisplayName) >= 3.0 ? 'var(--success-color)' : 'var(--danger-color)'
                                         }}>
                                             {computeSelfSimilarity(username, newDisplayName) >= 3.0 ? (
                                                 <span>✓ Similarity: {computeSelfSimilarity(username, newDisplayName)}/10 with @{username} (Valid)</span>
@@ -952,19 +952,19 @@ const ProfilePage = () => {
                                     )}
 
                                     {displayNameError && (
-                                        <div style={{ fontSize: '12px', color: '#ef4444', fontWeight: '500' }}>
+                                        <div style={{ fontSize: '12px', color: 'var(--danger-color)', fontWeight: '500' }}>
                                             {displayNameError}
                                         </div>
                                     )}
 
                                     <div style={{ display: 'flex', alignItems: 'center', marginTop: '2px', marginBottom: '4px' }}>
-                                        <span style={{ fontSize: '11px', color: 'var(--text-secondary, #94a3b8)' }}>
+                                        <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                                             Display names require &ge; 3/10 similarity to your permanent username.{' '}
                                             <button
                                                 type="button"
                                                 onClick={() => setShowPolicyModal(true)}
                                                 style={{
-                                                    color: '#60a5fa',
+                                                    color: 'var(--accent-text)',
                                                     textDecoration: 'underline',
                                                     background: 'none',
                                                     border: 'none',
@@ -1051,7 +1051,7 @@ const ProfilePage = () => {
                                                 width: '100%',
                                                 padding: '8px 36px 8px 12px',
                                                 borderRadius: '10px',
-                                                border: `1px solid ${roomNicknameCheck.status === 'block' ? '#ef4444' : roomNicknameCheck.status === 'warn' ? '#f59e0b' : roomNicknameCheck.status === 'allow' ? '#10b981' : 'var(--border-color)'}`,
+                                                border: `1px solid ${roomNicknameCheck.status === 'block' ? 'var(--danger-color)' : roomNicknameCheck.status === 'warn' ? 'var(--warning-color)' : roomNicknameCheck.status === 'allow' ? 'var(--success-color)' : 'var(--border-color)'}`,
                                                 background: 'var(--bg-primary)',
                                                 color: 'var(--text-primary)',
                                                 fontSize: '13px'
@@ -1063,13 +1063,13 @@ const ProfilePage = () => {
                                     </div>
                                     <UsernameStatusIndicator checkResult={roomNicknameCheck} />
                                     <div style={{ display: 'flex', alignItems: 'center', marginTop: '2px', marginBottom: '4px' }}>
-                                        <span style={{ fontSize: '11px', color: 'var(--text-secondary, #94a3b8)' }}>
+                                        <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                                             Nicknames are checked to prevent impersonation.{' '}
                                             <button
                                                 type="button"
                                                 onClick={() => setShowPolicyModal(true)}
                                                 style={{
-                                                    color: '#60a5fa',
+                                                    color: 'var(--accent-text)',
                                                     textDecoration: 'underline',
                                                     background: 'none',
                                                     border: 'none',
@@ -1126,9 +1126,9 @@ const ProfilePage = () => {
                         <div style={{ ...infoItemStyle, borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
                             <span style={labelStyle}>Status</span>
                             {isSleepMode ? (
-                                <span style={{ ...valueStyle, color: '#f59e0b' }}>Sleeping 😴</span>
+                                <span style={{ ...valueStyle, color: 'var(--warning-color)' }}>Sleeping 😴</span>
                             ) : (
-                                <span style={{ ...valueStyle, color: '#10b981' }}>● Online</span>
+                                <span style={{ ...valueStyle, color: 'var(--success-color)' }}>● Online</span>
                             )}
                         </div>
                     </div>
@@ -1144,11 +1144,11 @@ const ProfilePage = () => {
                                 <span style={{ ...labelStyle, color: 'var(--text-primary)', fontWeight: '600' }}>Push Notifications</span>
                             </div>
                             {(permissionStatus === 'granted' && fcmToken) ? (
-                                <span style={{ color: '#10b981', fontSize: '12px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ color: 'var(--success-color)', fontSize: '12px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                     <CheckCircle2 size={13} /> On
                                 </span>
                             ) : (
-                                <span style={{ color: '#ef4444', fontSize: '12px', fontWeight: '700' }}>Off</span>
+                                <span style={{ color: 'var(--danger-color)', fontSize: '12px', fontWeight: '700' }}>Off</span>
                             )}
                         </div>
 
@@ -1169,7 +1169,7 @@ const ProfilePage = () => {
                             ) : (
                                 <button
                                     onClick={disableNotifications}
-                                    style={{ ...notificationEnableButtonStyle, background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+                                    style={{ ...notificationEnableButtonStyle, background: 'var(--danger-tint)', color: 'var(--danger-color)', border: '1px solid var(--danger-tint-border)' }}
                                 >
                                     Disable Notifications
                                 </button>
@@ -1184,11 +1184,11 @@ const ProfilePage = () => {
                     <div style={infoSectionStyle}>
                         <div style={{ ...infoItemStyle, marginBottom: '4px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <Moon size={16} color={isSleepMode ? '#f59e0b' : 'var(--accent-color)'} />
+                                <Moon size={16} color={isSleepMode ? 'var(--warning-color)' : 'var(--accent-color)'} />
                                 <span style={{ ...labelStyle, color: 'var(--text-primary)', fontWeight: '600' }}>Sleep Mode</span>
                             </div>
                             {isSleepMode ? (
-                                <span style={{ color: '#f59e0b', fontSize: '12px', fontWeight: '700' }}>Active</span>
+                                <span style={{ color: 'var(--warning-color)', fontSize: '12px', fontWeight: '700' }}>Active</span>
                             ) : (
                                 <span style={{ color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '700' }}>Inactive</span>
                             )}
@@ -1205,7 +1205,7 @@ const ProfilePage = () => {
                             style={{
                                 ...notificationEnableButtonStyle,
                                 background: isSleepMode ? 'rgba(245, 158, 11, 0.1)' : 'var(--bg-card-hover)',
-                                color: isSleepMode ? '#f59e0b' : 'var(--text-primary)',
+                                color: isSleepMode ? 'var(--warning-color)' : 'var(--text-primary)',
                                 border: isSleepMode ? '1px solid rgba(245, 158, 11, 0.2)' : '1px solid var(--border-color)'
                             }}
                         >
@@ -1220,11 +1220,11 @@ const ProfilePage = () => {
                     <div style={infoSectionStyle}>
                         <div style={{ ...infoItemStyle, marginBottom: '4px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <ShieldCheck size={16} color={is2FAEnabled ? '#10b981' : 'var(--accent-color)'} />
+                                <ShieldCheck size={16} color={is2FAEnabled ? 'var(--success-color)' : 'var(--accent-color)'} />
                                 <span style={{ ...labelStyle, color: 'var(--text-primary)', fontWeight: '600' }}>2-Factor Authentication</span>
                             </div>
                             {is2FAEnabled ? (
-                                <span style={{ color: '#10b981', fontSize: '12px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ color: 'var(--success-color)', fontSize: '12px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                     <CheckCircle2 size={13} /> Enabled
                                 </span>
                             ) : (
@@ -1243,9 +1243,9 @@ const ProfilePage = () => {
                             disabled={toggling2FA}
                             style={{
                                 ...notificationEnableButtonStyle,
-                                background: is2FAEnabled ? 'rgba(239, 68, 68, 0.1)' : 'var(--accent-color)',
-                                color: is2FAEnabled ? '#ef4444' : 'white',
-                                border: is2FAEnabled ? '1px solid rgba(239, 68, 68, 0.2)' : 'none',
+                                background: is2FAEnabled ? 'var(--danger-tint)' : 'var(--accent-color)',
+                                color: is2FAEnabled ? 'var(--danger-color)' : 'white',
+                                border: is2FAEnabled ? '1px solid var(--danger-tint-border)' : 'none',
                                 opacity: toggling2FA ? 0.7 : 1,
                                 cursor: toggling2FA ? 'not-allowed' : 'pointer'
                             }}
@@ -1304,8 +1304,8 @@ const ProfilePage = () => {
                                     fontSize: '12px',
                                     fontWeight: '700',
                                     cursor: 'pointer',
-                                    backgroundColor: bookingSettings.isBookingEnabled ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                                    color: bookingSettings.isBookingEnabled ? '#10b981' : '#ef4444'
+                                    backgroundColor: bookingSettings.isBookingEnabled ? 'rgba(16, 185, 129, 0.15)' : 'var(--danger-tint)',
+                                    color: bookingSettings.isBookingEnabled ? 'var(--success-color)' : 'var(--danger-color)'
                                 }}
                             >
                                 {bookingSettings.isBookingEnabled ? 'Enabled' : 'Disabled'}
@@ -1339,7 +1339,7 @@ const ProfilePage = () => {
                                         style={{
                                             border: 'none',
                                             backgroundColor: copiedBookingLink ? 'rgba(16, 185, 129, 0.2)' : 'var(--bg-card-hover)',
-                                            color: copiedBookingLink ? '#10b981' : 'var(--text-primary)',
+                                            color: copiedBookingLink ? 'var(--success-color)' : 'var(--text-primary)',
                                             borderRadius: '8px',
                                             padding: '6px 10px',
                                             fontSize: '12px',
@@ -1369,8 +1369,8 @@ const ProfilePage = () => {
                                             fontSize: '12px',
                                             fontWeight: '700',
                                             cursor: 'pointer',
-                                            backgroundColor: bookingSettings.showBusySlots ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-secondary)',
-                                            color: bookingSettings.showBusySlots ? '#818cf8' : 'var(--text-secondary)'
+                                            backgroundColor: bookingSettings.showBusySlots ? 'var(--accent-tint)' : 'var(--bg-secondary)',
+                                            color: bookingSettings.showBusySlots ? 'var(--accent-text)' : 'var(--text-secondary)'
                                         }}
                                     >
                                         {bookingSettings.showBusySlots ? 'Public' : 'Hidden'}
@@ -1442,12 +1442,12 @@ const ProfilePage = () => {
                                     width: '36px',
                                     height: '36px',
                                     borderRadius: '10px',
-                                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                    backgroundColor: 'var(--accent-tint)',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center'
                                 }}>
-                                    <Lock size={20} color="#3b82f6" />
+                                    <Lock size={20} color="var(--accent-text)" />
                                 </div>
                                 <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)' }}>
                                     Change Password
@@ -1609,9 +1609,9 @@ const ProfilePage = () => {
                                 <div style={{
                                     padding: '10px 12px',
                                     borderRadius: '8px',
-                                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                                    border: '1px solid rgba(239, 68, 68, 0.2)',
-                                    color: '#ef4444',
+                                    backgroundColor: 'var(--danger-tint)',
+                                    border: '1px solid var(--danger-tint-border)',
+                                    color: 'var(--danger-color)',
                                     fontSize: '13px'
                                 }}>
                                     {passwordError}
@@ -1624,7 +1624,7 @@ const ProfilePage = () => {
                                     borderRadius: '8px',
                                     backgroundColor: 'rgba(16, 185, 129, 0.1)',
                                     border: '1px solid rgba(16, 185, 129, 0.2)',
-                                    color: '#10b981',
+                                    color: 'var(--success-color)',
                                     fontSize: '13px'
                                 }}>
                                     {passwordSuccessMsg}
@@ -1756,7 +1756,7 @@ const infoSectionStyle = {
     flexDirection: 'column',
     gap: '12px',
     padding: '20px',
-    background: 'rgba(255,255,255,0.03)',
+    background: 'var(--bg-hover)',
     borderRadius: '16px',
     border: '1px solid var(--border-color)',
 };

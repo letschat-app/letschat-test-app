@@ -4,10 +4,10 @@ import { fetchPutUrls, uploadMediaToR2, savePulseMediaKeys, createPulse } from '
 import { compressImageBlob } from '../../service/MediaUploader';
 
 const BG_COLORS = [
-  '#1e293b', '#0f172a', '#7c2d12', '#14532d', '#1e3a8a', '#581c87', '#831843', '#713f12',
+  'var(--bg-secondary)', 'var(--bg-primary)', '#7c2d12', '#14532d', '#1e3a8a', '#581c87', '#831843', '#713f12',
   'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)',
-  'linear-gradient(135deg, #3b82f6 0%, #10b981 100%)',
-  'linear-gradient(135deg, #f97316 0%, #e11d48 100%)'
+  'var(--accent-gradient) 100%)',
+  'linear-gradient(135deg, #f97316 0%, var(--danger-color) 100%)'
 ];
 
 const FONT_STYLES = [
@@ -477,7 +477,7 @@ const CreatePulseModal = ({ isOpen, onClose, onSuccess }) => {
                 <button
                   type="button"
                   onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
-                  style={{ flex: 1, padding: '12px', borderRadius: '12px', backgroundColor: isRecording ? '#ef4444' : 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: isRecording ? '#fff' : 'var(--text-primary)', fontWeight: '600', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer' }}
+                  style={{ flex: 1, padding: '12px', borderRadius: '12px', backgroundColor: isRecording ? 'var(--danger-color)' : 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: isRecording ? '#fff' : 'var(--text-primary)', fontWeight: '600', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer' }}
                 >
                   <Mic size={18} /> {isRecording ? 'Stop Recording' : 'Record Voice'}
                 </button>
@@ -600,7 +600,7 @@ const CreatePulseModal = ({ isOpen, onClose, onSuccess }) => {
               border: 'none', background: 'var(--accent-gradient)',
               color: '#ffffff', fontWeight: '700', cursor: isPublishing ? 'not-allowed' : 'pointer',
               display: 'flex', alignItems: 'center', gap: '8px',
-              boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+              boxShadow: '0 4px 12px color-mix(in srgb, var(--accent-solid) 45%, transparent)'
             }}
           >
             {isPublishing ? 'Publishing...' : 'Publish Pulse'}

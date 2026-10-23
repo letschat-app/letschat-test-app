@@ -233,17 +233,17 @@ const ScheduleMessageModal = ({ isOpen, onClose, onSubmit, initialData }) => {
       }}
     >
       <div style={{
-        background: '#1e1e1e', borderRadius: '16px', width: '90%', maxWidth: '400px',
+        background: 'var(--bg-card)', borderRadius: '16px', width: '90%', maxWidth: '400px',
         border: '1px solid #444', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7)',
         display: 'flex', flexDirection: 'column', overflow: 'visible',
         pointerEvents: 'auto'
       }}>
         <div style={{ padding: '16px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#f3f4f6', fontSize: '16px' }}>
-            <Clock size={18} color="#10b981" />
+            <Clock size={18} color="var(--success-color)" />
             {initialData ? 'Edit Scheduled Message' : 'Schedule Message'}
           </h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: '18px', fontWeight: '700' }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '18px', fontWeight: '700' }}>
             X
           </button>
         </div>
@@ -257,12 +257,12 @@ const ScheduleMessageModal = ({ isOpen, onClose, onSubmit, initialData }) => {
                padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between'
              }}>
                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <ImageIcon size={20} color="#10b981" />
+                  <ImageIcon size={20} color="var(--success-color)" />
                   <span style={{ color: '#fff', fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
                     {mediaData.fileName}
                   </span>
                </div>
-               <button type="button" onClick={() => setMediaData(null)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }}>
+               <button type="button" onClick={() => setMediaData(null)} style={{ background: 'transparent', border: 'none', color: 'var(--danger-color)', cursor: 'pointer' }}>
                  <Trash2 size={16} />
                </button>
              </div>
@@ -275,8 +275,8 @@ const ScheduleMessageModal = ({ isOpen, onClose, onSubmit, initialData }) => {
               style={{
                 flex: 1, padding: '8px', borderRadius: '6px', fontSize: '13px', fontWeight: '500',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                background: timeMode === 'datetime' ? '#3b82f6' : 'transparent',
-                color: timeMode === 'datetime' ? '#fff' : '#9ca3af',
+                background: timeMode === 'datetime' ? 'var(--accent-text)' : 'transparent',
+                color: timeMode === 'datetime' ? '#fff' : 'var(--text-secondary)',
                 border: 'none', cursor: 'pointer', transition: '0.2s'
               }}
             >
@@ -288,8 +288,8 @@ const ScheduleMessageModal = ({ isOpen, onClose, onSubmit, initialData }) => {
               style={{
                 flex: 1, padding: '8px', borderRadius: '6px', fontSize: '13px', fontWeight: '500',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                background: timeMode === 'timer' ? '#3b82f6' : 'transparent',
-                color: timeMode === 'timer' ? '#fff' : '#9ca3af',
+                background: timeMode === 'timer' ? 'var(--accent-text)' : 'transparent',
+                color: timeMode === 'timer' ? '#fff' : 'var(--text-secondary)',
                 border: 'none', cursor: 'pointer', transition: '0.2s'
               }}
             >
@@ -301,8 +301,8 @@ const ScheduleMessageModal = ({ isOpen, onClose, onSubmit, initialData }) => {
             {timeMode === 'datetime' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label style={{ color: '#9ca3af', fontSize: '13px' }}>Select Exact Time</label>
-                  <span style={{ fontSize: '11px', color: '#10b981' }}>15-min intervals (:00, :15, :30, :45)</span>
+                  <label style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Select Exact Time</label>
+                  <span style={{ fontSize: '11px', color: 'var(--success-color)' }}>15-min intervals (:00, :15, :30, :45)</span>
                 </div>
                 <input 
                   type="datetime-local" 
@@ -310,7 +310,7 @@ const ScheduleMessageModal = ({ isOpen, onClose, onSubmit, initialData }) => {
                   value={datetime}
                   onChange={(e) => setDatetime(e.target.value)}
                   style={{
-                    background: '#1a1a1a', border: '1px solid #444', color: '#fff', 
+                    background: 'var(--bg-secondary)', border: '1px solid #444', color: '#fff', 
                     padding: '10px', borderRadius: '6px', fontSize: '14px', width: '100%', boxSizing: 'border-box'
                   }}
                   required
@@ -319,30 +319,30 @@ const ScheduleMessageModal = ({ isOpen, onClose, onSubmit, initialData }) => {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label style={{ color: '#9ca3af', fontSize: '13px' }}>Send in...</label>
-                  <span style={{ fontSize: '11px', color: '#10b981' }}>15, 30, 45, or 60 mins</span>
+                  <label style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>Send in...</label>
+                  <span style={{ fontSize: '11px', color: 'var(--success-color)' }}>15, 30, 45, or 60 mins</span>
                 </div>
                 <div style={{ display: 'flex', gap: '12px' }}>
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <input 
                       type="number" min="0" value={timerValues.hours}
                       onChange={(e) => setTimerValues({...timerValues, hours: e.target.value})}
-                      style={{ background: '#1a1a1a', border: '1px solid #444', color: '#fff', padding: '10px', borderRadius: '6px', textAlign: 'center' }}
+                      style={{ background: 'var(--bg-secondary)', border: '1px solid #444', color: '#fff', padding: '10px', borderRadius: '6px', textAlign: 'center' }}
                     />
-                    <span style={{ fontSize: '11px', color: '#6b7280', textAlign: 'center' }}>Hours</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>Hours</span>
                   </div>
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     <select 
                       value={timerValues.minutes}
                       onChange={(e) => setTimerValues({...timerValues, minutes: parseInt(e.target.value) || 15})}
-                      style={{ background: '#1a1a1a', border: '1px solid #444', color: '#fff', padding: '10px', borderRadius: '6px', textAlign: 'center', fontSize: '14px' }}
+                      style={{ background: 'var(--bg-secondary)', border: '1px solid #444', color: '#fff', padding: '10px', borderRadius: '6px', textAlign: 'center', fontSize: '14px' }}
                     >
                       <option value={15}>15 Minutes</option>
                       <option value={30}>30 Minutes</option>
                       <option value={45}>45 Minutes</option>
                       <option value={60}>60 Minutes (1 Hr)</option>
                     </select>
-                    <span style={{ fontSize: '11px', color: '#6b7280', textAlign: 'center' }}>Minutes</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>Minutes</span>
                   </div>
                 </div>
               </div>
@@ -354,7 +354,7 @@ const ScheduleMessageModal = ({ isOpen, onClose, onSubmit, initialData }) => {
             onClick={handleSubmit}
             disabled={(!message.trim() && !mediaData) || isUploadingMedia}
             style={{
-              background: '#10b981', color: '#fff', border: 'none', borderRadius: '8px',
+              background: 'var(--success-color)', color: '#fff', border: 'none', borderRadius: '8px',
               padding: '12px', fontSize: '15px', fontWeight: '600', cursor: 'pointer',
               display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
               opacity: (!message.trim() && !mediaData) || isUploadingMedia ? 0.5 : 1
@@ -366,7 +366,7 @@ const ScheduleMessageModal = ({ isOpen, onClose, onSubmit, initialData }) => {
 
           {/* MINI INPUT BAR OVERRIDE */}
           <div style={{ marginTop: '4px' }}>
-            <label style={{ color: '#9ca3af', fontSize: '13px', fontWeight: '500', display: 'block', marginBottom: '8px' }}>
+            <label style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500', display: 'block', marginBottom: '8px' }}>
               Message Content
             </label>
             
@@ -388,11 +388,11 @@ const ScheduleMessageModal = ({ isOpen, onClose, onSubmit, initialData }) => {
                   }}
                 >
                   <style>{`
-                    .epr-main { background: #1a1a1a !important; border: 1px solid rgba(255,255,255,0.12) !important; border-radius:16px !important; box-shadow: 0 16px 48px rgba(0,0,0,0.7) !important; }
-                    .epr-category-nav { background: transparent !important; border-bottom: 1px solid rgba(255,255,255,0.08) !important; }
-                    .epr-search-container input { background: rgba(255,255,255,0.06) !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 10px !important; color: #ddd !important; }
-                    .epr-emoji-category-label { background: #1a1a1a !important; color: rgba(255,255,255,0.35) !important; font-size: 11px !important; }
-                    .epr-btn:hover { background: rgba(255,255,255,0.08) !important; }
+                    .epr-main { background: var(--bg-secondary) !important; border: 1px solid var(--border-color) !important; border-radius:16px !important; box-shadow: 0 16px 48px rgba(0,0,0,0.7) !important; }
+                    .epr-category-nav { background: transparent !important; border-bottom: 1px solid var(--bg-hover) !important; }
+                    .epr-search-container input { background: var(--bg-hover) !important; border: 1px solid var(--border-color) !important; border-radius: 10px !important; color: #ddd !important; }
+                    .epr-emoji-category-label { background: var(--bg-secondary) !important; color: rgba(255,255,255,0.35) !important; font-size: 11px !important; }
+                    .epr-btn:hover { background: var(--bg-hover) !important; }
                     .epr-skin-tones { display: none !important; }
                   `}</style>
                   <EmojiPicker
@@ -481,7 +481,7 @@ const ScheduleMessageModal = ({ isOpen, onClose, onSubmit, initialData }) => {
               <button
                 onClick={isRecording ? () => stopRecording(false) : (message.trim() || mediaData ? handleSubmit : startRecording)}
                 style={{
-                  background: isRecording ? '#00a884' : ((message.trim() || mediaData) ? '#2563eb' : '#00a884'),
+                  background: isRecording ? '#00a884' : ((message.trim() || mediaData) ? 'var(--accent-text)' : '#00a884'),
                   color: 'white', border: 'none',
                   borderRadius: '50%', width: '38px', height: '38px',
                   flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',

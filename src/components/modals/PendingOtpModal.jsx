@@ -109,44 +109,44 @@ export default function PendingOtpModal() {
       case 'FORGOT_PASSWORD':
         return {
           title: forgotStep === 'otp' ? 'Verify Password Reset Code' : 'Set New Password',
-          icon: forgotStep === 'otp' ? <KeyRound size={24} color="#60a5fa" /> : <Lock size={24} color="#10b981" />,
+          icon: forgotStep === 'otp' ? <KeyRound size={24} color="var(--accent-text)" /> : <Lock size={24} color="var(--success-color)" />,
           badge: 'Password Reset',
-          color: '#3b82f6'
+          color: 'var(--accent-text)'
         };
       case 'CHANGE_PASSWORD':
         return {
           title: 'Confirm Password Change',
-          icon: <Lock size={24} color="#60a5fa" />,
+          icon: <Lock size={24} color="var(--accent-text)" />,
           badge: 'Security Verification',
-          color: '#3b82f6'
+          color: 'var(--accent-text)'
         };
       case '2FA_TOGGLE':
         return {
           title: session.payload?.enable ? 'Enable Two-Factor Authentication' : 'Disable Two-Factor Authentication',
-          icon: <ShieldCheck size={24} color={session.payload?.enable ? '#10b981' : '#f59e0b'} />,
+          icon: <ShieldCheck size={24} color={session.payload?.enable ? 'var(--success-color)' : 'var(--warning-color)'} />,
           badge: '2FA Security Challenge',
-          color: session.payload?.enable ? '#10b981' : '#f59e0b'
+          color: session.payload?.enable ? 'var(--success-color)' : 'var(--warning-color)'
         };
       case '2FA_LOGIN':
         return {
           title: '2FA Verification Required',
-          icon: <ShieldCheck size={24} color="#3b82f6" />,
+          icon: <ShieldCheck size={24} color="var(--accent-text)" />,
           badge: 'Account Protection',
-          color: '#3b82f6'
+          color: 'var(--accent-text)'
         };
       case 'SIGNUP':
         return {
           title: 'Verify Email Registration',
-          icon: <Mail size={24} color="#3b82f6" />,
+          icon: <Mail size={24} color="var(--accent-text)" />,
           badge: 'Account Setup',
-          color: '#3b82f6'
+          color: 'var(--accent-text)'
         };
       default:
         return {
           title: 'Security Verification',
-          icon: <ShieldCheck size={24} color="#3b82f6" />,
+          icon: <ShieldCheck size={24} color="var(--accent-text)" />,
           badge: 'Verification',
-          color: '#3b82f6'
+          color: 'var(--accent-text)'
         };
     }
   };
@@ -402,7 +402,7 @@ export default function PendingOtpModal() {
         {forgotStep === 'otp' && remainingTime > 0 && (
           <div style={styles.timerPill}>
             <span>Code expires in: </span>
-            <span style={{ fontWeight: '700', color: remainingTime < 60 ? '#ef4444' : '#60a5fa' }}>
+            <span style={{ fontWeight: '700', color: remainingTime < 60 ? 'var(--danger-color)' : 'var(--accent-text)' }}>
               {formatTimer(remainingTime)}
             </span>
           </div>
@@ -454,7 +454,7 @@ export default function PendingOtpModal() {
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: resendCooldown > 0 ? '#64748b' : '#60a5fa',
+                  color: resendCooldown > 0 ? 'var(--text-secondary)' : 'var(--accent-text)',
                   fontSize: '13px',
                   fontWeight: '600',
                   cursor: resendCooldown > 0 ? 'not-allowed' : 'pointer',
@@ -504,7 +504,7 @@ export default function PendingOtpModal() {
             <div style={styles.inputGroup}>
               <label style={styles.label}>New Password</label>
               <div style={styles.inputWrapper}>
-                <Lock size={18} color="#94a3b8" style={styles.inputIcon} />
+                <Lock size={18} color="var(--text-secondary)" style={styles.inputIcon} />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
@@ -522,7 +522,7 @@ export default function PendingOtpModal() {
                   onClick={() => setShowPassword(!showPassword)}
                   style={styles.eyeBtn}
                 >
-                  {showPassword ? <EyeOff size={18} color="#94a3b8" /> : <Eye size={18} color="#94a3b8" />}
+                  {showPassword ? <EyeOff size={18} color="var(--text-secondary)" /> : <Eye size={18} color="var(--text-secondary)" />}
                 </button>
               </div>
             </div>
@@ -530,7 +530,7 @@ export default function PendingOtpModal() {
             <div style={styles.inputGroup}>
               <label style={styles.label}>Confirm New Password</label>
               <div style={styles.inputWrapper}>
-                <Lock size={18} color="#94a3b8" style={styles.inputIcon} />
+                <Lock size={18} color="var(--text-secondary)" style={styles.inputIcon} />
                 <input
                   type={showConfirmPassword ? 'text' : 'password'}
                   required
@@ -547,7 +547,7 @@ export default function PendingOtpModal() {
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   style={styles.eyeBtn}
                 >
-                  {showConfirmPassword ? <EyeOff size={18} color="#94a3b8" /> : <Eye size={18} color="#94a3b8" />}
+                  {showConfirmPassword ? <EyeOff size={18} color="var(--text-secondary)" /> : <Eye size={18} color="var(--text-secondary)" />}
                 </button>
               </div>
             </div>
@@ -565,7 +565,7 @@ export default function PendingOtpModal() {
                 disabled={loading || !newPassword || !confirmPassword}
                 style={{
                   ...styles.submitBtn,
-                  backgroundColor: '#10b981',
+                  backgroundColor: 'var(--success-color)',
                   opacity: (loading || !newPassword || !confirmPassword) ? 0.6 : 1
                 }}
               >
@@ -603,8 +603,8 @@ const styles = {
   modal: {
     width: '100%',
     maxWidth: '430px',
-    backgroundColor: 'var(--bg-card, #1e293b)',
-    border: '1px solid var(--border-color, rgba(255, 255, 255, 0.12))',
+    backgroundColor: 'var(--bg-card)',
+    border: '1px solid var(--border-color))',
     borderRadius: '24px',
     padding: '28px 24px',
     boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
@@ -616,7 +616,7 @@ const styles = {
   closeBtn: {
     background: 'none',
     border: 'none',
-    color: 'var(--text-secondary, #94a3b8)',
+    color: 'var(--text-secondary)',
     cursor: 'pointer',
     padding: '4px',
     display: 'flex',
@@ -644,21 +644,21 @@ const styles = {
     margin: 0,
     fontSize: '20px',
     fontWeight: '700',
-    color: 'var(--text-primary, #f8fafc)'
+    color: 'var(--text-primary)'
   },
   subtitle: {
     margin: 0,
     fontSize: '13px',
-    color: 'var(--text-secondary, #94a3b8)',
+    color: 'var(--text-secondary)',
     lineHeight: '1.45',
     textAlign: 'center'
   },
   timerPill: {
     alignSelf: 'center',
     fontSize: '12px',
-    color: 'var(--text-secondary, #94a3b8)',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    border: '1px solid var(--border-color, rgba(255, 255, 255, 0.08))',
+    color: 'var(--text-secondary)',
+    backgroundColor: 'var(--bg-hover)',
+    border: '1px solid var(--border-color))',
     padding: '4px 12px',
     borderRadius: '20px',
     display: 'flex',
@@ -677,7 +677,7 @@ const styles = {
   label: {
     fontSize: '12px',
     fontWeight: '600',
-    color: 'var(--text-secondary, #94a3b8)',
+    color: 'var(--text-secondary)',
     textTransform: 'uppercase',
     letterSpacing: '0.5px'
   },
@@ -695,10 +695,10 @@ const styles = {
     width: '100%',
     padding: '12px 14px 12px 40px',
     fontSize: '14px',
-    background: 'var(--bg-secondary, #0f172a)',
-    border: '1px solid var(--border-color, #334155)',
+    background: 'var(--bg-secondary)',
+    border: '1px solid var(--border-color)',
     borderRadius: '12px',
-    color: 'var(--text-primary, #f8fafc)',
+    color: 'var(--text-primary)',
     outline: 'none',
     boxSizing: 'border-box'
   },
@@ -709,10 +709,10 @@ const styles = {
     fontWeight: '700',
     letterSpacing: '8px',
     textAlign: 'center',
-    background: 'var(--bg-secondary, #0f172a)',
-    border: '1px solid var(--border-color, #334155)',
+    background: 'var(--bg-secondary)',
+    border: '1px solid var(--border-color)',
     borderRadius: '12px',
-    color: 'var(--text-primary, #f8fafc)',
+    color: 'var(--text-primary)',
     outline: 'none',
     boxSizing: 'border-box'
   },
@@ -747,9 +747,9 @@ const styles = {
     fontSize: '14px',
     fontWeight: '500',
     borderRadius: '12px',
-    background: 'rgba(255, 255, 255, 0.05)',
-    border: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))',
-    color: 'var(--text-secondary, #94a3b8)',
+    background: 'var(--bg-hover)',
+    border: '1px solid var(--border-color))',
+    color: 'var(--text-secondary)',
     cursor: 'pointer'
   },
   infoBox: {
@@ -760,7 +760,7 @@ const styles = {
     borderRadius: '10px',
     backgroundColor: 'rgba(16, 185, 129, 0.1)',
     border: '1px solid rgba(16, 185, 129, 0.25)',
-    color: '#34d399',
+    color: 'var(--success-color)',
     fontSize: '13px'
   },
   errorBox: {
@@ -769,9 +769,9 @@ const styles = {
     gap: '8px',
     padding: '10px 14px',
     borderRadius: '10px',
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    border: '1px solid rgba(239, 68, 68, 0.25)',
-    color: '#f87171',
+    backgroundColor: 'var(--danger-tint)',
+    border: '1px solid var(--danger-tint)',
+    color: 'var(--danger-color)',
     fontSize: '13px'
   }
 };

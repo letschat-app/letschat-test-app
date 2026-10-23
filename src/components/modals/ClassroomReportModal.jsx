@@ -131,14 +131,14 @@ const ClassroomReportModal = ({ roomId, classroomName = '', isOpen, onClose }) =
     >
       <div
         style={{
-          backgroundColor: 'var(--bg-card, #1e293b)',
-          border: '1px solid var(--border-color, #334155)',
+          backgroundColor: 'var(--bg-card)',
+          border: '1px solid var(--border-color)',
           borderRadius: '16px',
           width: '100%',
           maxWidth: '480px',
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
           overflow: 'hidden',
-          color: 'var(--text-primary, #f8fafc)',
+          color: 'var(--text-primary)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -146,11 +146,11 @@ const ClassroomReportModal = ({ roomId, classroomName = '', isOpen, onClose }) =
         <div
           style={{
             padding: '16px 20px',
-            borderBottom: '1px solid var(--border-color, #334155)',
+            borderBottom: '1px solid var(--border-color)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: 'linear-gradient(90deg, rgba(59, 130, 246, 0.15), transparent)',
+            background: 'linear-gradient(90deg, var(--accent-tint), transparent)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -159,18 +159,18 @@ const ClassroomReportModal = ({ roomId, classroomName = '', isOpen, onClose }) =
                 width: '36px',
                 height: '36px',
                 borderRadius: '10px',
-                backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                backgroundColor: 'var(--accent-tint-border)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#60a5fa',
+                color: 'var(--accent-text)',
               }}
             >
               <FileText size={20} />
             </div>
             <div>
               <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>Export Matrix Report</h3>
-              <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary, #94a3b8)' }}>
+              <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)' }}>
                 {classroomName || `Classroom #${roomId}`}
               </p>
             </div>
@@ -181,7 +181,7 @@ const ClassroomReportModal = ({ roomId, classroomName = '', isOpen, onClose }) =
             style={{
               background: 'none',
               border: 'none',
-              color: 'var(--text-secondary, #94a3b8)',
+              color: 'var(--text-secondary)',
               cursor: 'pointer',
               padding: '6px',
               borderRadius: '8px',
@@ -198,7 +198,7 @@ const ClassroomReportModal = ({ roomId, classroomName = '', isOpen, onClose }) =
         <form onSubmit={handleExport} style={{ padding: '20px' }}>
           {/* Format Selection */}
           <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '10px', color: 'var(--text-secondary, #94a3b8)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               1. Select Report Format
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
@@ -216,9 +216,9 @@ const ClassroomReportModal = ({ roomId, classroomName = '', isOpen, onClose }) =
                     style={{
                       padding: '12px 8px',
                       borderRadius: '12px',
-                      border: `2px solid ${isSelected ? 'var(--accent-color, #3b82f6)' : 'var(--border-color, #334155)'}`,
-                      backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.15)' : 'var(--bg-secondary, #0f172a)',
-                      color: isSelected ? '#60a5fa' : 'var(--text-primary, #f8fafc)',
+                      border: `2px solid ${isSelected ? 'var(--accent-color)' : 'var(--border-color)'}`,
+                      backgroundColor: isSelected ? 'var(--accent-tint)' : 'var(--bg-secondary)',
+                      color: isSelected ? 'var(--accent-text)' : 'var(--text-primary)',
                       cursor: 'pointer',
                       display: 'flex',
                       flexDirection: 'column',
@@ -238,7 +238,7 @@ const ClassroomReportModal = ({ roomId, classroomName = '', isOpen, onClose }) =
 
           {/* Delivery Options */}
           <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '10px', color: 'var(--text-secondary, #94a3b8)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', marginBottom: '10px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               2. Delivery Method
             </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -250,8 +250,8 @@ const ClassroomReportModal = ({ roomId, classroomName = '', isOpen, onClose }) =
                   gap: '12px',
                   padding: '12px 14px',
                   borderRadius: '12px',
-                  border: `1px solid ${deliveryMode === 'download' ? 'var(--accent-color, #3b82f6)' : 'var(--border-color, #334155)'}`,
-                  backgroundColor: deliveryMode === 'download' ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-secondary, #0f172a)',
+                  border: `1px solid ${deliveryMode === 'download' ? 'var(--accent-color)' : 'var(--border-color)'}`,
+                  backgroundColor: deliveryMode === 'download' ? 'var(--accent-tint)' : 'var(--bg-secondary)',
                   cursor: 'pointer',
                 }}
               >
@@ -261,12 +261,12 @@ const ClassroomReportModal = ({ roomId, classroomName = '', isOpen, onClose }) =
                   value="download"
                   checked={deliveryMode === 'download'}
                   onChange={() => setDeliveryMode('download')}
-                  style={{ accentColor: 'var(--accent-color, #3b82f6)' }}
+                  style={{ accentColor: 'var(--accent-color)' }}
                 />
-                <Download size={18} color={deliveryMode === 'download' ? '#60a5fa' : '#94a3b8'} />
+                <Download size={18} color={deliveryMode === 'download' ? 'var(--accent-text)' : 'var(--text-secondary)'} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '14px', fontWeight: '600' }}>Download / Share in App</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-secondary, #94a3b8)' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                     Save file locally or launch native share sheet (WhatsApp, Files, Telegram)
                   </div>
                 </div>
@@ -280,8 +280,8 @@ const ClassroomReportModal = ({ roomId, classroomName = '', isOpen, onClose }) =
                   gap: '12px',
                   padding: '12px 14px',
                   borderRadius: '12px',
-                  border: `1px solid ${deliveryMode === 'email' ? 'var(--accent-color, #3b82f6)' : 'var(--border-color, #334155)'}`,
-                  backgroundColor: deliveryMode === 'email' ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-secondary, #0f172a)',
+                  border: `1px solid ${deliveryMode === 'email' ? 'var(--accent-color)' : 'var(--border-color)'}`,
+                  backgroundColor: deliveryMode === 'email' ? 'var(--accent-tint)' : 'var(--bg-secondary)',
                   cursor: 'pointer',
                 }}
               >
@@ -291,12 +291,12 @@ const ClassroomReportModal = ({ roomId, classroomName = '', isOpen, onClose }) =
                   value="email"
                   checked={deliveryMode === 'email'}
                   onChange={() => setDeliveryMode('email')}
-                  style={{ accentColor: 'var(--accent-color, #3b82f6)' }}
+                  style={{ accentColor: 'var(--accent-color)' }}
                 />
-                <Mail size={18} color={deliveryMode === 'email' ? '#60a5fa' : '#94a3b8'} />
+                <Mail size={18} color={deliveryMode === 'email' ? 'var(--accent-text)' : 'var(--text-secondary)'} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '14px', fontWeight: '600' }}>Send to Email</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-secondary, #94a3b8)' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                     Deliver formatted document with classroom summary directly to email
                   </div>
                 </div>
@@ -307,7 +307,7 @@ const ClassroomReportModal = ({ roomId, classroomName = '', isOpen, onClose }) =
           {/* Email Input Field (shown when deliveryMode === 'email') */}
           {deliveryMode === 'email' && (
             <div style={{ marginBottom: '20px', animation: 'fadeIn 0.2s ease' }}>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '6px', color: 'var(--text-secondary, #94a3b8)' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', marginBottom: '6px', color: 'var(--text-secondary)' }}>
                 Faculty Email Address
               </label>
               <input
@@ -320,9 +320,9 @@ const ClassroomReportModal = ({ roomId, classroomName = '', isOpen, onClose }) =
                   width: '100%',
                   padding: '10px 14px',
                   borderRadius: '10px',
-                  border: '1px solid var(--border-color, #334155)',
-                  backgroundColor: 'var(--bg-secondary, #0f172a)',
-                  color: 'var(--text-primary, #f8fafc)',
+                  border: '1px solid var(--border-color)',
+                  backgroundColor: 'var(--bg-secondary)',
+                  color: 'var(--text-primary)',
                   fontSize: '14px',
                   outline: 'none',
                   boxSizing: 'border-box',
@@ -337,9 +337,9 @@ const ClassroomReportModal = ({ roomId, classroomName = '', isOpen, onClose }) =
               style={{
                 padding: '10px 14px',
                 borderRadius: '10px',
-                backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                color: '#f87171',
+                backgroundColor: 'var(--danger-tint)',
+                border: '1px solid var(--danger-tint-border)',
+                color: 'var(--danger-color)',
                 fontSize: '13px',
                 marginBottom: '16px',
               }}
@@ -355,7 +355,7 @@ const ClassroomReportModal = ({ roomId, classroomName = '', isOpen, onClose }) =
                 borderRadius: '10px',
                 backgroundColor: 'rgba(16, 185, 129, 0.15)',
                 border: '1px solid rgba(16, 185, 129, 0.3)',
-                color: '#34d399',
+                color: 'var(--success-color)',
                 fontSize: '13px',
                 marginBottom: '16px',
                 display: 'flex',
@@ -377,9 +377,9 @@ const ClassroomReportModal = ({ roomId, classroomName = '', isOpen, onClose }) =
               style={{
                 padding: '10px 18px',
                 borderRadius: '10px',
-                border: '1px solid var(--border-color, #334155)',
+                border: '1px solid var(--border-color)',
                 backgroundColor: 'transparent',
-                color: 'var(--text-secondary, #94a3b8)',
+                color: 'var(--text-secondary)',
                 fontWeight: '600',
                 cursor: 'pointer',
               }}
@@ -394,14 +394,14 @@ const ClassroomReportModal = ({ roomId, classroomName = '', isOpen, onClose }) =
                 padding: '10px 22px',
                 borderRadius: '10px',
                 border: 'none',
-                backgroundColor: 'var(--accent-color, #3b82f6)',
+                backgroundColor: 'var(--accent-color)',
                 color: '#ffffff',
                 fontWeight: '700',
                 cursor: loading ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
+                boxShadow: '0 4px 12px color-mix(in srgb, var(--accent-solid) 45%, transparent)',
               }}
             >
               {loading ? (

@@ -30,7 +30,7 @@ const MENU_OPTIONS = [
     icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg>,
   },
   {
-    id: 'poll', label: 'Poll', color: '#f59e0b',
+    id: 'poll', label: 'Poll', color: 'var(--warning-color)',
     accept: undefined, capture: undefined,
     icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M18 20V10" /><path d="M12 20V4" /><path d="M6 20v-6" /></svg>,
   },
@@ -40,7 +40,7 @@ const MENU_OPTIONS = [
     icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>,
   },
   {
-    id: 'schedule', label: 'Schedule Message', color: '#10b981',
+    id: 'schedule', label: 'Schedule Message', color: 'var(--success-color)',
     accept: undefined, capture: undefined,
     icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
   }
@@ -65,9 +65,9 @@ function UploadProgressToast({ file, progress, stage, onCancel }) {
         {!isDone && <button onClick={onCancel} style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '18px', lineHeight: 1, padding: 0 }}>×</button>}
       </div>
       <div style={{ background: 'var(--bg-secondary)', borderRadius: '4px', height: '4px', overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${progress}%`, background: isDone ? 'linear-gradient(90deg,#10b981,#34d399)' : 'linear-gradient(90deg,var(--accent-color),#a78bfa)', borderRadius: '4px', transition: 'width 0.3s ease' }} />
+        <div style={{ height: '100%', width: `${progress}%`, background: isDone ? 'linear-gradient(90deg,var(--success-color),var(--success-color))' : 'linear-gradient(90deg,var(--accent-color),#a78bfa)', borderRadius: '4px', transition: 'width 0.3s ease' }} />
       </div>
-      <div style={{ fontSize: '11px', color: isDone ? '#10b981' : 'var(--text-secondary)' }}>{STAGE_LABELS[stage] ?? stage}</div>
+      <div style={{ fontSize: '11px', color: isDone ? 'var(--success-color)' : 'var(--text-secondary)' }}>{STAGE_LABELS[stage] ?? stage}</div>
     </div>
   );
 }
@@ -203,8 +203,8 @@ export default function MediaUploadButton({
             position: 'fixed',
             bottom: `${menuPos.bottom}px`,
             left: `${menuPos.left}px`,
-            background: '#1a1a1a',
-            border: '1px solid rgba(255,255,255,0.12)',
+            background: 'var(--bg-secondary)',
+            border: '1px solid var(--border-color)',
             borderRadius: '16px',
             padding: '8px',
             minWidth: '210px',
@@ -239,7 +239,7 @@ export default function MediaUploadButton({
                 textAlign: 'left',
                 marginBottom: i < MENU_OPTIONS.length - 1 ? '2px' : 0,
               }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.06)'}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
               <div style={{

@@ -85,7 +85,7 @@ const BookingRequestModal = () => {
     }}>
       <div style={{
         backgroundColor: 'rgba(23, 23, 28, 0.98)',
-        border: '1px solid rgba(59, 130, 246, 0.3)',
+        border: '1px solid var(--accent-tint-border)',
         borderRadius: '20px',
         padding: '24px',
         width: '100%',
@@ -99,8 +99,8 @@ const BookingRequestModal = () => {
               display: 'inline-flex',
               padding: '6px 12px',
               borderRadius: '8px',
-              backgroundColor: 'rgba(59, 130, 246, 0.15)',
-              color: '#60a5fa',
+              backgroundColor: 'var(--accent-tint)',
+              color: 'var(--accent-text)',
               fontSize: '12px',
               fontWeight: '700',
               textTransform: 'uppercase',
@@ -114,7 +114,7 @@ const BookingRequestModal = () => {
             style={{
               background: 'none',
               border: 'none',
-              color: '#9ca3af',
+              color: 'var(--text-secondary)',
               cursor: 'pointer',
               padding: '4px'
             }}
@@ -126,7 +126,7 @@ const BookingRequestModal = () => {
         <h3 style={{
           fontSize: '20px',
           fontWeight: '700',
-          color: '#f9fafb',
+          color: 'var(--text-primary)',
           margin: '0 0 16px 0'
         }}>
           {currentRequest.agenda || 'New Meeting Booking'}
@@ -134,7 +134,7 @@ const BookingRequestModal = () => {
 
         {/* Booker details */}
         <div style={{
-          backgroundColor: 'rgba(255, 255, 255, 0.04)',
+          backgroundColor: 'var(--bg-hover)',
           borderRadius: '12px',
           padding: '14px',
           marginBottom: '16px',
@@ -142,17 +142,17 @@ const BookingRequestModal = () => {
           flexDirection: 'column',
           gap: '8px'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#e5e7eb', fontSize: '14px' }}>
-            <User size={16} color="#9ca3af" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', fontSize: '14px' }}>
+            <User size={16} color="var(--text-secondary)" />
             <span style={{ fontWeight: '600' }}>{currentRequest.bookerName || 'Guest'}</span>
           </div>
           {currentRequest.bookerEmail && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#9ca3af', fontSize: '13px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '13px' }}>
               <Mail size={16} />
               <span>{currentRequest.bookerEmail}</span>
             </div>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#60a5fa', fontSize: '13px', fontWeight: '500' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-text)', fontSize: '13px', fontWeight: '500' }}>
             <Clock size={16} />
             <span>
               {formatDateTime(currentRequest.startTime)} - {formatDateTime(currentRequest.endTime)?.split(',').pop()?.trim()}
@@ -177,7 +177,7 @@ const BookingRequestModal = () => {
           )}
 
           {currentRequest.location && (
-            <div style={{ fontSize: '12px', color: '#9ca3af', paddingLeft: '24px' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', paddingLeft: '24px' }}>
               Venue: {currentRequest.location}
             </div>
           )}
@@ -188,7 +188,7 @@ const BookingRequestModal = () => {
             padding: '12px',
             borderRadius: '10px',
             backgroundColor: 'rgba(16, 185, 129, 0.15)',
-            color: '#10b981',
+            color: 'var(--success-color)',
             textAlign: 'center',
             fontWeight: '600',
             fontSize: '14px'
@@ -204,9 +204,9 @@ const BookingRequestModal = () => {
                 flex: 1,
                 padding: '12px',
                 borderRadius: '10px',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-                backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                color: '#ef4444',
+                border: '1px solid var(--danger-tint-border)',
+                backgroundColor: 'var(--danger-tint)',
+                color: 'var(--danger-color)',
                 fontWeight: '600',
                 cursor: loading ? 'not-allowed' : 'pointer',
                 display: 'flex',
@@ -225,7 +225,7 @@ const BookingRequestModal = () => {
                 padding: '12px',
                 borderRadius: '10px',
                 border: 'none',
-                backgroundColor: '#10b981',
+                backgroundColor: 'var(--success-color)',
                 color: '#ffffff',
                 fontWeight: '700',
                 cursor: loading ? 'not-allowed' : 'pointer',

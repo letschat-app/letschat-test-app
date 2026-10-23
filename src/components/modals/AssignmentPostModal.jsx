@@ -142,7 +142,7 @@ const AssignmentPostModal = ({ chatid, onClose, sendApi, isPanel = false }) => {
       maxHeight: isPanel ? 'none' : '90vh',
       borderRadius: isPanel ? '0' : '24px',
       display: 'flex', flexDirection: 'column',
-      border: isPanel ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+      border: isPanel ? 'none' : '1px solid var(--border-color)',
       boxShadow: isPanel ? 'none' : '0 25px 50px -12px rgba(0, 0, 0, 0.6)',
       position: 'relative', overflow: 'hidden',
       height: isPanel ? '100%' : 'auto'
@@ -150,7 +150,7 @@ const AssignmentPostModal = ({ chatid, onClose, sendApi, isPanel = false }) => {
       {/* Header */}
       <div style={{
         padding: '24px',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+        borderBottom: '1px solid var(--bg-hover)',
         display: 'flex', justifyContent: 'space-between',
         alignItems: 'center',
         background: isPanel ? 'rgba(15, 23, 42, 0.8)' : 'transparent',
@@ -160,12 +160,12 @@ const AssignmentPostModal = ({ chatid, onClose, sendApi, isPanel = false }) => {
         zIndex: 10
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ padding: '8px', borderRadius: '10px', backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}>
+          <div style={{ padding: '8px', borderRadius: '10px', backgroundColor: 'var(--accent-tint)', color: 'var(--accent-text)' }}>
             <FileText size={20} />
           </div>
           <h2 style={{ fontSize: isPanel ? '18px' : '20px', fontWeight: '700', color: '#f3f4f6', margin: 0 }}>Create Assignment</h2>
         </div>
-        <button onClick={handleClose} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '4px', fontSize: '24px', fontWeight: '700' }}>
+        <button onClick={handleClose} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px', fontSize: '24px', fontWeight: '700' }}>
           X
         </button>
       </div>
@@ -175,11 +175,11 @@ const AssignmentPostModal = ({ chatid, onClose, sendApi, isPanel = false }) => {
         {error && (
           <div style={{
             display: 'flex', gap: '10px', padding: '12px 16px',
-            backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)',
+            backgroundColor: 'var(--danger-tint)', border: '1px solid var(--danger-tint-border)',
             borderRadius: '12px', marginBottom: '20px'
           }}>
-            <AlertCircle size={18} color="#ef4444" style={{ flexShrink: 0 }} />
-            <p style={{ fontSize: '13px', color: '#f87171', margin: 0 }}>{error}</p>
+            <AlertCircle size={18} color="var(--danger-color)" style={{ flexShrink: 0 }} />
+            <p style={{ fontSize: '13px', color: 'var(--danger-color)', margin: 0 }}>{error}</p>
           </div>
         )}
 
@@ -239,9 +239,9 @@ const AssignmentPostModal = ({ chatid, onClose, sendApi, isPanel = false }) => {
                 style={{
                   padding: '10px',
                   borderRadius: '12px',
-                  backgroundColor: uploading ? 'rgba(59, 130, 246, 0.1)' : 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  color: uploading ? '#3b82f6' : '#9ca3af',
+                  backgroundColor: uploading ? 'var(--accent-tint)' : 'var(--bg-hover)',
+                  border: '1px solid var(--border-color)',
+                  color: uploading ? 'var(--accent-text)' : 'var(--text-secondary)',
                   cursor: uploading ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -255,17 +255,17 @@ const AssignmentPostModal = ({ chatid, onClose, sendApi, isPanel = false }) => {
 
             {uploading && (
               <div style={{ marginTop: '8px' }}>
-                <div style={{ height: '4px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
-                  <div style={{ width: `${uploadProgress}%`, height: '100%', backgroundColor: '#3b82f6', transition: 'width 0.3s' }} />
+                <div style={{ height: '4px', backgroundColor: 'var(--bg-hover)', borderRadius: '2px', overflow: 'hidden' }}>
+                  <div style={{ width: `${uploadProgress}%`, height: '100%', backgroundColor: 'var(--accent-solid)', transition: 'width 0.3s' }} />
                 </div>
-                <div style={{ fontSize: '11px', color: '#60a5fa', marginTop: '4px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--accent-text)', marginTop: '4px' }}>
                   {STAGE_LABELS[uploadStage] || 'Uploading...'} {fileName && `(${fileName})`}
                 </div>
               </div>
             )}
 
             {formData.attachments && !uploading && (
-              <div style={{ marginTop: '8px', fontSize: '11px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--success-color)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <CheckCircle2 size={12} /> Ready: {formData.attachments}
               </div>
             )}
@@ -275,11 +275,11 @@ const AssignmentPostModal = ({ chatid, onClose, sendApi, isPanel = false }) => {
         {/* Deadline Section */}
         <div style={{
           padding: '20px', backgroundColor: 'rgba(255, 255, 255, 0.02)',
-          borderRadius: '16px', border: '1px solid rgba(255, 255, 255, 0.05)',
+          borderRadius: '16px', border: '1px solid var(--bg-hover)',
           marginBottom: isPanel ? '40px' : '0'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-            <Calendar size={16} color="#9ca3af" />
+            <Calendar size={16} color="var(--text-secondary)" />
             <label style={{ ...labelStyle, margin: 0 }}>Set Submission Deadline</label>
           </div>
 
@@ -296,9 +296,9 @@ const AssignmentPostModal = ({ chatid, onClose, sendApi, isPanel = false }) => {
                 }}
                 style={{
                   padding: '6px 14px',
-                  backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                  color: '#60a5fa',
-                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                  backgroundColor: 'var(--accent-tint)',
+                  color: 'var(--accent-text)',
+                  border: '1px solid var(--accent-tint-border)',
                   borderRadius: '20px',
                   fontSize: '13px',
                   fontWeight: '600',
@@ -306,12 +306,12 @@ const AssignmentPostModal = ({ chatid, onClose, sendApi, isPanel = false }) => {
                   transition: 'all 0.2s'
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
-                  e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.4)';
+                  e.currentTarget.style.backgroundColor = 'var(--accent-tint-border)';
+                  e.currentTarget.style.borderColor = 'var(--accent-tint-border)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
-                  e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.2)';
+                  e.currentTarget.style.backgroundColor = 'var(--accent-tint)';
+                  e.currentTarget.style.borderColor = 'var(--accent-tint-border)';
                 }}
               >
                 +{days} Day{days > 1 ? 's' : ''}
@@ -352,7 +352,7 @@ const AssignmentPostModal = ({ chatid, onClose, sendApi, isPanel = false }) => {
           </div>
 
           {formData.deadline && (
-            <div style={{ marginTop: '12px', fontSize: '13px', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ marginTop: '12px', fontSize: '13px', color: 'var(--accent-text)', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <CheckCircle2 size={14} />
               Due on {new Date(formData.deadline).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
             </div>
@@ -363,7 +363,7 @@ const AssignmentPostModal = ({ chatid, onClose, sendApi, isPanel = false }) => {
       {/* Footer */}
       <div style={{
         padding: '24px',
-        borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+        borderTop: '1px solid var(--bg-hover)',
         backgroundColor: isPanel ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.02)',
         position: isPanel ? 'sticky' : 'relative',
         bottom: 0,
@@ -374,12 +374,12 @@ const AssignmentPostModal = ({ chatid, onClose, sendApi, isPanel = false }) => {
           disabled={isSubmitting}
           style={{
             width: '100%', padding: '16px', borderRadius: '14px',
-            backgroundColor: '#3b82f6', color: '#fff',
+            backgroundColor: 'var(--accent-solid)', color: 'var(--text-on-accent)',
             border: 'none', fontWeight: '700', fontSize: '16px',
             cursor: isSubmitting ? 'not-allowed' : 'pointer',
             transition: 'all 0.3s',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
-            boxShadow: '0 10px 15px -3px rgba(59, 130, 246, 0.3)'
+            boxShadow: '0 10px 15px -3px color-mix(in srgb, var(--accent-solid) 45%, transparent)'
           }}
         >
           {isSubmitting ? 'Posting Assignment...' : 'Post Assignment'}
@@ -396,9 +396,9 @@ const AssignmentPostModal = ({ chatid, onClose, sendApi, isPanel = false }) => {
         }}>
           <div style={{ animation: 'bounceIn 0.3s' }}>
             <h3 style={{ color: '#fff', fontSize: '20px', marginBottom: '12px' }}>Discard changes?</h3>
-            <p style={{ color: '#9ca3af', marginBottom: '24px' }}>You have unsaved work. Are you sure you want to close?</p>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>You have unsaved work. Are you sure you want to close?</p>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-              <button onClick={onClose} style={{ ...primaryBtnStyle, backgroundColor: '#ef4444' }}>Discard</button>
+              <button onClick={onClose} style={{ ...primaryBtnStyle, backgroundColor: 'var(--danger-color)' }}>Discard</button>
               <button onClick={() => setShowCloseWarning(false)} style={secondaryBtnStyle}>Keep Editing</button>
             </div>
           </div>
@@ -441,25 +441,25 @@ const AssignmentPostModal = ({ chatid, onClose, sendApi, isPanel = false }) => {
 };
 
 const labelStyle = {
-  display: 'block', fontSize: '12px', fontWeight: '700', color: '#64748b',
+  display: 'block', fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)',
   marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px'
 };
 
 const inputStyle = {
   width: '100%', padding: '12px 16px', borderRadius: '12px',
-  backgroundColor: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)',
+  backgroundColor: 'var(--bg-hover)', border: '1px solid var(--border-color)',
   color: '#f3f4f6', fontSize: '15px', outline: 'none', transition: 'all 0.2s',
   boxSizing: 'border-box'
 };
 
 const primaryBtnStyle = {
-  padding: '12px 24px', borderRadius: '12px', backgroundColor: '#3b82f6', color: '#fff',
+  padding: '12px 24px', borderRadius: '12px', backgroundColor: 'var(--accent-solid)', color: 'var(--text-on-accent)',
   border: 'none', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s'
 };
 
 const secondaryBtnStyle = {
-  padding: '12px 24px', borderRadius: '12px', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: '#9ca3af',
-  border: '1px solid rgba(255, 255, 255, 0.1)', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s'
+  padding: '12px 24px', borderRadius: '12px', backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)',
+  border: '1px solid var(--border-color)', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s'
 };
 
 export default AssignmentPostModal;

@@ -1,8 +1,9 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getsocket } from '../service/Websocket';
-import { MessageSquare, Users, Search, Calendar, LogOut, User, Star } from 'lucide-react';
+import { MessageSquare, Users, Search, Calendar, LogOut, User, Star, FlaskConical } from 'lucide-react';
 import { removeFCMToken } from '../service/UserAuth';
+import { useBadges } from '../service/BadgeStore';
 
 const PulsesIcon = ({ size = 22, color = 'currentColor', strokeWidth = 2 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
@@ -18,6 +19,7 @@ const topMenuItems = [
     { id: 'starred', path: '/starred', icon: Star, label: 'Starred' },
     { id: 'rooms', path: '/rooms', icon: Users, label: 'Rooms' },
     { id: 'calendar', path: '/calendar', icon: Calendar, label: 'Calendar' },
+    { id: 'labs', path: '/labs', icon: FlaskConical, label: 'Labs' },
 ];
 
 const bottomMenuItems = [
@@ -27,6 +29,7 @@ const bottomMenuItems = [
 const DesktopSidebar = () => {
     const navigate = useNavigate();
     const location = useLocation();
+    const { calendarUnread, pulsesUnread } = useBadges();
 
     const handleLogout = async () => {
         try {
@@ -115,6 +118,38 @@ const DesktopSidebar = () => {
                                     background: 'var(--accent-color)',
                                     borderRadius: '0 4px 4px 0',
                                 }} />
+                            )}
+                            {id === 'calendar' && calendarUnread && (
+                                <span
+                                    style={{
+                                        position: 'absolute',
+                                        top: '8px',
+                                        right: '8px',
+                                        width: '8px',
+                                        height: '8px',
+                                        borderRadius: '50%',
+                                        backgroundColor: 'var(--accent-solid)',
+                                        boxShadow: '0 0 6px 1px var(--accent-text)',
+                                        border: '1.5px solid var(--bg-secondary)',
+                                        zIndex: 5,
+                                    }}
+                                />
+                            )}
+                            {id === 'pulses' && pulsesUnread && (
+                                <span
+                                    style={{
+                                        position: 'absolute',
+                                        top: '8px',
+                                        right: '8px',
+                                        width: '8px',
+                                        height: '8px',
+                                        borderRadius: '50%',
+                                        backgroundColor: 'var(--accent-solid)',
+                                        boxShadow: '0 0 6px 1px var(--accent-text)',
+                                        border: '1.5px solid var(--bg-secondary)',
+                                        zIndex: 5,
+                                    }}
+                                />
                             )}
                         </div>
                     );

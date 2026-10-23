@@ -232,15 +232,15 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: 'rgba(0,0,0,0.1)', borderRadius: '8px' }}>
-        <Loader2 className="animate-spin" size={18} color="#9ca3af" />
-        <span style={{ fontSize: '12px', color: '#9ca3af' }}>Loading media...</span>
+        <Loader2 className="animate-spin" size={18} color="var(--text-secondary)" />
+        <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Loading media...</span>
       </div>
     );
   }
 
   if (error || !mediaInfo) {
     return (
-      <div style={{ padding: '8px', borderLeft: '3px solid #ef4444', background: 'rgba(239, 68, 68, 0.1)', fontSize: '12px' }}>
+      <div style={{ padding: '8px', borderLeft: '3px solid var(--danger-color)', background: 'var(--danger-tint)', fontSize: '12px' }}>
         Media unavailable
       </div>
     );
@@ -276,7 +276,7 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
               <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
                 <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="4" />
                 <circle 
-                  cx="18" cy="18" r="16" fill="none" stroke="#60a5fa" strokeWidth="4" 
+                  cx="18" cy="18" r="16" fill="none" stroke="var(--accent-text)" strokeWidth="4" 
                   strokeDasharray="100" strokeDashoffset={100 - uploadProgress}
                   style={{ transition: 'stroke-dashoffset 0.3s ease' }}
                 />
@@ -305,8 +305,8 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
         borderRadius: '12px',
         overflow: 'hidden',
         cursor: 'pointer',
-        background: '#1a1a1a',
-        border: '1px solid rgba(255,255,255,0.1)'
+        background: 'var(--bg-secondary)',
+        border: '1px solid var(--border-color)'
       }}
     >
       <img
@@ -343,13 +343,13 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
               title="Retry Upload"
               style={{
                 display: 'flex', alignItems: 'center', gap: '6px',
-                background: 'rgba(239, 68, 68, 0.8)', padding: '4px 8px', borderRadius: '12px',
+                background: 'var(--danger-tint-border)', padding: '4px 8px', borderRadius: '12px',
                 color: 'white', fontSize: '11px', fontWeight: '500',
                 border: '1px solid rgba(255,255,255,0.2)',
                 cursor: 'pointer', transition: 'background 0.2s ease'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 1)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.8)'}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--danger-tint)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'var(--danger-tint)'}
             >
               <RotateCcw size={14} />
               <span>Retry</span>
@@ -459,7 +459,7 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
             }}
             title="Retry Upload"
             style={{
-              padding: '6px 10px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.8)',
+              padding: '6px 10px', borderRadius: '12px', background: 'var(--danger-tint-border)',
               border: '1px solid rgba(255,255,255,0.2)', color: 'white',
               display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer',
               fontSize: '11px', fontWeight: '500'
@@ -471,7 +471,7 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
         )}
         <div style={{
           background: 'rgba(0,0,0,0.7)', padding: '4px 8px', borderRadius: '12px',
-          fontSize: '11px', color: 'white', border: '1px solid rgba(255,255,255,0.1)'
+          fontSize: '11px', color: 'white', border: '1px solid var(--border-color)'
         }}>
           {formatDuration(duration)}
         </div>
@@ -490,7 +490,7 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
         padding: '12px 16px',
         background: isReceived ? 'var(--bg-card)' : 'rgba(0, 0, 0, 0.18)',
         backdropFilter: 'blur(10px)',
-        border: isReceived ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.15)',
+        border: isReceived ? '1px solid var(--border-color)' : '1px solid var(--border-color)',
         borderRadius: '16px',
         display: 'flex',
         flexDirection: 'column',
@@ -505,7 +505,7 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
             <div
               style={{
                 width: '48px', height: '48px', borderRadius: '50%',
-                background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(96, 165, 250, 0.3)',
+                background: 'rgba(0,0,0,0.3)', border: '1px solid var(--accent-tint-border)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 flexShrink: 0
               }}
@@ -530,7 +530,7 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
               }}
               style={{
                 width: '48px', height: '48px', borderRadius: '50%',
-                background: isReceived ? 'var(--bg-hover)' : 'rgba(255,255,255,0.15)', border: 'none',
+                background: isReceived ? 'var(--bg-hover)' : 'var(--border-color)', border: 'none',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: isReceived ? 'var(--accent-color)' : '#ffffff', cursor: 'pointer', flexShrink: 0, outline: 'none'
               }}
@@ -621,7 +621,7 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
     // 2. Resolve thumbnail presence logic — only show thumbnail for PDFs, not generic docs
     const hasThumb = isPDF && !!(resolvedThumb || thumbnailUrl) && !thumbError;
 
-    const docColor = isPDF ? '#ef4444' : '#6366f1';
+    const docColor = isPDF ? 'var(--danger-color)' : 'var(--accent-text)';
 
     return (
       <div
@@ -635,7 +635,7 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
           flexDirection: 'column',
           position: 'relative',
           cursor: 'pointer',
-          border: isReceived ? '1px solid var(--border-color)' : '1px solid rgba(255, 255, 255, 0.15)',
+          border: isReceived ? '1px solid var(--border-color)' : '1px solid var(--border-color)',
           boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
         }}
         onClick={(e) => {
@@ -734,13 +734,13 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
                 }}
                 title="Retry Upload"
                 style={{
-                  padding: '8px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.15)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  padding: '8px', borderRadius: '50%', background: 'var(--danger-tint)',
+                  border: '1px solid var(--danger-tint-border)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                  transition: 'background 0.2s', color: '#ef4444'
+                  transition: 'background 0.2s', color: 'var(--danger-color)'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)'}
-                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'var(--danger-tint)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'var(--danger-tint)'}
               >
                 <RotateCcw size={16} />
               </div>
@@ -750,7 +750,7 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
               <div
                 style={{
                   width: '34px', height: '34px', borderRadius: '50%',
-                  background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(96, 165, 250, 0.3)',
+                  background: 'rgba(0,0,0,0.3)', border: '1px solid var(--accent-tint-border)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   flexShrink: 0
                 }}
@@ -759,7 +759,7 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
                   <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
                     <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="3.5" />
                     <circle 
-                      cx="18" cy="18" r="15" fill="none" stroke={isReceived ? "var(--accent-color)" : "#60a5fa"} strokeWidth="3.5" 
+                      cx="18" cy="18" r="15" fill="none" stroke={isReceived ? "var(--accent-color)" : "var(--accent-text)"} strokeWidth="3.5" 
                       strokeDasharray="100" strokeDashoffset={100 - uploadProgress}
                       style={{ transition: 'stroke-dashoffset 0.2s ease' }}
                     />
@@ -775,8 +775,8 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
                   downloadFile(url, fileName);
                 }}
                 style={{
-                  padding: '8px', borderRadius: '50%', background: isReceived ? 'var(--bg-hover)' : 'rgba(255,255,255,0.12)',
-                  border: isReceived ? '1px solid var(--border-color)' : '1px solid rgba(255,255,255,0.15)',
+                  padding: '8px', borderRadius: '50%', background: isReceived ? 'var(--bg-hover)' : 'var(--border-color)',
+                  border: isReceived ? '1px solid var(--border-color)' : '1px solid var(--border-color)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
                   transition: 'background 0.2s'
                 }}

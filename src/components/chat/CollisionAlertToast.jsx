@@ -60,7 +60,7 @@ const CollisionAlertToast = () => {
             padding: '6px',
             borderRadius: '10px',
             backgroundColor: 'rgba(245, 158, 11, 0.15)',
-            color: '#f59e0b',
+            color: 'var(--warning-color)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -79,7 +79,7 @@ const CollisionAlertToast = () => {
               <span style={{
                 fontSize: '13px',
                 fontWeight: '700',
-                color: '#fbbf24',
+                color: 'var(--warning-color)',
                 letterSpacing: '0.3px',
                 textTransform: 'uppercase'
               }}>
@@ -90,7 +90,7 @@ const CollisionAlertToast = () => {
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: '#9ca3af',
+                  color: 'var(--text-secondary)',
                   cursor: 'pointer',
                   padding: '2px',
                   display: 'flex',
@@ -103,7 +103,7 @@ const CollisionAlertToast = () => {
 
             <p style={{
               fontSize: '13px',
-              color: '#e5e7eb',
+              color: 'var(--text-primary)',
               margin: '0 0 4px 0',
               lineHeight: '1.4'
             }}>
@@ -116,7 +116,7 @@ const CollisionAlertToast = () => {
                 alignItems: 'center',
                 gap: '6px',
                 fontSize: '11px',
-                color: '#9ca3af'
+                color: 'var(--text-secondary)'
               }}>
                 <Clock size={12} />
                 <span>{alert.timeRange}</span>

@@ -110,6 +110,17 @@ messaging.onBackgroundMessage((payload) => {
     });
   }
 
+  if (type === 'EVENT_CHANGED') {
+    const summary = data.changeSummary || 'Event details were updated';
+    return self.registration.showNotification(title || 'Event Details Changed', {
+      body: summary,
+      icon: 'icon.png',
+      badge: 'icon.png',
+      tag: `event-${data.eventId || Date.now()}`,
+      data: { type: 'EVENT_CHANGED', eventId: data.eventId, changeSummary: summary }
+    });
+  }
+
   if (type === 'DAILY') {
     let eventCount = 0;
     try {
@@ -443,7 +454,9 @@ self.addEventListener('notificationclick', (event) => {
   const baseUrl = self.registration.scope;
 
   let relativePath = '#/chats';
-  if (tag === 'daily-summary' || data.type === 'DAILY' || data.type === 'EVENT') {
+  if (data.type === 'EVENT_CHANGED' || (data.type === 'EVENT' && data.eventId)) {
+    relativePath = `#/calendar?eventId=${data.eventId}&viewInfo=true`;
+  } else if (tag === 'daily-summary' || data.type === 'DAILY' || data.type === 'EVENT') {
     relativePath = '#/calendar';
   } else if (tag === 'assignments-missing' || data.type === 'ASSIGNMENT_MISSING') {
     relativePath = '#/communities';

@@ -4,7 +4,7 @@ import { getsocket, isSocketOpen, sendSafe } from "../service/Websocket";
 import { API } from "../service/UserAuth";
 import messageStore from "./MessageStore";
 import { getMessagesFromDB, syncChatsMapToDB } from "../service/db";
-import { getMediaInfo, getMediaBlob } from "../service/MediaCache";
+import { getMediaInfo, getMediaBlob, memoryThumbCache } from "../service/MediaCache";
 import { getChatIcon, getChatColor } from "../service/ChatUtils";
 import MediaViewer from "../components/chat/MediaViewer";
 import Avatar from "../components/chat/Avatar";
@@ -108,7 +108,7 @@ export function VerifiedBadge({ size = 16, style = {} }) {
         width: `${size}px`,
         height: `${size}px`,
         borderRadius: '50%',
-        backgroundColor: '#2563eb',
+        backgroundColor: 'var(--accent-solid)',
         color: '#ffffff',
         flexShrink: 0,
         ...style
@@ -321,8 +321,8 @@ const ChatRow = React.memo(function ChatRow({
               <span style={{
                 fontSize: '10px',
                 padding: '2px 6px',
-                backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                color: '#60a5fa',
+                backgroundColor: 'var(--accent-tint)',
+                color: 'var(--accent-text)',
                 borderRadius: '4px',
                 marginLeft: '4px',
                 fontWeight: '700',
@@ -548,21 +548,75 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
   // Stable avatar click handler — avoids re-creating per render inside map()
   const handleAvatarClick = useCallback(async (e, chat) => {
     e.stopPropagation();
-    if (!chat.profile) return;
-    try {
-      const info = await getMediaInfo(chat.profile);
-      const fullUrl = await getMediaBlob(chat.profile + '_full', info.fileKey, 'mainCache');
-      if (isMounted.current) setViewingMedia({
-        fileUrl: fullUrl || `${API}/files/get-url/${chat.profile}`,
-        fileName: chat.chatName,
-        fileType: 'image'
-      });
-    } catch {
-      if (isMounted.current) setViewingMedia({
-        fileUrl: `${API}/files/get-url/${chat.profile}`,
-        fileName: chat.chatName,
-        fileType: 'image'
-      });
+    const profileTarget = chat?.profile || chat?.profilePic || chat?.Profile;
+    const title = chat?.chatName || chat?.displayName || 'Profile Picture';
+
+    // 1. Direct URL or local image
+    if (typeof profileTarget === 'string' && (
+      profileTarget.startsWith('http') || 
+      profileTarget.startsWith('/') || 
+      profileTarget.startsWith('data:')
+    )) {
+      if (isMounted.current) {
+        setViewingMedia({
+          fileUrl: profileTarget,
+          fileName: title,
+          fileType: 'image'
+        });
+      }
+      return;
+    }
+
+    // 2. If it's a media ID or hash
+    if (profileTarget) {
+      // Check memory cache first for instant preview
+      const cachedUrl = memoryThumbCache.get(profileTarget + '_full') || memoryThumbCache.get(profileTarget + '_thumb');
+      if (cachedUrl && isMounted.current) {
+        setViewingMedia({
+          fileUrl: cachedUrl,
+          fileName: title,
+          fileType: 'image'
+        });
+      }
+
+      try {
+        const info = await getMediaInfo(profileTarget);
+        const fullUrl = await getMediaBlob(
+          profileTarget + '_full', 
+          info.fileKey || info.thumbnailKey, 
+          'mainCache'
+        );
+        if (isMounted.current) {
+          setViewingMedia({
+            fileUrl: fullUrl || info.fileKey || info.thumbnailKey || cachedUrl,
+            fileName: title,
+            fileType: 'image'
+          });
+        }
+      } catch (err) {
+        console.warn('[ChatNames] Failed to fetch full profile media:', err);
+        if (!cachedUrl && isMounted.current) {
+          setViewingMedia({
+            fileUrl: `${API}/files/get-url/${profileTarget}`,
+            fileName: title,
+            fileType: 'image'
+          });
+        }
+      }
+      return;
+    }
+
+    // 3. System broadcast / guide chat fallback
+    if (chat?.chatId === 'BROADCAST_SYSTEM' || chat?.id === 'BROADCAST_SYSTEM' || chat?.chatId === SIMULATION_ID || chat?.id === SIMULATION_ID || chat?.isSimulation || chat?.isSystem || chat?.type === 'broadcast' || chat?.type === 'guide') {
+      const systemLogo = `${import.meta.env.BASE_URL}icon.png`;
+      if (isMounted.current) {
+        setViewingMedia({
+          fileUrl: systemLogo,
+          fileName: title,
+          fileType: 'image'
+        });
+      }
+      return;
     }
   }, []);
 
@@ -660,9 +714,6 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
       if (!isMounted.current) return;
       const dbLastMsgs = {};
       const chatsToScan = [...chats];
-      if (!chatsToScan.some(c => c.chatId === "BROADCAST_SYSTEM")) {
-        chatsToScan.push({ chatId: "BROADCAST_SYSTEM" });
-      }
       if (!chatsToScan.some(c => c.chatId === SIMULATION_ID)) {
         chatsToScan.push({ chatId: SIMULATION_ID });
       }
@@ -717,20 +768,16 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
         })();
         const chatsMap = {};
         if (existingMap["BROADCAST_SYSTEM"]) {
-          chatsMap["BROADCAST_SYSTEM"] = existingMap["BROADCAST_SYSTEM"];
-        } else {
-          chatsMap["BROADCAST_SYSTEM"] = {
-            id: "BROADCAST_SYSTEM",
-            chatId: "BROADCAST_SYSTEM",
-            chatName: "Letschat (System)",
-            type: "broadcast",
-            isSystem: true,
-            verified: true,
-            profile: `${import.meta.env.BASE_URL}icon.png`
-          };
+          delete existingMap["BROADCAST_SYSTEM"];
         }
         if (existingMap[SIMULATION_ID]) {
-          chatsMap[SIMULATION_ID] = existingMap[SIMULATION_ID];
+          chatsMap[SIMULATION_ID] = {
+            ...existingMap[SIMULATION_ID],
+            chatName: "LetsChat",
+            profile: `${import.meta.env.BASE_URL}icon.png`,
+            isSystem: true,
+            verified: true
+          };
         } else {
           chatsMap[SIMULATION_ID] = {
             chatId: SIMULATION_ID,
@@ -739,7 +786,8 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
             type: "guide",
             isSimulation: true,
             isSystem: true,
-            verified: true
+            verified: true,
+            profile: `${import.meta.env.BASE_URL}icon.png`
           };
         }
 
@@ -957,26 +1005,11 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
         type: "guide",
         isSimulation: true,
         isSystem: true,
-        verified: true
-      };
-      if (!filtered.some(c => c.chatId === SIMULATION_ID)) {
-        filtered.push(guideChat);
-      }
-    }
-
-    // Inject Broadcast System Chat (Permanently available, ordered by timestamp)
-    if (!searchQuery || "letschat (system)".includes(lowerSearch) || "letschat".includes(lowerSearch) || "system".includes(lowerSearch) || "broadcast_system".toLowerCase().includes(lowerSearch)) {
-      const broadcastChat = {
-        chatId: "BROADCAST_SYSTEM",
-        id: "BROADCAST_SYSTEM",
-        chatName: "Letschat (System)",
-        type: "broadcast",
-        isSystem: true,
         verified: true,
         profile: `${import.meta.env.BASE_URL}icon.png`
       };
-      if (!filtered.some(c => c.chatId === "BROADCAST_SYSTEM")) {
-        filtered.push(broadcastChat);
+      if (!filtered.some(c => c.chatId === SIMULATION_ID)) {
+        filtered.push(guideChat);
       }
     }
 
@@ -1012,7 +1045,6 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
     const regularChats = chatNames.filter(c => c.type !== 'room' && !messageStore.isVolatile(c.chatId));
     let systemBonus = 0;
     if (!regularChats.some(c => c.chatId === SIMULATION_ID)) systemBonus++;
-    if (!regularChats.some(c => c.chatId === "BROADCAST_SYSTEM")) systemBonus++;
 
     return {
       All: regularChats.length + systemBonus,
@@ -1081,9 +1113,9 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
       <div style={{
         margin: '16px',
         padding: '16px',
-        backgroundColor: 'rgba(59, 130, 246, 0.05)',
+        backgroundColor: 'var(--accent-tint)',
         borderRadius: '16px',
-        border: '1px solid rgba(59, 130, 246, 0.1)',
+        border: '1px solid var(--accent-tint)',
         overflow: 'hidden'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
@@ -1096,7 +1128,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
             alignItems: 'center',
             gap: '8px'
           }}>
-            <Users size={16} color="#60a5fa" />
+            <Users size={16} color="var(--accent-text)" />
             People you may know
           </h3>
           <button
@@ -1113,7 +1145,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
               borderRadius: '4px',
               transition: 'background-color 0.2s'
             }}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
             onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
             title="Refresh recommendations"
           >
@@ -1279,19 +1311,13 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
       if (userClosedSpacesRef.current !== String(targetChatId)) {
         if (!selectedChatForSpacesRef.current || String(selectedChatForSpacesRef.current.chatId) !== String(targetChatId)) {
           let chat = chatNames.find(c => String(c.chatId) === String(targetChatId));
-          if (!chat && (targetChatId === SIMULATION_ID || targetChatId === "simulation_guide")) {
+          if (!chat && (targetChatId === SIMULATION_ID || targetChatId === "simulation_guide" || targetChatId === "BROADCAST_SYSTEM")) {
             chat = {
               chatId: SIMULATION_ID,
+              id: SIMULATION_ID,
               chatName: "LetsChat",
               type: "guide",
-              isSimulation: true
-            };
-          } else if (!chat && targetChatId === "BROADCAST_SYSTEM") {
-            chat = {
-              chatId: "BROADCAST_SYSTEM",
-              id: "BROADCAST_SYSTEM",
-              chatName: "Letschat (System)",
-              type: "broadcast",
+              isSimulation: true,
               isSystem: true,
               verified: true,
               profile: `${import.meta.env.BASE_URL}icon.png`
@@ -1409,6 +1435,28 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
           }}>LetsChat</h3>
           <div style={{ display: 'flex', gap: '8px', color: 'var(--text-secondary)' }}>
             <button
+              onClick={() => navigate('/batch-message')}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'inherit',
+                cursor: 'pointer',
+                padding: '8px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              className="hover-bg"
+              title="Batch Message"
+              aria-label="Batch Message"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4c0-1.1.9-2 2-2h8a2 2 0 0 1 2 2v5Z" />
+                <path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1" />
+              </svg>
+            </button>
+            <button
               onClick={() => {
                 // Dispatch a custom event to open the navbar menu
                 window.dispatchEvent(new CustomEvent('open-navbar-menu'));
@@ -1515,7 +1563,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
               style={{
                 width: '100%',
                 padding: '12px',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                background: 'linear-gradient(135deg, var(--success-color) 0%, var(--success-color) 100%)',
                 color: 'white',
                 border: 'none',
                 borderRadius: '12px',
@@ -1549,9 +1597,9 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                 style={{
                   padding: '5px 14px',
                   borderRadius: '16px',
-                  backgroundColor: isActive ? 'rgba(59, 130, 246, 0.18)' : 'transparent',
-                  color: isActive ? '#60a5fa' : 'var(--text-secondary)',
-                  border: isActive ? '1px solid rgba(59, 130, 246, 0.35)' : '1px solid var(--border-color)',
+                  backgroundColor: isActive ? 'var(--accent-tint)' : 'transparent',
+                  color: isActive ? 'var(--accent-text)' : 'var(--text-secondary)',
+                  border: isActive ? '1px solid var(--accent-tint)' : '1px solid var(--border-color)',
                   fontSize: '13px',
                   fontWeight: isActive ? '600' : '400',
                   cursor: 'pointer',
@@ -1569,11 +1617,11 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
         {error && (
           <div style={{
             padding: "12px 16px",
-            backgroundColor: "#2d1515",
-            color: "#ff6b6b",
+            backgroundColor: "var(--danger-tint)",
+            color: "var(--danger-color)",
             borderRadius: "8px",
             marginBottom: "20px",
-            border: "1px solid #4a2020"
+            border: "1px solid var(--danger-tint-border)"
           }}>
             {error}
           </div>
@@ -1715,7 +1763,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                     width: '36px',
                     height: '36px',
                     borderRadius: '50%',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    backgroundColor: 'var(--accent-tint)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -1753,7 +1801,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                     style={{
                       background: 'none',
                       border: 'none',
-                      color: newSpaceName.trim() ? '#10b981' : 'var(--text-secondary)',
+                      color: newSpaceName.trim() ? 'var(--success-color)' : 'var(--text-secondary)',
                       cursor: newSpaceName.trim() ? 'pointer' : 'not-allowed',
                       display: 'flex',
                       alignItems: 'center',
@@ -1772,7 +1820,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                     style={{
                       background: 'none',
                       border: 'none',
-                      color: '#ef4444',
+                      color: 'var(--danger-color)',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -1795,14 +1843,14 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                     marginTop: '4px'
                   }}
                   onClick={() => setIsCreatingSpace(true)}
-                  onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'}
+                  onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
                   onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
                 >
                   <div style={{
                     width: '36px',
                     height: '36px',
                     borderRadius: '50%',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    backgroundColor: 'var(--accent-tint)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -1854,7 +1902,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                         onClick={() => navigate('/calendar', { state: { selectedEventDate: evt.date } })}
                         style={{
                           padding: '10px 12px',
-                          backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                          backgroundColor: 'var(--bg-hover)',
                           borderRadius: '10px',
                           borderLeft: `3px solid ${evt.color || 'var(--accent-color)'}`,
                           display: 'flex',
@@ -1864,11 +1912,11 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                           transition: 'transform 0.2s, background-color 0.2s'
                         }}
                         onMouseEnter={e => {
-                          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.06)';
+                          e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
                           e.currentTarget.style.transform = 'translateX(4px)';
                         }}
                         onMouseLeave={e => {
-                          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.03)';
+                          e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
                           e.currentTarget.style.transform = 'translateX(0)';
                         }}
                       >
@@ -1908,10 +1956,10 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
             `}</style>
             {[1, 2, 3, 4, 5, 6].map(i => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '12px 16px', width: '100%', boxSizing: 'border-box' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '14px', backgroundColor: 'rgba(255, 255, 255, 0.08)', flexShrink: 0, animation: 'chatSkeletonPulse 1.5s ease-in-out infinite' }} />
+                <div style={{ width: '48px', height: '48px', borderRadius: '14px', backgroundColor: 'var(--bg-hover)', flexShrink: 0, animation: 'chatSkeletonPulse 1.5s ease-in-out infinite' }} />
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <div style={{ width: '45%', height: '14px', borderRadius: '6px', backgroundColor: 'rgba(255, 255, 255, 0.1)', animation: 'chatSkeletonPulse 1.5s ease-in-out infinite' }} />
-                  <div style={{ width: '75%', height: '11px', borderRadius: '4px', backgroundColor: 'rgba(255, 255, 255, 0.05)', animation: 'chatSkeletonPulse 1.5s ease-in-out infinite' }} />
+                  <div style={{ width: '45%', height: '14px', borderRadius: '6px', backgroundColor: 'var(--border-color)', animation: 'chatSkeletonPulse 1.5s ease-in-out infinite' }} />
+                  <div style={{ width: '75%', height: '11px', borderRadius: '4px', backgroundColor: 'var(--bg-hover)', animation: 'chatSkeletonPulse 1.5s ease-in-out infinite' }} />
                 </div>
               </div>
             ))}
@@ -1920,7 +1968,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
           <div style={{
             textAlign: "center",
             padding: "60px 20px",
-            color: "#808080",
+            color: "var(--text-muted)",
             fontSize: "15px"
           }}>
             {searchQuery ? "No chats found matching your search" : "No chats available"}
@@ -1991,12 +2039,12 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
             padding: "20px"
           }}>
             <div style={{
-              backgroundColor: "#1a1a1a",
+              backgroundColor: "var(--bg-secondary)",
               borderRadius: "16px",
               padding: "12px",
               maxWidth: "600px",
               width: "100%",
-              border: "2px solid #2a2a2a",
+              border: "2px solid var(--bg-card)",
               boxShadow: "0 8px 24px rgba(0,0,0,0.4)"
             }}>
               <div style={{
@@ -2013,7 +2061,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                 </h3>
                 <p style={{
                   fontSize: "15px",
-                  color: "#808080"
+                  color: "var(--text-muted)"
                 }}>
                   Checkout these features
                 </p>
@@ -2024,9 +2072,9 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                   display: "flex",
                   gap: "16px",
                   padding: "10px",
-                  backgroundColor: "#0f0f0f",
+                  backgroundColor: "var(--bg-secondary)",
                   borderRadius: "12px",
-                  border: "1px solid #2a2a2a"
+                  border: "1px solid var(--bg-card)"
                 }}>
                   <div style={{
                     minWidth: "48px",
@@ -2044,14 +2092,14 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                     <h4 style={{
                       fontSize: "16px",
                       fontWeight: "600",
-                      color: "#e0e0e0",
+                      color: "var(--text-primary)",
                       marginBottom: "6px"
                     }}>
                       Multiple Chat Spaces
                     </h4>
                     <p style={{
                       fontSize: "14px",
-                      color: "#a0a0a0",
+                      color: "var(--text-muted)",
                       lineHeight: "1.5"
                     }}>
                       No more messy chats - keep multiple conversations with the same person neatly separated. keep your discussions separate and focused
@@ -2063,9 +2111,9 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                   display: "flex",
                   gap: "16px",
                   padding: "10px",
-                  backgroundColor: "#0f0f0f",
+                  backgroundColor: "var(--bg-secondary)",
                   borderRadius: "12px",
-                  border: "1px solid #2a2a2a"
+                  border: "1px solid var(--bg-card)"
                 }}>
                   <div style={{
                     minWidth: "48px",
@@ -2083,14 +2131,14 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                     <h4 style={{
                       fontSize: "16px",
                       fontWeight: "600",
-                      color: "#e0e0e0",
+                      color: "var(--text-primary)",
                       marginBottom: "6px"
                     }}>
                       Message Revival After Deletion
                     </h4>
                     <p style={{
                       fontSize: "14px",
-                      color: "#a0a0a0",
+                      color: "var(--text-muted)",
                       lineHeight: "1.5"
                     }}>
                       Never lose important messages. Recover deleted messages and maintain complete conversation history
@@ -2102,9 +2150,9 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                   display: "flex",
                   gap: "16px",
                   padding: "10px",
-                  backgroundColor: "#0f0f0f",
+                  backgroundColor: "var(--bg-secondary)",
                   borderRadius: "12px",
-                  border: "1px solid #2a2a2a"
+                  border: "1px solid var(--bg-card)"
                 }}>
                   <div style={{
                     minWidth: "48px",
@@ -2122,14 +2170,14 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                     <h4 style={{
                       fontSize: "16px",
                       fontWeight: "600",
-                      color: "#e0e0e0",
+                      color: "var(--text-primary)",
                       marginBottom: "6px"
                     }}>
                       Event Detection for Chat Messages
                     </h4>
                     <p style={{
                       fontSize: "14px",
-                      color: "#a0a0a0",
+                      color: "var(--text-muted)",
                       lineHeight: "1.5"
                     }}>
                       Smart detection of time based events in your conversations and storing them in calendar for you
@@ -2142,7 +2190,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                 marginTop: "12px",
                 textAlign: "center",
                 paddingTop: "12px",
-                borderTop: "1px solid #2a2a2a"
+                borderTop: "1px solid var(--bg-card)"
               }}>
                 <button
                   onClick={() => navigate('/search')}
@@ -2151,22 +2199,22 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                     fontSize: "15px",
                     fontWeight: "600",
                     color: "#ffffff",
-                    backgroundColor: "#2563eb",
+                    backgroundColor: "var(--accent-solid)",
                     border: "none",
                     borderRadius: "10px",
                     cursor: "pointer",
                     transition: "all 0.2s ease",
-                    boxShadow: "0 4px 12px rgba(37, 99, 235, 0.3)"
+                    boxShadow: "0 4px 12px color-mix(in srgb, var(--accent-solid) 45%, transparent)"
                   }}
                   onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = "#1d4ed8";
+                    e.target.style.backgroundColor = "var(--accent-text)";
                     e.target.style.transform = "translateY(-2px)";
-                    e.target.style.boxShadow = "0 6px 16px rgba(37, 99, 235, 0.4)";
+                    e.target.style.boxShadow = "0 6px 16px color-mix(in srgb, var(--accent-solid) 45%, transparent)";
                   }}
                   onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = "#2563eb";
+                    e.target.style.backgroundColor = "var(--accent-text)";
                     e.target.style.transform = "translateY(0)";
-                    e.target.style.boxShadow = "0 4px 12px rgba(37, 99, 235, 0.3)";
+                    e.target.style.boxShadow = "0 4px 12px color-mix(in srgb, var(--accent-solid) 45%, transparent)";
                   }}
                 >
                   Find friends
@@ -2183,6 +2231,53 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
           media={viewingMedia}
           onClose={() => setViewingMedia(null)}
         />
+      )}
+
+      {/* Batch Message Floating Action Button (FAB) */}
+      {(location.pathname === '/chats' || location.pathname === '/') && (
+        <button
+          type="button"
+          onClick={() => navigate('/batch-message')}
+          aria-label="Batch Message"
+          title="Batch Message"
+          style={{
+            position: 'fixed',
+            bottom: isDesktop ? '28px' : 'calc(76px + env(safe-area-inset-bottom, 0px))',
+            right: isDesktop ? '32px' : '20px',
+            width: '56px',
+            height: '56px',
+            borderRadius: '50%',
+            backgroundColor: 'var(--accent-color)',
+            color: '#ffffff',
+            border: 'none',
+            boxShadow: '0 6px 18px color-mix(in srgb, var(--accent-solid) 45%, transparent), 0 2px 6px rgba(0, 0, 0, 0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            zIndex: 9999,
+            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+            outline: 'none',
+            userSelect: 'none',
+            WebkitTapHighlightColor: 'transparent'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.08) translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 10px 24px color-mix(in srgb, var(--accent-solid) 45%, transparent), 0 4px 8px rgba(0, 0, 0, 0.3)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1) translateY(0)';
+            e.currentTarget.style.boxShadow = '0 6px 18px color-mix(in srgb, var(--accent-solid) 45%, transparent), 0 2px 6px rgba(0, 0, 0, 0.25)';
+          }}
+          onMouseDown={(e) => {
+            e.currentTarget.style.transform = 'scale(0.95)';
+          }}
+        >
+          <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4c0-1.1.9-2 2-2h8a2 2 0 0 1 2 2v5Z" />
+            <path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1" />
+          </svg>
+        </button>
       )}
     </div>
   );

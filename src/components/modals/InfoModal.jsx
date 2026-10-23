@@ -499,7 +499,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
           display: 'flex', alignItems: 'center', gap: '4px',
           padding: '4px 10px', borderRadius: '20px',
           fontSize: '11px', fontWeight: '700',
-          background: 'rgba(251, 191, 36, 0.15)', color: '#fbbf24',
+          background: 'rgba(251, 191, 36, 0.15)', color: 'var(--warning-color)',
           border: '1px solid rgba(251, 191, 36, 0.3)',
           letterSpacing: '0.5px'
         }}>
@@ -513,8 +513,8 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
           display: 'flex', alignItems: 'center', gap: '4px',
           padding: '4px 10px', borderRadius: '20px',
           fontSize: '11px', fontWeight: '700',
-          background: 'rgba(96, 165, 250, 0.15)', color: '#60a5fa',
-          border: '1px solid rgba(96, 165, 250, 0.3)',
+          background: 'var(--accent-tint)', color: 'var(--accent-text)',
+          border: '1px solid var(--accent-tint-border)',
           letterSpacing: '0.5px'
         }}>
           <Award size={10} /> FACULTY
@@ -538,7 +538,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
       overflowY: 'auto',
       borderRadius: isPanel ? '0' : '24px', 
       position: 'relative',
-      border: isPanel ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
+      border: isPanel ? 'none' : '1px solid var(--border-color)',
       boxShadow: isPanel ? 'none' : '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
       scrollbarWidth: 'none',
       height: isPanel ? '100%' : 'auto',
@@ -553,7 +553,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
         padding: '16px 24px', zIndex: 10,
         background: isPanel ? 'rgba(15, 23, 42, 0.8)' : 'transparent',
         backdropFilter: isPanel ? 'blur(10px)' : 'none',
-        borderBottom: isPanel ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
+        borderBottom: isPanel ? '1px solid var(--border-color)' : 'none',
         marginBottom: isPanel ? '20px' : '0'
       }}>
         {isPanel && <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '18px', fontWeight: '700' }}>Contact Info</h3>}
@@ -568,10 +568,10 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
                 setGroupEditMode(true);
               }}
               style={{
-                background: 'rgba(59, 130, 246, 0.1)', border: 'none',
+                background: 'var(--accent-tint)', border: 'none',
                 borderRadius: '50%', width: '36px', height: '36px',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', color: '#3b82f6', transition: 'all 0.2s'
+                cursor: 'pointer', color: 'var(--accent-text)', transition: 'all 0.2s'
               }}
               title={isSleepMode ? "Cannot edit in Sleep Mode" : `Edit ${chat.type} info`}
             >
@@ -579,11 +579,11 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
             </button>
           )}
           <button onClick={onClose} style={{
-            background: 'rgba(255, 255, 255, 0.05)', border: 'none',
+            background: 'var(--bg-hover)', border: 'none',
             borderRadius: '50%', width: '36px', height: '36px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', color: '#9ca3af', transition: 'all 0.2s'
-          }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'}>
+            cursor: 'pointer', color: 'var(--text-secondary)', transition: 'all 0.2s'
+          }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--border-color)'}>
             <span style={{ fontSize: '20px', fontWeight: '700' }}>X</span>
           </button>
         </div>
@@ -598,8 +598,6 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
               size={isPanel ? 160 : 120} 
               highRes={true}
               style={{ 
-                border: '4px solid rgba(255, 255, 255, 0.1)',
-                boxShadow: '0 8px 16px rgba(0, 0, 0, 0.3)',
                 cursor: 'pointer'
               }} 
               onClick={groupEditMode ? () => groupFileInputRef.current?.click() : () => handleAvatarClick((groupEditMode ? tempGroupProfile : chat.profile) || chat.profilePic, chat.chatName)}
@@ -673,7 +671,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
                     width: '20px',
                     height: '20px',
                     borderRadius: '50%',
-                    backgroundColor: '#2563eb',
+                    backgroundColor: 'var(--accent-solid)',
                     color: '#ffffff',
                     flexShrink: 0
                   }}>
@@ -684,16 +682,16 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
                 )}
               </h2>
               {chat.type !== 'group' && chat.type !== 'classroom' && chat.type !== 'room' && (
-                <div style={{ fontSize: '13px', color: 'var(--text-secondary, #9ca3af)', marginBottom: '8px' }}>
+                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
                   @{chat.username || chat.userName || chat.id} · {chat.id || chat.otherUserId || chat.userId || chat.chatId}
                 </div>
               )}
               <div style={{ 
                 padding: '6px 14px', borderRadius: '20px',
-                backgroundColor: chat.type === 'classroom' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)',
-                color: chat.type === 'classroom' ? '#10b981' : '#3b82f6',
+                backgroundColor: chat.type === 'classroom' ? 'rgba(16, 185, 129, 0.1)' : 'var(--accent-tint)',
+                color: chat.type === 'classroom' ? 'var(--success-color)' : 'var(--accent-text)',
                 fontSize: '13px', fontWeight: '600', textTransform: 'capitalize',
-                border: `1px solid ${chat.type === 'classroom' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(59, 130, 246, 0.2)'}`
+                border: `1px solid ${chat.type === 'classroom' ? 'rgba(16, 185, 129, 0.2)' : 'var(--accent-tint-border)'}`
               }}>
                 {chat.type} Chat
               </div>
@@ -702,7 +700,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
                 (chat.motto || chat.description) ? (
                   <p style={{
                     fontSize: '13px',
-                    color: 'var(--text-secondary, #9ca3af)',
+                    color: 'var(--text-secondary)',
                     fontStyle: 'italic',
                     margin: '10px 0 0 0',
                     textAlign: 'center',
@@ -718,7 +716,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
                       style={{
                         background: 'none',
                         border: 'none',
-                        color: '#60a5fa',
+                        color: 'var(--accent-text)',
                         fontSize: '12px',
                         cursor: 'pointer',
                         marginTop: '8px',
@@ -736,15 +734,15 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
 
         {/* User Profile Section */}
         <section style={{ 
-          backgroundColor: 'rgba(255, 255, 255, 0.03)', 
+          backgroundColor: 'var(--bg-hover)', 
           borderRadius: '20px', padding: '20px',
-          border: '1px solid rgba(255, 255, 255, 0.05)',
+          border: '1px solid var(--bg-hover)',
           marginBottom: '32px'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Edit2 size={16} color="#9ca3af" />
-              <h3 style={{ fontSize: '13px', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>
+              <Edit2 size={16} color="var(--text-secondary)" />
+              <h3 style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>
                 How you appear
               </h3>
             </div>
@@ -756,7 +754,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
                 }
                 setEditMode(true);
               }} style={{
-                fontSize: '13px', fontWeight: '600', color: '#3b82f6',
+                fontSize: '13px', fontWeight: '600', color: 'var(--accent-text)',
                 background: 'none', border: 'none', cursor: 'pointer'
               }}>Edit Profile</button>
             )}
@@ -785,11 +783,11 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
                   {uploading && (
                     <div style={{
                       position: 'absolute', bottom: 0, left: 0, right: 0,
-                      height: '4px', backgroundColor: 'rgba(255,255,255,0.1)'
+                      height: '4px', backgroundColor: 'var(--border-color)'
                     }}>
                       <div style={{
                         width: `${progress}%`, height: '100%',
-                        backgroundColor: '#3b82f6', transition: 'width 0.2s'
+                        backgroundColor: 'var(--accent-solid)', transition: 'width 0.2s'
                       }} />
                     </div>
                   )}
@@ -815,8 +813,8 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
                       borderColor: !myDisplayName.trim()
                         ? undefined
                         : chatNicknameValidation.isValid
-                          ? '#10b981'
-                          : '#ef4444'
+                          ? 'var(--success-color)'
+                          : 'var(--danger-color)'
                     }}
                   />
                 </div>
@@ -830,7 +828,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
                   alignItems: 'center',
                   gap: '6px',
                   marginBottom: '6px',
-                  color: chatNicknameValidation.isValid ? '#10b981' : '#ef4444'
+                  color: chatNicknameValidation.isValid ? 'var(--success-color)' : 'var(--danger-color)'
                 }}>
                   {chatNicknameValidation.isValid ? (
                     <span>✓ Self similarity: {chatNicknameValidation.selfScore}/10 with @{currentUsername} (Valid)</span>
@@ -841,13 +839,13 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
               )}
               
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <span style={{ fontSize: '11px', color: '#9ca3af' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                   Per-chat names must have &ge; 3/10 similarity with your permanent username (@{currentUsername}) and &lt; 8/10 peer similarity.{" "}
                   <button
                     type="button"
                     onClick={() => setShowPolicyModal(true)}
                     style={{
-                      color: '#60a5fa',
+                      color: 'var(--accent-text)',
                       textDecoration: 'underline',
                       background: 'none',
                       border: 'none',
@@ -899,10 +897,10 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
               />
               <div>
                 <div style={{ fontSize: '16px', fontWeight: '600', color: '#f3f4f6' }}>{myDisplayName || 'Set your name'}</div>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary, #9ca3af)', marginTop: '2px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                   @{currentUsername} · {currentUserId}
                 </div>
-                <div style={{ fontSize: '11px', color: '#6b7280', marginTop: '2px' }}>Your visible nickname in this chat</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>Your visible nickname in this chat</div>
               </div>
             </div>
           )}
@@ -910,9 +908,9 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
 
         {/* Notifications Section */}
         <section style={{ 
-          backgroundColor: 'rgba(255, 255, 255, 0.03)', 
+          backgroundColor: 'var(--bg-hover)', 
           borderRadius: '20px', padding: '16px 20px',
-          border: '1px solid rgba(255, 255, 255, 0.05)',
+          border: '1px solid var(--bg-hover)',
           marginBottom: '32px',
           display: 'flex',
           justifyContent: 'space-between',
@@ -922,22 +920,22 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{
               width: '36px', height: '36px', borderRadius: '10px',
-              backgroundColor: muted ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+              backgroundColor: muted ? 'var(--danger-tint)' : 'rgba(16, 185, 129, 0.1)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: muted ? '#ef4444' : '#10b981'
+              color: muted ? 'var(--danger-color)' : 'var(--success-color)'
             }}>
               {muted ? <BellOff size={18} /> : <Bell size={18} />}
             </div>
             <div>
               <div style={{ fontSize: '15px', fontWeight: '600', color: '#f3f4f6' }}>Mute Notifications</div>
-              <div style={{ fontSize: '12px', color: '#9ca3af' }}>{muted ? 'Alerts are disabled for this chat' : 'Receive alerts for new messages'}</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{muted ? 'Alerts are disabled for this chat' : 'Receive alerts for new messages'}</div>
             </div>
           </div>
           <div style={{
             width: '44px', height: '24px', borderRadius: '12px',
-            backgroundColor: muted ? '#ef4444' : 'rgba(255, 255, 255, 0.1)',
+            backgroundColor: muted ? 'var(--danger-color)' : 'var(--border-color)',
             position: 'relative', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            border: '1px solid rgba(255, 255, 255, 0.1)'
+            border: '1px solid var(--border-color)'
           }}>
             <div style={{
               position: 'absolute', top: '2px', left: muted ? '22px' : '2px',
@@ -950,9 +948,9 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
 
         {/* Quick Access Section (Mobile Navigation Wheel) */}
         <section style={{ 
-          backgroundColor: 'rgba(255, 255, 255, 0.03)', 
+          backgroundColor: 'var(--bg-hover)', 
           borderRadius: '20px', padding: '16px 20px',
-          border: '1px solid rgba(255, 255, 255, 0.05)',
+          border: '1px solid var(--bg-hover)',
           marginBottom: '32px',
           display: 'flex',
           justifyContent: 'space-between',
@@ -962,22 +960,22 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{
               width: '36px', height: '36px', borderRadius: '10px',
-              backgroundColor: pinned ? 'rgba(168, 85, 247, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+              backgroundColor: pinned ? 'rgba(168, 85, 247, 0.15)' : 'var(--bg-hover)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: pinned ? '#a855f7' : '#9ca3af'
+              color: pinned ? '#a855f7' : 'var(--text-secondary)'
             }}>
               <Zap size={18} />
             </div>
             <div>
               <div style={{ fontSize: '15px', fontWeight: '600', color: '#f3f4f6' }}>Pin to Quick Access</div>
-              <div style={{ fontSize: '12px', color: '#9ca3af' }}>{pinned ? 'Available on mobile radial menu' : 'Add to quick floating navigation'}</div>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{pinned ? 'Available on mobile radial menu' : 'Add to quick floating navigation'}</div>
             </div>
           </div>
           <div style={{
             width: '44px', height: '24px', borderRadius: '12px',
-            backgroundColor: pinned ? '#a855f7' : 'rgba(255, 255, 255, 0.1)',
+            backgroundColor: pinned ? '#a855f7' : 'var(--border-color)',
             position: 'relative', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-            border: '1px solid rgba(255, 255, 255, 0.1)'
+            border: '1px solid var(--border-color)'
           }}>
             <div style={{
               position: 'absolute', top: '2px', left: pinned ? '22px' : '2px',
@@ -1000,7 +998,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
             {commonGroups.length === 0 ? (
               <div style={{
                 padding: '16px', borderRadius: '16px',
-                backgroundColor: 'rgba(255, 255, 255, 0.03)', color: 'var(--text-secondary)',
+                backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)',
                 fontSize: '13px', textAlign: 'center', border: '1px solid var(--border-color)'
               }}>
                 No common groups found
@@ -1017,12 +1015,12 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
                     style={{
                       display: 'flex', alignItems: 'center', gap: '12px',
                       padding: '12px', borderRadius: '16px',
-                      backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                      backgroundColor: 'var(--bg-hover)',
                       border: '1px solid var(--border-color)',
                       cursor: 'pointer', transition: 'all 0.2s ease'
                     }}
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)'}
-                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.03)'}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
                   >
                     <Avatar chat={g} size={40} />
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -1045,8 +1043,8 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
           <section>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Users size={16} color="#9ca3af" />
-                <h3 style={{ fontSize: '13px', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>
+                <Users size={16} color="var(--text-secondary)" />
+                <h3 style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>
                   Members ({chat.type === 'room' ? memberCount : members.length})
                 </h3>
               </div>
@@ -1054,11 +1052,11 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
                 <button onClick={() => setShowAddMember(true)} style={{
                   display: 'flex', alignItems: 'center', gap: '6px',
                   padding: '8px 14px', borderRadius: '12px',
-                  backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6',
-                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                  backgroundColor: 'var(--accent-tint)', color: 'var(--accent-text)',
+                  border: '1px solid var(--accent-tint-border)',
                   fontSize: '13px', fontWeight: '600', cursor: 'pointer',
                   transition: 'all 0.2s'
-                }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)'}>
+                }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--accent-tint-border)'}>
                   <UserPlus size={16} /> Add
                 </button>
               )}
@@ -1067,7 +1065,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '32px' }}>
               {chat.type !== 'room' && (
                 loading ? (
-                  <div style={{ textAlign: 'center', padding: '20px', color: '#6b7280' }}>Loading members...</div>
+                  <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>Loading members...</div>
                 ) : (
                   members.map((member) => (
                     <div 
@@ -1077,11 +1075,11 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
                         display: 'flex', alignItems: 'center', gap: '12px',
                         padding: '12px', borderRadius: '16px',
                         backgroundColor: 'rgba(255, 255, 255, 0.02)',
-                        border: '1px solid rgba(255, 255, 255, 0.05)',
+                        border: '1px solid var(--bg-hover)',
                         cursor: 'pointer', transition: 'all 0.2s'
                       }}
                       onMouseEnter={e => {
-                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)';
                         e.currentTarget.style.transform = 'translateX(4px)';
                       }}
                       onMouseLeave={e => {
@@ -1102,7 +1100,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
                           </span>
                           {getRoleBadge(member.role)}
                         </div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-secondary, #9ca3af)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           @{member.username || member.userName} · {member.userId}
                         </div>
                       </div>
@@ -1116,13 +1114,13 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
             {chat.type !== 'room' && (
               <button onClick={handleLeaveGroup} style={{
                 width: '100%', padding: '16px', borderRadius: '16px',
-                backgroundColor: 'rgba(239, 68, 68, 0.08)', color: '#ef4444',
-                border: '1px solid rgba(239, 68, 68, 0.2)',
+                backgroundColor: 'var(--danger-tint)', color: 'var(--danger-color)',
+                border: '1px solid var(--danger-tint-border)',
                 fontSize: '15px', fontWeight: '600', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
                 transition: 'all 0.2s',
                 marginBottom: isPanel ? '40px' : '0'
-              }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.15)'}>
+              }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--danger-tint)'}>
                 <LogOut size={20} /> Leave {chat.type === 'classroom' ? 'Classroom' : 'Group'}
               </button>
             )}
@@ -1183,7 +1181,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
       backgroundColor: 'rgba(0, 0, 0, 0.8)',
       backdropFilter: 'blur(12px)',
       display: 'flex', justifyContent: 'center', alignItems: 'center',
-      zIndex: 1000, padding: '20px',
+      zIndex: 100000, padding: '20px',
       animation: 'fadeIn 0.3s ease-out'
     }}>
       {content}
@@ -1200,18 +1198,18 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
 
 const inputStyle = {
   width: '100%', padding: '12px 14px', borderRadius: '12px',
-  backgroundColor: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.1)',
+  backgroundColor: 'var(--bg-hover)', border: '1px solid var(--border-color)',
   color: '#f3f4f6', fontSize: '14px', outline: 'none', transition: 'all 0.2s'
 };
 
 const primaryBtnStyle = {
-  padding: '12px', borderRadius: '12px', backgroundColor: '#3b82f6', color: '#fff',
+  padding: '12px', borderRadius: '12px', backgroundColor: 'var(--accent-solid)', color: 'var(--text-on-accent)',
   border: 'none', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s'
 };
 
 const secondaryBtnStyle = {
-  padding: '12px', borderRadius: '12px', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: '#9ca3af',
-  border: '1px solid rgba(255, 255, 255, 0.1)', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s'
+  padding: '12px', borderRadius: '12px', backgroundColor: 'var(--bg-hover)', color: 'var(--text-secondary)',
+  border: '1px solid var(--border-color)', fontWeight: '600', cursor: 'pointer', transition: 'all 0.2s'
 };
 
 export default InfoModal;

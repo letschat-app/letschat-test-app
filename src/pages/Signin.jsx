@@ -51,44 +51,44 @@ const WeightlifterAvatar = ({ score }) => {
         {safeScore === 0 && (
           <g style={{ animation: "idleBreath 2s ease-in-out infinite" }}>
             {/* Barbell resting peacefully on floor */}
-            <line x1="8" y1="36" x2="30" y2="36" stroke="#64748b" strokeWidth="2" />
-            <rect x="5" y="31" width="3.5" height="10" rx="1.5" fill="#475569" />
-            <rect x="29.5" y="31" width="3.5" height="10" rx="1.5" fill="#475569" />
+            <line x1="8" y1="36" x2="30" y2="36" stroke="var(--text-secondary)" strokeWidth="2" />
+            <rect x="5" y="31" width="3.5" height="10" rx="1.5" fill="var(--text-muted)" />
+            <rect x="29.5" y="31" width="3.5" height="10" rx="1.5" fill="var(--text-muted)" />
 
             {/* Character standing casually beside weights */}
-            <circle cx="44" cy="11" r="5" fill="#93c5fd" stroke="#3b82f6" strokeWidth="1.5" />
-            <line x1="39.5" y1="10" x2="48.5" y2="10" stroke="#f43f5e" strokeWidth="1.8" />
-            <circle cx="42.5" cy="11" r="0.8" fill="#1e293b" />
-            <circle cx="45.5" cy="11" r="0.8" fill="#1e293b" />
-            <line x1="44" y1="16" x2="44" y2="27" stroke="#60a5fa" strokeWidth="3" strokeLinecap="round" />
-            <path d="M 44 18 L 39 22 L 42 26" stroke="#93c5fd" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-            <path d="M 44 18 L 49 22 L 46 26" stroke="#93c5fd" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-            <path d="M 44 27 L 41 37 M 44 27 L 47 37" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" />
+            <circle cx="44" cy="11" r="5" fill="var(--accent-text)" stroke="var(--accent-text)" strokeWidth="1.5" />
+            <line x1="39.5" y1="10" x2="48.5" y2="10" stroke="var(--danger-color)" strokeWidth="1.8" />
+            <circle cx="42.5" cy="11" r="0.8" fill="var(--bg-secondary)" />
+            <circle cx="45.5" cy="11" r="0.8" fill="var(--bg-secondary)" />
+            <line x1="44" y1="16" x2="44" y2="27" stroke="var(--accent-text)" strokeWidth="3" strokeLinecap="round" />
+            <path d="M 44 18 L 39 22 L 42 26" stroke="var(--accent-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            <path d="M 44 18 L 49 22 L 46 26" stroke="var(--accent-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            <path d="M 44 27 L 41 37 M 44 27 L 47 37" stroke="var(--accent-text)" strokeWidth="2.5" strokeLinecap="round" />
           </g>
         )}
 
         {/* LEVEL 1: Basic / Ready Stance */}
         {safeScore === 1 && (
           <g style={{ animation: "idleBreath 1.5s ease-in-out infinite" }}>
-            <line x1="16" y1="34" x2="48" y2="34" stroke="#cbd5e1" strokeWidth="2" />
-            <rect x="12" y="29" width="4" height="10" rx="1.5" fill="#f59e0b" />
-            <rect x="48" y="29" width="4" height="10" rx="1.5" fill="#f59e0b" />
-            <circle cx="32" cy="15" r="5" fill="#fde047" stroke="#f59e0b" strokeWidth="1.5" />
-            <line x1="28" y1="14" x2="36" y2="14" stroke="#f43f5e" strokeWidth="1.8" />
-            <line x1="32" y1="20" x2="32" y2="28" stroke="#fbbf24" strokeWidth="3" strokeLinecap="round" />
+            <line x1="16" y1="34" x2="48" y2="34" stroke="var(--text-secondary)" strokeWidth="2" />
+            <rect x="12" y="29" width="4" height="10" rx="1.5" fill="var(--warning-color)" />
+            <rect x="48" y="29" width="4" height="10" rx="1.5" fill="var(--warning-color)" />
+            <circle cx="32" cy="15" r="5" fill="#fde047" stroke="var(--warning-color)" strokeWidth="1.5" />
+            <line x1="28" y1="14" x2="36" y2="14" stroke="var(--danger-color)" strokeWidth="1.8" />
+            <line x1="32" y1="20" x2="32" y2="28" stroke="var(--warning-color)" strokeWidth="3" strokeLinecap="round" />
             <path d="M 32 21 L 22 34 M 32 21 L 42 34" stroke="#fde047" strokeWidth="2" strokeLinecap="round" />
-            <path d="M 32 28 L 26 36 M 32 28 L 38 36" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" />
+            <path d="M 32 28 L 26 36 M 32 28 L 38 36" stroke="var(--warning-color)" strokeWidth="2.5" strokeLinecap="round" />
           </g>
         )}
 
         {/* LEVEL 2: Fair (Lifting to waist) */}
         {safeScore === 2 && (
           <g style={{ animation: "waistHold 1s ease-in-out infinite" }}>
-            <line x1="16" y1="26" x2="48" y2="26" stroke="#cbd5e1" strokeWidth="2" />
+            <line x1="16" y1="26" x2="48" y2="26" stroke="var(--text-secondary)" strokeWidth="2" />
             <rect x="12" y="21" width="4" height="10" rx="1.5" fill="#eab308" />
             <rect x="48" y="21" width="4" height="10" rx="1.5" fill="#eab308" />
             <circle cx="32" cy="13" r="5" fill="#fde047" stroke="#eab308" strokeWidth="1.5" />
-            <line x1="32" y1="18" x2="32" y2="28" stroke="#fbbf24" strokeWidth="3" strokeLinecap="round" />
+            <line x1="32" y1="18" x2="32" y2="28" stroke="var(--warning-color)" strokeWidth="3" strokeLinecap="round" />
             <path d="M 32 20 L 22 26 M 32 20 L 42 26" stroke="#fde047" strokeWidth="2.2" strokeLinecap="round" />
             <path d="M 32 28 L 27 36 M 32 28 L 37 36" stroke="#ca8a04" strokeWidth="2.5" strokeLinecap="round" />
           </g>
@@ -98,12 +98,12 @@ const WeightlifterAvatar = ({ score }) => {
         {safeScore === 3 && (
           <g style={{ animation: "chestHold 0.9s ease-in-out infinite" }}>
             <line x1="16" y1="18" x2="48" y2="18" stroke="#ffffff" strokeWidth="2" />
-            <rect x="12" y="13" width="4" height="10" rx="1.5" fill="#3b82f6" />
-            <rect x="48" y="13" width="4" height="10" rx="1.5" fill="#3b82f6" />
-            <circle cx="32" cy="12" r="5" fill="#93c5fd" stroke="#3b82f6" strokeWidth="1.5" />
-            <line x1="32" y1="17" x2="32" y2="28" stroke="#60a5fa" strokeWidth="3" strokeLinecap="round" />
-            <path d="M 32 19 L 24 18 M 32 19 L 40 18" stroke="#93c5fd" strokeWidth="2.5" strokeLinecap="round" />
-            <path d="M 32 28 L 27 36 M 32 28 L 37 36" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" />
+            <rect x="12" y="13" width="4" height="10" rx="1.5" fill="var(--accent-text)" />
+            <rect x="48" y="13" width="4" height="10" rx="1.5" fill="var(--accent-text)" />
+            <circle cx="32" cy="12" r="5" fill="var(--accent-text)" stroke="var(--accent-text)" strokeWidth="1.5" />
+            <line x1="32" y1="17" x2="32" y2="28" stroke="var(--accent-text)" strokeWidth="3" strokeLinecap="round" />
+            <path d="M 32 19 L 24 18 M 32 19 L 40 18" stroke="var(--accent-text)" strokeWidth="2.5" strokeLinecap="round" />
+            <path d="M 32 28 L 27 36 M 32 28 L 37 36" stroke="var(--accent-text)" strokeWidth="2.5" strokeLinecap="round" />
           </g>
         )}
 
@@ -113,12 +113,12 @@ const WeightlifterAvatar = ({ score }) => {
             <text x="6" y="8" fontSize="8" style={{ animation: "sparkleGlow 0.8s infinite" }}>✨</text>
             <text x="50" y="8" fontSize="8" style={{ animation: "sparkleGlow 0.8s infinite 0.4s" }}>✨</text>
             <line x1="14" y1="8" x2="50" y2="8" stroke="#ffffff" strokeWidth="2.5" />
-            <rect x="10" y="3" width="4" height="10" rx="1.5" fill="#10b981" />
-            <rect x="50" y="3" width="4" height="10" rx="1.5" fill="#10b981" />
+            <rect x="10" y="3" width="4" height="10" rx="1.5" fill="var(--success-color)" />
+            <rect x="50" y="3" width="4" height="10" rx="1.5" fill="var(--success-color)" />
             <path d="M 32 18 L 22 9 M 32 18 L 42 9" stroke="#6ee7b7" strokeWidth="2.5" strokeLinecap="round" />
-            <circle cx="32" cy="16" r="5" fill="#6ee7b7" stroke="#10b981" strokeWidth="1.5" />
-            <line x1="32" y1="21" x2="32" y2="30" stroke="#34d399" strokeWidth="3" strokeLinecap="round" />
-            <path d="M 32 30 L 26 37 M 32 30 L 38 37" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" />
+            <circle cx="32" cy="16" r="5" fill="#6ee7b7" stroke="var(--success-color)" strokeWidth="1.5" />
+            <line x1="32" y1="21" x2="32" y2="30" stroke="var(--success-color)" strokeWidth="3" strokeLinecap="round" />
+            <path d="M 32 30 L 26 37 M 32 30 L 38 37" stroke="var(--success-color)" strokeWidth="2.5" strokeLinecap="round" />
           </g>
         )}
       </svg>
@@ -197,10 +197,10 @@ function Signin() {
     if (/[A-Z]/.test(pwd) && /[a-z]/.test(pwd)) score += 1;
     if (/[0-9]/.test(pwd) || /[^A-Za-z0-9]/.test(pwd)) score += 1;
 
-    if (score <= 1) return { score: 1, label: "", color: "#f59e0b", percent: 25 };
+    if (score <= 1) return { score: 1, label: "", color: "var(--warning-color)", percent: 25 };
     if (score === 2) return { score: 2, label: "Fair", color: "#eab308", percent: 50 };
-    if (score === 3) return { score: 3, label: "Good", color: "#3b82f6", percent: 75 };
-    return { score: 4, label: "Strong", color: "#10b981", percent: 100 };
+    if (score === 3) return { score: 3, label: "Good", color: 'var(--accent-text)', percent: 75 };
+    return { score: 4, label: "Strong", color: "var(--success-color)", percent: 100 };
   };
 
   const passwordStrength = getPasswordStrength(form.password);
@@ -385,7 +385,7 @@ function Signin() {
       {/* Brand Heading */}
       <div style={{ textAlign: "center", marginBottom: "24px" }}>
         <h1 style={styles.brandName}>LetsChat</h1>
-        <p style={{ margin: 0, fontSize: "14px", color: "var(--text-secondary, #94a3b8)" }}>
+        <p style={{ margin: 0, fontSize: "14px", color: "var(--text-secondary)" }}>
           {step === 1 ? "Create your secure account" : "Verify your email to complete registration"}
         </p>
       </div>
@@ -447,24 +447,24 @@ function Signin() {
                     placeholder="alex_dev"
                     style={{
                       ...styles.input,
-                      borderColor: (usernameCheck.status === 'block' && form.username.trim().length >= 3) ? '#ef4444' 
-                        : usernameCheck.status === 'warn' ? '#f59e0b' 
-                        : usernameCheck.status === 'allow' ? '#10b981' 
+                      borderColor: (usernameCheck.status === 'block' && form.username.trim().length >= 3) ? 'var(--danger-color)' 
+                        : usernameCheck.status === 'warn' ? 'var(--warning-color)' 
+                        : usernameCheck.status === 'allow' ? 'var(--success-color)' 
                         : undefined,
                       boxShadow: usernameCheck.status === 'allow' ? '0 0 0 1px rgba(16, 185, 129, 0.2)' 
                         : usernameCheck.status === 'warn' ? '0 0 0 1px rgba(245, 158, 11, 0.2)' 
-                        : (usernameCheck.status === 'block' && form.username.trim().length >= 3) ? '0 0 0 1px rgba(239, 68, 68, 0.2)' 
+                        : (usernameCheck.status === 'block' && form.username.trim().length >= 3) ? '0 0 0 1px var(--danger-tint)' 
                         : undefined
                     }}
                   />
                 </div>
                 {usernameCheck.status === 'block' && form.username.trim().length >= 3 && (
-                  <span style={{ fontSize: "12px", color: "#ef4444", marginTop: "4px", display: "block", fontWeight: "500" }}>
+                  <span style={{ fontSize: "12px", color: "var(--danger-color)", marginTop: "4px", display: "block", fontWeight: "500" }}>
                     {usernameCheck.message || "Username is already taken"}
                   </span>
                 )}
                 {usernameCheck.status === 'warn' && (
-                  <span style={{ fontSize: "12px", color: "#f59e0b", marginTop: "4px", display: "block", fontWeight: "500" }}>
+                  <span style={{ fontSize: "12px", color: "var(--warning-color)", marginTop: "4px", display: "block", fontWeight: "500" }}>
                     Available but similar to existing username
                   </span>
                 )}
@@ -474,7 +474,7 @@ function Signin() {
               <div style={styles.fieldGroup}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <label style={styles.label}>PASSWORD</label>
-                  <span style={{ fontSize: "12px", fontWeight: "600", color: form.password && passwordStrength.color ? passwordStrength.color : "var(--text-secondary, #94a3b8)" }}>
+                  <span style={{ fontSize: "12px", fontWeight: "600", color: form.password && passwordStrength.color ? passwordStrength.color : "var(--text-secondary)" }}>
                     {form.password && passwordStrength.label ? passwordStrength.label : "Ready"}
                   </span>
                 </div>
@@ -506,8 +506,8 @@ function Signin() {
                       width: "72px",
                       height: "44px",
                       flexShrink: 0,
-                      backgroundColor: "var(--bg-secondary, #090f1d)",
-                      border: "1px solid var(--border-color, #1e293b)",
+                      backgroundColor: "var(--bg-secondary)",
+                      border: "1px solid var(--border-color)",
                       borderRadius: "12px",
                       display: "flex",
                       alignItems: "center",
@@ -528,7 +528,7 @@ function Signin() {
                       style={{
                         height: "3px",
                         borderRadius: "2px",
-                        backgroundColor: (form.password && passwordStrength.score >= seg) ? passwordStrength.color : "rgba(255,255,255,0.08)",
+                        backgroundColor: (form.password && passwordStrength.score >= seg) ? passwordStrength.color : "var(--bg-hover)",
                         transition: "background-color 0.3s ease"
                       }}
                     />
@@ -558,7 +558,7 @@ function Signin() {
                   </button>
                 </div>
                 {form.confirmPassword && form.password !== form.confirmPassword && (
-                  <span style={{ fontSize: "12px", color: "var(--danger-color, #ef4444)", marginTop: "4px", display: "block" }}>
+                  <span style={{ fontSize: "12px", color: "var(--danger-color)", marginTop: "4px", display: "block" }}>
                     Passwords do not match
                   </span>
                 )}
@@ -600,10 +600,10 @@ function Signin() {
                         backgroundColor: isUsernameBlocked 
                           ? "#172339" 
                           : isWeakPassword 
-                          ? "var(--bg-secondary, #334155)" 
-                          : "var(--accent-color, #2563eb)",
-                        color: isUsernameBlocked ? "#64748b" : "#ffffff",
-                        boxShadow: (!isSubmitDisabled && !isUsernameBlocked) ? "0 4px 15px rgba(37, 99, 235, 0.4)" : "none",
+                          ? "var(--bg-secondary)" 
+                          : "var(--accent-color)",
+                        color: isUsernameBlocked ? "var(--text-secondary)" : "#ffffff",
+                        boxShadow: (!isSubmitDisabled && !isUsernameBlocked) ? "0 4px 15px color-mix(in srgb, var(--accent-solid) 45%, transparent)" : "none",
                       }}
                     >
                       {loading ? (
@@ -627,7 +627,7 @@ function Signin() {
                       )}
                     </button>
                     {isWeakPassword && (
-                      <span style={{ fontSize: "11px", color: "var(--text-secondary, #94a3b8)", textAlign: "center", marginTop: "6px", display: "block", fontWeight: "500" }}>
+                      <span style={{ fontSize: "11px", color: "var(--text-secondary)", textAlign: "center", marginTop: "6px", display: "block", fontWeight: "500" }}>
                         Password should be at least 6 characters with mixed characters.
                       </span>
                     )}
@@ -652,8 +652,8 @@ function Signin() {
                     width: "48px",
                     height: "48px",
                     borderRadius: "50%",
-                    backgroundColor: "rgba(59, 130, 246, 0.15)",
-                    color: "var(--accent-color, #3b82f6)",
+                    backgroundColor: "var(--accent-tint)",
+                    color: "var(--accent-color)",
                     display: "inline-flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -663,7 +663,7 @@ function Signin() {
                   <KeyRound size={24} />
                 </div>
                 <h3 style={{ margin: "0 0 6px 0", fontSize: "18px", fontWeight: "700" }}>Enter Verification Code</h3>
-                <p style={{ margin: 0, fontSize: "13px", color: "var(--text-secondary, #94a3b8)" }}>
+                <p style={{ margin: 0, fontSize: "13px", color: "var(--text-secondary)" }}>
                   We emailed a 6-digit OTP code to <strong style={{ color: "var(--text-primary)" }}>{form.email}</strong>
                 </p>
               </div>
@@ -680,7 +680,7 @@ function Signin() {
               <div style={styles.fieldGroup}>
                 <label style={styles.label}>6-Digit OTP Code</label>
                 <div style={styles.inputWrapper}>
-                  <ShieldCheck size={18} color="var(--text-secondary, #94a3b8)" style={styles.inputIcon} />
+                  <ShieldCheck size={18} color="var(--text-secondary)" style={styles.inputIcon} />
                   <input
                     ref={otpInputRef}
                     type="text"
@@ -705,7 +705,7 @@ function Signin() {
 
               {/* 10-Minute Countdown Timer & Resend Option */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", color: timer > 0 ? "var(--text-secondary, #94a3b8)" : "#ef4444" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", color: timer > 0 ? "var(--text-secondary)" : "var(--danger-color)" }}>
                   <Clock size={16} />
                   <span>
                     {timer > 0 ? `Expires in ${formatTimer(timer)}` : "OTP Expired"}
@@ -792,8 +792,8 @@ const styles = {
     minHeight: "100%",
     maxHeight: "100dvh",
     width: "100%",
-    background: "var(--bg-gradient, #0f172a)",
-    color: "var(--text-primary, #f8fafc)",
+    background: "var(--bg-gradient)",
+    color: "var(--text-primary)",
     fontFamily: "Inter, system-ui, sans-serif",
     padding: "24px 16px 48px 16px",
     boxSizing: "border-box",
@@ -803,7 +803,7 @@ const styles = {
   brandName: {
     fontSize: "30px",
     fontWeight: "800",
-    color: "var(--text-primary, #f8fafc)",
+    color: "var(--text-primary)",
     margin: "0 0 4px 0",
     letterSpacing: "0.5px",
   },
@@ -813,8 +813,8 @@ const styles = {
     margin: "auto 0",
     flexShrink: 0,
     padding: "28px 24px",
-    backgroundColor: "var(--bg-card, #0d1527)",
-    border: "1px solid var(--border-color, rgba(255,255,255,0.06))",
+    backgroundColor: "var(--bg-card)",
+    border: "1px solid var(--border-color))",
     borderRadius: "20px",
     boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
     boxSizing: "border-box",
@@ -832,16 +832,16 @@ const styles = {
   },
   subtleNote: {
     fontSize: "11px",
-    color: "#60a5fa",
-    backgroundColor: "rgba(59, 130, 246, 0.08)",
-    border: "1px solid rgba(59, 130, 246, 0.22)",
+    color: 'var(--accent-text)',
+    backgroundColor: "var(--accent-tint)",
+    border: "1px solid var(--accent-tint)",
     padding: "7px 12px",
     borderRadius: "8px",
     lineHeight: "1.38",
     margin: "-4px 0 -4px 0",
   },
   learnMoreLink: {
-    color: "#60a5fa",
+    color: 'var(--accent-text)',
     textDecoration: "underline",
     background: "none",
     border: "none",
@@ -855,7 +855,7 @@ const styles = {
     fontSize: "12px",
     fontWeight: "700",
     letterSpacing: "0.04em",
-    color: "var(--text-secondary, #94a3b8)",
+    color: "var(--text-secondary)",
     textTransform: "uppercase",
   },
   inputWrapper: {
@@ -873,10 +873,10 @@ const styles = {
     width: "100%",
     padding: "11px 14px",
     fontSize: "14px",
-    backgroundColor: "var(--bg-secondary, #090f1d)",
-    border: "1px solid var(--border-color, #1e293b)",
+    backgroundColor: "var(--bg-secondary)",
+    border: "1px solid var(--border-color)",
     borderRadius: "10px",
-    color: "var(--text-primary, #f8fafc)",
+    color: "var(--text-primary)",
     outline: "none",
     transition: "all 0.2s ease",
     boxSizing: "border-box",
@@ -886,7 +886,7 @@ const styles = {
     right: "10px",
     background: "none",
     border: "none",
-    color: "var(--text-secondary, #94a3b8)",
+    color: "var(--text-secondary)",
     cursor: "pointer",
     padding: "4px",
     display: "flex",
@@ -896,7 +896,7 @@ const styles = {
   strengthBarBg: {
     width: "100%",
     height: "4px",
-    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    backgroundColor: "var(--border-color)",
     borderRadius: "2px",
     overflow: "hidden",
   },
@@ -910,9 +910,9 @@ const styles = {
     gap: "8px",
     padding: "10px 14px",
     borderRadius: "10px",
-    backgroundColor: "rgba(239, 68, 68, 0.15)",
-    border: "1px solid rgba(239, 68, 68, 0.3)",
-    color: "#f87171",
+    backgroundColor: "var(--danger-tint)",
+    border: "1px solid var(--danger-tint-border)",
+    color: "var(--danger-color)",
     fontSize: "13px",
     fontWeight: "500",
   },
@@ -924,14 +924,14 @@ const styles = {
     borderRadius: "10px",
     backgroundColor: "rgba(16, 185, 129, 0.15)",
     border: "1px solid rgba(16, 185, 129, 0.3)",
-    color: "#34d399",
+    color: "var(--success-color)",
     fontSize: "13px",
     fontWeight: "500",
   },
   submitButton: {
     width: "100%",
     padding: "12px 20px",
-    backgroundColor: "var(--accent-color, #2563eb)",
+    backgroundColor: "var(--accent-color)",
     color: "#ffffff",
     border: "none",
     borderRadius: "12px",
@@ -942,13 +942,13 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     gap: "8px",
-    boxShadow: "0 4px 15px rgba(37, 99, 235, 0.35)",
+    boxShadow: "0 4px 15px color-mix(in srgb, var(--accent-solid) 45%, transparent)",
     transition: "all 0.2s ease",
   },
   resendBtn: {
     background: "none",
     border: "none",
-    color: "var(--accent-color, #3b82f6)",
+    color: "var(--accent-color)",
     fontSize: "13px",
     fontWeight: "600",
     cursor: "pointer",
@@ -960,7 +960,7 @@ const styles = {
   backBtn: {
     background: "none",
     border: "none",
-    color: "var(--text-secondary, #94a3b8)",
+    color: "var(--text-secondary)",
     fontSize: "13px",
     fontWeight: "600",
     cursor: "pointer",
@@ -971,10 +971,10 @@ const styles = {
     marginTop: "20px",
     textAlign: "center",
     fontSize: "13px",
-    color: "var(--text-secondary, #94a3b8)",
+    color: "var(--text-secondary)",
   },
   link: {
-    color: "var(--accent-color, #3b82f6)",
+    color: "var(--accent-color)",
     textDecoration: "none",
     fontWeight: "700",
   },
