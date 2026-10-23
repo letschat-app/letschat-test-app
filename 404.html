@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>LetsChat</title>
+    <script type="text/javascript">
+      // GitHub Pages Single Page Application (SPA) redirect handler.
+      // Redirects direct URL hits to the appropriate HashRouter route.
+      (function() {
+        var path = window.location.pathname;
+        var search = window.location.search || '';
+        var hash = window.location.hash || '';
+        
+        // Detect repo base name if hosted on project GitHub Pages
+        var repoName = '/letschat-test-app';
+        
+        if (path.indexOf(repoName) === 0) {
+          var route = path.slice(repoName.length);
+          if (!route || route === '/') {
+            window.location.replace(repoName + '/' + search + hash);
+          } else {
+            window.location.replace(repoName + '/#' + (route.charAt(0) === '/' ? route : '/' + route) + search + hash);
+          }
+        } else {
+          // If hosted at domain root (e.g. https://letschat-app.github.io/)
+          var cleanPath = path === '/' ? '' : path;
+          window.location.replace('/#' + cleanPath + search + hash);
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; background-color: #0f172a; color: #f8fafc; text-align: center;">
+      <div>
+        <h2 style="margin-bottom: 8px;">Loading LetsChat...</h2>
+        <p style="color: #94a3b8; font-size: 14px;">Redirecting you to the requested page.</p>
+      </div>
+    </div>
+  </body>
+</html>
