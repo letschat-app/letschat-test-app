@@ -233,6 +233,8 @@ const Avatar = ({
     backgroundPosition: 'center',
     backgroundRepeat: 'no-repeat',
     opacity: resolvedThumb ? 1 : 0,
+    backgroundColor: isSystem ? '#030712' : 'transparent',
+    filter: 'none',
     transition: 'opacity 0.3s ease',
   };
 

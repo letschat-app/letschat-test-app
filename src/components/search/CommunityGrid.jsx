@@ -30,7 +30,7 @@ const UserCard = memo(({ user, commonGroupsText, onCardClick }) => {
         <span className="community-card-name">{displayName}</span>
         {streak > 0 && <StreakBadge streak={streak} size="sm" />}
       </div>
-      <div className="community-card-id">ID: {user.userId}</div>
+      <div className="community-card-id">ID: @{user.userId} {user.username || user.publicName ? `| @${user.username || user.publicName}` : ''}</div>
       {commonGroupsText && (
         <div className="community-card-common">
           <Users size={12} style={{ color: 'var(--accent-color)' }} aria-hidden="true" />

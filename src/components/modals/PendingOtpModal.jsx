@@ -12,9 +12,106 @@ import {
   send2FAOtp,
   verify2FALogin,
   signupVerify,
-  signupInit
+  signupInit,
+  loginUser
 } from '../../service/UserAuth';
 import { initWebsocket } from '../../service/Websocket';
+
+const WeightlifterAvatar = ({ score }) => {
+  const safeScore = score || 0;
+
+  return (
+    <div style={{ width: "64px", height: "40px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <style>{`
+        @keyframes idleBreath {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-1.5px); }
+        }
+        @keyframes waistHold {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-1.5px); }
+        }
+        @keyframes chestHold {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-2px); }
+        }
+        @keyframes overheadTriumph {
+          0%, 100% { transform: translateY(0px) scale(1); }
+          50% { transform: translateY(-2px) scale(1.02); }
+        }
+        @keyframes sparkleGlow {
+          0%, 100% { opacity: 0.3; transform: scale(0.85); }
+          50% { opacity: 1; transform: scale(1.25); }
+        }
+      `}</style>
+
+      <svg width="64" height="40" viewBox="0 0 64 40" style={{ overflow: "visible" }}>
+        {safeScore === 0 && (
+          <g style={{ animation: "idleBreath 2s ease-in-out infinite" }}>
+            <line x1="8" y1="36" x2="30" y2="36" stroke="var(--text-secondary)" strokeWidth="2" />
+            <rect x="5" y="31" width="3.5" height="10" rx="1.5" fill="var(--text-muted)" />
+            <rect x="29.5" y="31" width="3.5" height="10" rx="1.5" fill="var(--text-muted)" />
+            <circle cx="44" cy="11" r="5" fill="var(--accent-text)" stroke="var(--accent-text)" strokeWidth="1.5" />
+            <line x1="39.5" y1="10" x2="48.5" y2="10" stroke="var(--danger-color)" strokeWidth="1.8" />
+            <circle cx="42.5" cy="11" r="0.8" fill="var(--bg-secondary)" />
+            <circle cx="45.5" cy="11" r="0.8" fill="var(--bg-secondary)" />
+            <line x1="44" y1="16" x2="44" y2="27" stroke="var(--accent-text)" strokeWidth="3" strokeLinecap="round" />
+            <path d="M 44 18 L 39 22 L 42 26" stroke="var(--accent-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            <path d="M 44 18 L 49 22 L 46 26" stroke="var(--accent-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            <path d="M 44 27 L 41 37 M 44 27 L 47 37" stroke="var(--accent-text)" strokeWidth="2.5" strokeLinecap="round" />
+          </g>
+        )}
+        {safeScore === 1 && (
+          <g style={{ animation: "idleBreath 1.5s ease-in-out infinite" }}>
+            <line x1="16" y1="34" x2="48" y2="34" stroke="var(--text-secondary)" strokeWidth="2" />
+            <rect x="12" y="29" width="4" height="10" rx="1.5" fill="var(--warning-color)" />
+            <rect x="48" y="29" width="4" height="10" rx="1.5" fill="var(--warning-color)" />
+            <circle cx="32" cy="15" r="5" fill="#fde047" stroke="var(--warning-color)" strokeWidth="1.5" />
+            <line x1="28" y1="14" x2="36" y2="14" stroke="var(--danger-color)" strokeWidth="1.8" />
+            <line x1="32" y1="20" x2="32" y2="28" stroke="var(--warning-color)" strokeWidth="3" strokeLinecap="round" />
+            <path d="M 32 21 L 22 34 M 32 21 L 42 34" stroke="#fde047" strokeWidth="2" strokeLinecap="round" />
+            <path d="M 32 28 L 26 36 M 32 28 L 38 36" stroke="var(--warning-color)" strokeWidth="2.5" strokeLinecap="round" />
+          </g>
+        )}
+        {safeScore === 2 && (
+          <g style={{ animation: "waistHold 1s ease-in-out infinite" }}>
+            <line x1="16" y1="26" x2="48" y2="26" stroke="var(--text-secondary)" strokeWidth="2" />
+            <rect x="12" y="21" width="4" height="10" rx="1.5" fill="#eab308" />
+            <rect x="48" y="21" width="4" height="10" rx="1.5" fill="#eab308" />
+            <circle cx="32" cy="13" r="5" fill="#fde047" stroke="#eab308" strokeWidth="1.5" />
+            <line x1="32" y1="18" x2="32" y2="28" stroke="var(--warning-color)" strokeWidth="3" strokeLinecap="round" />
+            <path d="M 32 20 L 22 26 M 32 20 L 42 26" stroke="#fde047" strokeWidth="2.2" strokeLinecap="round" />
+            <path d="M 32 28 L 27 36 M 32 28 L 37 36" stroke="#ca8a04" strokeWidth="2.5" strokeLinecap="round" />
+          </g>
+        )}
+        {safeScore === 3 && (
+          <g style={{ animation: "chestHold 0.9s ease-in-out infinite" }}>
+            <line x1="16" y1="18" x2="48" y2="18" stroke="#ffffff" strokeWidth="2" />
+            <rect x="12" y="13" width="4" height="10" rx="1.5" fill="var(--accent-text)" />
+            <rect x="48" y="13" width="4" height="10" rx="1.5" fill="var(--accent-text)" />
+            <circle cx="32" cy="12" r="5" fill="var(--accent-text)" stroke="var(--accent-text)" strokeWidth="1.5" />
+            <line x1="32" y1="17" x2="32" y2="28" stroke="var(--accent-text)" strokeWidth="3" strokeLinecap="round" />
+            <path d="M 32 19 L 24 18 M 32 19 L 40 18" stroke="var(--accent-text)" strokeWidth="2.5" strokeLinecap="round" />
+            <path d="M 32 28 L 27 36 M 32 28 L 37 36" stroke="var(--accent-text)" strokeWidth="2.5" strokeLinecap="round" />
+          </g>
+        )}
+        {safeScore === 4 && (
+          <g style={{ animation: "overheadTriumph 1.1s ease-in-out infinite" }}>
+            <text x="6" y="8" fontSize="8" style={{ animation: "sparkleGlow 0.8s infinite" }}>✨</text>
+            <text x="50" y="8" fontSize="8" style={{ animation: "sparkleGlow 0.8s infinite 0.4s" }}>✨</text>
+            <line x1="14" y1="8" x2="50" y2="8" stroke="#ffffff" strokeWidth="2.5" />
+            <rect x="10" y="3" width="4" height="10" rx="1.5" fill="var(--success-color)" />
+            <rect x="50" y="3" width="4" height="10" rx="1.5" fill="var(--success-color)" />
+            <path d="M 32 18 L 22 9 M 32 18 L 42 9" stroke="#6ee7b7" strokeWidth="2.5" strokeLinecap="round" />
+            <circle cx="32" cy="16" r="5" fill="#6ee7b7" stroke="var(--success-color)" strokeWidth="1.5" />
+            <line x1="32" y1="21" x2="32" y2="30" stroke="var(--success-color)" strokeWidth="3" strokeLinecap="round" />
+            <path d="M 32 30 L 26 37 M 32 30 L 38 37" stroke="var(--success-color)" strokeWidth="2.5" strokeLinecap="round" />
+          </g>
+        )}
+      </svg>
+    </div>
+  );
+};
 
 export default function PendingOtpModal() {
   const [session, setSession] = useState(() => getPendingOtpSession());
@@ -35,6 +132,22 @@ export default function PendingOtpModal() {
 
   const otpInputRef = useRef(null);
   const navigate = useNavigate();
+
+  const getPasswordStrength = (pwd) => {
+    if (!pwd) return { score: 0, label: "", color: "transparent", percent: 0 };
+    let score = 0;
+    if (pwd.length >= 6) score += 1;
+    if (pwd.length >= 8) score += 1;
+    if (/[A-Z]/.test(pwd) && /[a-z]/.test(pwd)) score += 1;
+    if (/[0-9]/.test(pwd) || /[^A-Za-z0-9]/.test(pwd)) score += 1;
+
+    if (score <= 1) return { score: 1, label: "", color: "var(--warning-color)", percent: 25 };
+    if (score === 2) return { score: 2, label: "Fair", color: "#eab308", percent: 50 };
+    if (score === 3) return { score: 3, label: "Good", color: 'var(--accent-text)', percent: 75 };
+    return { score: 4, label: "Strong", color: "var(--success-color)", percent: 100 };
+  };
+
+  const passwordStrength = getPasswordStrength(newPassword);
 
   // Listen to pending OTP session updates across windows / components
   useEffect(() => {
@@ -345,7 +458,44 @@ export default function PendingOtpModal() {
       if (data?.status === 'SUCCESS' || res.status === 200) {
         clearPendingOtpSession();
         setSession(null);
-        alert('Password has been reset successfully! You can now log in with your new password.');
+        try {
+          const cleanId = session.payload.identifier;
+          const loginRes = await loginUser({
+            userId: cleanId,
+            password: newPassword,
+          });
+          const loginData = loginRes.data;
+          if (
+            loginData?.status === "SUCCESS" ||
+            loginData === "login succesfull" ||
+            loginData?.message === "login succesfull" ||
+            loginRes.status === 200 ||
+            loginRes.status === 201
+          ) {
+            const loggedUserId = loginData?.userId || loginData?.userid || loginData?.id || loginData?.data?.userId || cleanId;
+            localStorage.setItem("userid", loggedUserId);
+            if (loginData?.email) localStorage.setItem("email", loginData.email);
+            if (loginData?.profile) localStorage.setItem("profile", loginData.profile);
+            if (loginData?.username || loginData?.publicName) {
+              localStorage.setItem("username", String(loginData.username || loginData.publicName).trim().toLowerCase());
+            } else if (loginData?.userName) {
+              localStorage.setItem("username", String(loginData.userName).trim().toLowerCase());
+            }
+            if (loginData?.displayName || loginData?.privateName) {
+              localStorage.setItem("displayName", String(loginData.displayName || loginData.privateName).trim());
+            } else if (loginData?.userName) {
+              localStorage.setItem("displayName", String(loginData.userName).trim());
+            }
+            if (loginData?.is2FAEnabled !== undefined) {
+              localStorage.setItem("is2FAEnabled", String(loginData.is2FAEnabled));
+            }
+            initWebsocket();
+            navigate("/chats", { replace: true });
+            return;
+          }
+        } catch (loginErr) {
+          console.warn("[PendingOtpModal] Auto login after reset error:", loginErr);
+        }
         navigate('/login', { replace: true });
       } else {
         setErrorMsg(data?.message || 'Failed to reset password.');
@@ -508,27 +658,62 @@ export default function PendingOtpModal() {
           <form onSubmit={handleResetPasswordSubmit} style={styles.form}>
             <div style={styles.inputGroup}>
               <label style={styles.label}>New Password</label>
-              <div style={styles.inputWrapper}>
-                <Lock size={18} color="var(--text-secondary)" style={styles.inputIcon} />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  autoFocus
-                  placeholder="At least 6 characters"
-                  value={newPassword}
-                  onChange={(e) => {
-                    setNewPassword(e.target.value);
-                    setErrorMsg('');
+              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                <div style={{ ...styles.inputWrapper, flex: 1 }}>
+                  <Lock size={18} color="var(--text-secondary)" style={styles.inputIcon} />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    autoFocus
+                    placeholder="At least 6 characters"
+                    value={newPassword}
+                    onChange={(e) => {
+                      setNewPassword(e.target.value);
+                      setErrorMsg('');
+                    }}
+                    style={{ ...styles.input, paddingRight: '40px' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={styles.eyeBtn}
+                  >
+                    {showPassword ? <EyeOff size={18} color="var(--text-secondary)" /> : <Eye size={18} color="var(--text-secondary)" />}
+                  </button>
+                </div>
+                {/* Weightlifter Companion Box alongside the inputbox */}
+                <div
+                  style={{
+                    width: "72px",
+                    height: "44px",
+                    flexShrink: 0,
+                    backgroundColor: "var(--bg-secondary)",
+                    border: "1px solid var(--border-color)",
+                    borderRadius: "12px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    overflow: "hidden"
                   }}
-                  style={{ ...styles.input, paddingRight: '40px' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  style={styles.eyeBtn}
+                  title="Password strength companion"
                 >
-                  {showPassword ? <EyeOff size={18} color="var(--text-secondary)" /> : <Eye size={18} color="var(--text-secondary)" />}
-                </button>
+                  <WeightlifterAvatar score={passwordStrength.score} />
+                </div>
+              </div>
+
+              {/* Clean subtle 4-segment strength indicator */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", marginTop: "6px" }}>
+                {[1, 2, 3, 4].map((seg) => (
+                  <div
+                    key={seg}
+                    style={{
+                      height: "3px",
+                      borderRadius: "2px",
+                      backgroundColor: (newPassword && passwordStrength.score >= seg) ? passwordStrength.color : "var(--bg-hover)",
+                      transition: "background-color 0.3s ease"
+                    }}
+                  />
+                ))}
               </div>
             </div>
 

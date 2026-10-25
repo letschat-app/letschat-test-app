@@ -73,12 +73,21 @@ const SmoothCalendar = () => {
   const [copiedToken, setCopiedToken] = useState(null);
   const [copiedMeetingLink, setCopiedMeetingLink] = useState(false);
 
+  const constructBookingUrl = (slug) => {
+    const cleanSlug = (slug || '').trim().replace(/^@/, '');
+    const envUrl = import.meta.env.VITE_FRONTEND_URL;
+    if (envUrl) {
+      const base = envUrl.replace(/\/$/, '');
+      return base.includes('#') ? `${base}/book/${cleanSlug}` : `${base}/#/book/${cleanSlug}`;
+    }
+    const base = `${window.location.origin}${import.meta.env.BASE_URL || '/'}`.replace(/\/$/, '');
+    return `${base}/#/book/${cleanSlug}`;
+  };
+
   const handleCopyMeetingLink = (e) => {
-    e.stopPropagation();
+    e?.stopPropagation();
     const permanentUsername = (localStorage.getItem('username') || localStorage.getItem('userid') || '').toLowerCase();
-    const baseOrigin = window.location.origin;
-    const pathname = window.location.pathname.replace(/\/$/, '');
-    const meetingUrl = `${baseOrigin}${pathname}/#/book/${permanentUsername}`;
+    const meetingUrl = constructBookingUrl(permanentUsername);
 
     if (navigator.clipboard) {
       navigator.clipboard.writeText(meetingUrl);

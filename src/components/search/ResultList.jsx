@@ -88,7 +88,7 @@ const ResultList = ({
                     {streak > 0 && <StreakBadge streak={streak} size="sm" />}
                   </div>
                   <div className="search-result-subline">
-                    User ID: {user.userId} {masked ? `· ${masked}` : ''}
+                    User ID: @{user.userId} {user.username || user.publicName ? `| @${user.username || user.publicName}` : ''} {masked ? `· ${masked}` : ''}
                   </div>
                   {commonText && (
                     <div className="search-result-common-line">

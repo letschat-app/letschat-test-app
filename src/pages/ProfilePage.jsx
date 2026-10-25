@@ -405,9 +405,20 @@ const ProfilePage = () => {
         }
     };
 
+    const constructBookingUrl = (slug) => {
+        const cleanSlug = (slug || '').trim().replace(/^@/, '');
+        const envUrl = import.meta.env.VITE_FRONTEND_URL;
+        if (envUrl) {
+            const base = envUrl.replace(/\/$/, '');
+            return base.includes('#') ? `${base}/book/${cleanSlug}` : `${base}/#/book/${cleanSlug}`;
+        }
+        const base = `${window.location.origin}${import.meta.env.BASE_URL || '/'}`.replace(/\/$/, '');
+        return `${base}/#/book/${cleanSlug}`;
+    };
+
     const handleCopyBookingLink = () => {
         const slug = bookingSettings.bookingSlug || username || userId;
-        const link = `${window.location.origin}/book/${slug}`;
+        const link = constructBookingUrl(slug);
         navigator.clipboard.writeText(link);
         setCopiedBookingLink(true);
         setTimeout(() => setCopiedBookingLink(false), 2000);
@@ -1332,7 +1343,7 @@ const ProfilePage = () => {
                                     marginBottom: '14px'
                                 }}>
                                     <span style={{ fontSize: '12px', color: 'var(--text-primary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {window.location.origin}/book/{bookingSettings.bookingSlug || username || userId}
+                                        {constructBookingUrl(bookingSettings.bookingSlug || username || userId)}
                                     </span>
                                     <button
                                         onClick={handleCopyBookingLink}
