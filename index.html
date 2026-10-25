@@ -12,8 +12,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" />
   <title>LetsChat</title>
-  <script type="module" crossorigin src="/letschat-test-app/assets/index-4b2v-zoV.js"></script>
-  <link rel="stylesheet" crossorigin href="/letschat-test-app/assets/index-3jCEtOB0.css">
+  <script type="module" crossorigin src="/letschat-test-app/assets/index-BYvDTXzQ.js"></script>
+  <link rel="stylesheet" crossorigin href="/letschat-test-app/assets/index-Cvb8Bqiz.css">
 <link rel="manifest" href="/letschat-test-app/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/letschat-test-app/registerSW.js"></script></head>
 
 <body>
@@ -137,7 +137,17 @@
     </main>
   </div>
 
-  <div id="root"></div>
+  <div id="root"></div>
+  <script>
+    // Fail-safe: ensure splash loader never permanently traps user on slow connections or script errors
+    setTimeout(function() {
+      var loader = document.getElementById('pwa-splash-loader');
+      if (loader && !loader.classList.contains('fade-out')) {
+        loader.classList.add('fade-out');
+        setTimeout(function() { if (loader && loader.parentNode) loader.remove(); }, 350);
+      }
+    }, 3500);
+  </script>
 </body>
 
 </html>
