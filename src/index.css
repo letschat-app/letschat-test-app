@@ -441,3 +441,18 @@ button:focus-visible {
   animation: bannerPinPulse 1.8s ease-in-out infinite;
 }
 
+/* Universal Keyframes & Utility for Spinner Animations */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite !important;
+}
+
+

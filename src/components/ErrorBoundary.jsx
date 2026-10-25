@@ -18,6 +18,10 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error("[ErrorBoundary caught an uncaught error]:", error, errorInfo);
+    try {
+      const splash = document.getElementById('pwa-splash-loader');
+      if (splash) splash.remove();
+    } catch (_) {}
   }
 
   handleGoBack = () => {

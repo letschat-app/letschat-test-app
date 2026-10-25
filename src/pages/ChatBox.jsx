@@ -48,7 +48,8 @@ import {
   Lock,
   Filter,
   User,
-  BarChart3
+  BarChart3,
+  Send
 } from "lucide-react";
 import { useEventMediator } from "../service/EventStorage";
 import AssignmentMessage from "./AssignmentMessage";
@@ -574,9 +575,10 @@ const ChatBox = () => {
         allow_multiple: pollData.allow_multiple,
         allow_user_options: pollData.allow_user_options,
         anonymous: pollData.anonymous,
+        is_hidden_voting: Boolean(pollData.is_hidden_voting),
         expires_at: pollData.expires_at,
         total_voters: 0,
-        total_members: (chatMembers && chatMembers.length) || 1,
+        total_members: (chat && chat.type === 'private') ? 2 : ((chatMembers && chatMembers.length) || 2),
         options: (pollData.options || []).map(opt => ({
           option_id: opt.option_id,
           option_text: opt.text || opt.option_text || String(opt),
@@ -1209,7 +1211,7 @@ const ChatBox = () => {
       chatid,
       tempmsgid: `reaction-${uuidv4()}`,
       content: cleanText,
-      type: 'text',
+      type: 'reaction',
       msgtype: 'reaction',
       repliedTo: msg.msgid || msg.tempmsgid,
       repliedto: msg.msgid || msg.tempmsgid,
@@ -1833,6 +1835,7 @@ const ChatBox = () => {
       setShowEmojiPicker(false);
       if (!overrideText) setInput("");
       setActiveMentions([]);
+      sendIndicator('stop');
       stopIndicators();
       resetInChatTimer();
     }
@@ -3484,12 +3487,33 @@ const ChatBox = () => {
     return msg.content || "";
   }, []);
 
+  const [dismissedBannerPinIds, setDismissedBannerPinIds] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(`dismissed_pins_${chatid}`) || '[]');
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const handleDismissBannerPin = (e, pinMsgId) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    const targetId = pinMsgId;
+    const updated = [...dismissedBannerPinIds, targetId];
+    setDismissedBannerPinIds(updated);
+    try {
+      localStorage.setItem(`dismissed_pins_${chatid}`, JSON.stringify(updated));
+    } catch (err) {}
+  };
+
   const activeBannerPins = useMemo(() => {
     if (!messages || messages.length === 0) return [];
     return messages
-      .filter((m) => m && m.type === "banner-pin" && isWithin24Hours(m.timestamp))
+      .filter((m) => m && m.type === "banner-pin" && isWithin24Hours(m.timestamp) && !dismissedBannerPinIds.includes(m.msgid || m.tempmsgid))
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  }, [messages, isWithin24Hours]);
+  }, [messages, isWithin24Hours, dismissedBannerPinIds]);
 
   // Member Entrance Highlight: When entering chat, highlight unread banner-pin
   useEffect(() => {
@@ -3636,6 +3660,19 @@ const ChatBox = () => {
 
   const [showInfo, setShowInfo] = useState(false);
   const [showGroupCalendar, setShowGroupCalendar] = useState(false);
+  const [hasNewGroupEvent, setHasNewGroupEvent] = useState(false);
+
+  useEffect(() => {
+    const handleSync = (e) => {
+      const msg = e.detail;
+      if (msg && String(msg.chatId) === String(chatid) && !showGroupCalendar) {
+        setHasNewGroupEvent(true);
+      }
+    };
+    window.addEventListener('letschat_event_sync', handleSync);
+    return () => window.removeEventListener('letschat_event_sync', handleSync);
+  }, [chatid, showGroupCalendar]);
+
   const clickInfo = () => {
     setShowInfo(true);
   }
@@ -4443,7 +4480,10 @@ const ChatBox = () => {
             )}
 
             <button
-              onClick={() => setShowGroupCalendar(!showGroupCalendar)}
+              onClick={() => {
+                setShowGroupCalendar(!showGroupCalendar);
+                setHasNewGroupEvent(false);
+              }}
               title="Group Calendar"
               style={{
                 background: showGroupCalendar ? 'var(--accent-tint-border)' : 'none',
@@ -4455,12 +4495,25 @@ const ChatBox = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                position: 'relative',
                 transition: 'background-color 0.2s'
               }}
               onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--accent-tint)'}
               onMouseLeave={e => e.currentTarget.style.backgroundColor = showGroupCalendar ? 'var(--accent-tint-border)' : 'transparent'}
             >
               <Calendar size={20} />
+              {hasNewGroupEvent && (
+                <span style={{
+                  position: 'absolute',
+                  top: '6px',
+                  right: '6px',
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  backgroundColor: '#3b82f6',
+                  boxShadow: '0 0 0 2px var(--bg-card)'
+                }} />
+              )}
             </button>
 
             <button
@@ -4800,16 +4853,29 @@ const ChatBox = () => {
                     </button>
                   )}
 
-                  <span style={{
-                    fontSize: "11px",
-                    color: "var(--text-secondary)",
-                    background: "var(--bg-hover)",
-                    padding: "2px 6px",
-                    borderRadius: "6px",
-                    fontWeight: "500",
-                  }}>
-                    {formatTimeRemaining(activeBannerPins[0].timestamp)}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => handleDismissBannerPin(e, activeBannerPins[0].msgid || activeBannerPins[0].tempmsgid)}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      color: "var(--text-secondary)",
+                      cursor: "pointer",
+                      padding: "4px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: "6px",
+                      lineHeight: 1,
+                      transition: "background 0.15s ease",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.15)"}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}
+                    title="Dismiss"
+                    aria-label="Dismiss banner"
+                  >
+                    <X size={15} color="var(--text-secondary)" />
+                  </button>
                 </div>
               </div>
             ) : (
@@ -4878,9 +4944,29 @@ const ChatBox = () => {
                           {formatBannerText(pin)}
                         </span>
                       </div>
-                      <span style={{ fontSize: "10px", color: "var(--text-secondary)", flexShrink: 0 }}>
-                        {formatTimeRemaining(pin.timestamp)}
-                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => handleDismissBannerPin(e, pin.msgid || pin.tempmsgid)}
+                        style={{
+                          background: "transparent",
+                          border: "none",
+                          color: "var(--text-secondary)",
+                          cursor: "pointer",
+                          padding: "2px 4px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          borderRadius: "4px",
+                          lineHeight: 1,
+                          flexShrink: 0
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.15)"}
+                        onMouseLeave={e => e.currentTarget.style.backgroundColor = "transparent"}
+                        title="Dismiss"
+                        aria-label="Dismiss pin"
+                      >
+                        <X size={13} color="var(--text-secondary)" />
+                      </button>
                     </div>
                   ))}
                 </div>

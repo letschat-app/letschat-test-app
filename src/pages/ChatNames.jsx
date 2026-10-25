@@ -434,6 +434,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
     return JSON.parse(localStorage.getItem("visited") || "{}");
   });
   const [selectedChatForSpaces, setSelectedChatForSpaces] = useState(null);
+  const [spaceGroupEvents, setSpaceGroupEvents] = useState([]);
   const { events: allEvents } = useEventMediator();
   const [spacesCache, setSpacesCache] = useState(() => {
     try {
@@ -453,6 +454,39 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
   const [newSpaceName, setNewSpaceName] = useState("");
   const [isAddingSpace, setIsAddingSpace] = useState(false);
   const [spaceLastMessages, setSpaceLastMessages] = useState({});
+
+  useEffect(() => {
+    if (!selectedChatForSpaces?.chatId) {
+      setSpaceGroupEvents([]);
+      return;
+    }
+    const currentChatId = selectedChatForSpaces.chatId;
+    const fetchEvents = async () => {
+      try {
+        const userId = localStorage.getItem('userid');
+        const res = await fetch(`${API}/user/event/group/${currentChatId}`, {
+          headers: { 'User-Id': userId }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            setSpaceGroupEvents(data);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch group events for spaces:', e);
+      }
+    };
+    fetchEvents();
+
+    const handleSync = () => fetchEvents();
+    window.addEventListener('letschat_event_sync', handleSync);
+    window.addEventListener('letschat_refresh_events', handleSync);
+    return () => {
+      window.removeEventListener('letschat_event_sync', handleSync);
+      window.removeEventListener('letschat_refresh_events', handleSync);
+    };
+  }, [selectedChatForSpaces?.chatId]);
 
   useEffect(() => {
     if (selectedChatForSpaces) {
@@ -1869,11 +1903,33 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
             {(() => {
               const chatEvents = [];
               const now = new Date();
+              const currentChatId = String(selectedChatForSpaces.chatId);
+
+              // 1. From group events endpoint (visible to all members!)
+              if (Array.isArray(spaceGroupEvents)) {
+                spaceGroupEvents.forEach(ev => {
+                  const sTime = ev.startTime ? new Date(ev.startTime) : null;
+                  if (sTime && sTime >= now && ev.action !== 'cancelled') {
+                    chatEvents.push({
+                      id: ev.eventId || ev.groupEventId,
+                      chatid: currentChatId,
+                      title: ev.eventTitle,
+                      date: ev.startTime,
+                      startTime: new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true }).format(sTime),
+                      color: ev.eventColor || 'var(--accent-color)'
+                    });
+                  }
+                });
+              }
+
+              // 2. From personal calendar mediator
               Object.values(allEvents).forEach(dateGroup => {
                 dateGroup.forEach(evt => {
-                  if (String(evt.chatid) === String(selectedChatForSpaces.chatId)) {
+                  if (String(evt.chatid) === currentChatId) {
                     const evtDate = new Date(evt.date);
-                    if (evtDate >= now) chatEvents.push(evt);
+                    if (evtDate >= now && !chatEvents.some(e => e.id === evt.id || (e.title === evt.title && Math.abs(new Date(e.date) - evtDate) < 60000))) {
+                      chatEvents.push(evt);
+                    }
                   }
                 });
               });
@@ -1924,7 +1980,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                           {evt.title}
                         </div>
                         <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                          {new Date(evt.date).toLocaleDateString([], { month: 'short', day: 'numeric' })} • {evt.startTime}
+                          {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', month: 'short', day: 'numeric' }).format(new Date(evt.date))} • {evt.startTime}
                         </div>
                       </div>
                     ))}

@@ -14,8 +14,15 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firebase Cloud Messaging and get a reference to the service
-const messaging = getMessaging(app);
+// Initialize Firebase Cloud Messaging safely (handles iOS Safari & environments where Web Push is unsupported)
+let messaging = null;
+try {
+  if (typeof window !== 'undefined' && 'Notification' in window && 'serviceWorker' in navigator) {
+    messaging = getMessaging(app);
+  }
+} catch (err) {
+  console.warn('[Firebase] Cloud messaging not supported on this browser/device:', err);
+}
 
 export { messaging, getToken, onMessage, deleteToken };
 export default app;

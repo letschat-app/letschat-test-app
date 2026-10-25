@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { X, Edit2, Users, UserPlus, LogOut, Shield, Award, MessageCircle, UserMinus, Info, Camera, Loader2, Bell, BellOff, Zap } from 'lucide-react';
 import MemberActionsPopup from './MemberActionsPopup';
 import AddMemberModal from './AddMemberModal';
@@ -46,6 +46,25 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
 
   const peers = members.filter(m => String(m.userId) !== String(currentUserId));
   const chatNicknameValidation = validateChatNickname(currentUsername, myDisplayName, peers);
+
+  const sortedMembers = useMemo(() => {
+    if (!members || !Array.isArray(members)) return [];
+    return [...members].sort((a, b) => {
+      const isAYou = String(a.userId) === String(currentUserId);
+      const isBYou = String(b.userId) === String(currentUserId);
+      if (isAYou) return -1;
+      if (isBYou) return 1;
+
+      const isAAdmin = a.role === 'admin' || a.role === 'faculty' || a.isAdmin || a.isFaculty;
+      const isBAdmin = b.role === 'admin' || b.role === 'faculty' || b.isAdmin || b.isFaculty;
+      if (isAAdmin && !isBAdmin) return -1;
+      if (!isAAdmin && isBAdmin) return 1;
+
+      const nameA = (a.userName || a.username || a.displayName || '').toLowerCase();
+      const nameB = (b.userName || b.username || b.displayName || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+  }, [members, currentUserId]);
   const [selectedMember, setSelectedMember] = useState(null);
   const [showMemberActions, setShowMemberActions] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
@@ -1067,7 +1086,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
                 loading ? (
                   <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>Loading members...</div>
                 ) : (
-                  members.map((member) => (
+                  sortedMembers.map((member) => (
                     <div 
                       key={member.userId} 
                       onClick={() => openMemberActions(member)}

@@ -1,4 +1,4 @@
-import React, { useState, createContext, useContext, useEffect, useCallback } from "react";
+import React, { useState, createContext, useContext, useEffect, useCallback, useRef } from "react";
 import * as chrono from "chrono-node";
 import { useEventMediator } from "./EventStorage";
 import messageStore from "../pages/MessageStore";
@@ -79,6 +79,7 @@ const EVENT_COLORS = {
 export default function EventPanel({ children }) {
   const [event, setEvents] = useState([]);
   const { events,addEvent: addEventToMediator } = useEventMediator();
+  const processedKeysRef = useRef(new Set());
 
   const formatDateKey = (date) => {
     if (!date) return '';
@@ -93,29 +94,32 @@ export default function EventPanel({ children }) {
   };
 
   const sendToCalendar = useCallback((eventData) => {
-    if (eventData.purpose  && eventData.dateTime) {
+    if (eventData.purpose && eventData.dateTime) {
+      const creatorAttribution = eventData.creatorName ? `Created by @${eventData.creatorName}\n` : '';
       const calendarEvent = {
         title: eventData.purpose.charAt(0).toUpperCase() + eventData.purpose.slice(1),
         date: eventData.date,
         startTime: eventData.dateTime.toTimeString().split(" ")[0].slice(0, 5),
         endTime: '',
-        description: `Detected from: "${eventData.message}"`,
-        msgref:eventData.msgref,
-        chatid:eventData.chatid,
+        description: `${creatorAttribution}Detected from: "${eventData.message}"`,
+        creatorName: eventData.creatorName || '',
+        msgref: eventData.msgref,
+        chatid: eventData.chatid,
         color: getEventColor(eventData.action.trim().split(' ')[0]),
-        action:eventData.action,
-        tempid:eventData.tempid,
+        action: eventData.action,
+        tempid: eventData.tempid,
       };
 
       addEventToMediator(calendarEvent);
       console.log('Event sent to calendar:', calendarEvent);
     }
   }, [addEventToMediator]);
+
 function toDateOnly(dateInput) {
   const d = new Date(dateInput);
-  //return d.toISOString().split("T")[0]; // YYYY-MM-DD
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+
  const handleParse = useCallback((msg) => {
   console.log("=== handleParse start ===");
   console.log("Incoming message object:", msg);
@@ -125,14 +129,38 @@ function toDateOnly(dateInput) {
     console.log("Empty message, skipping parse");
     return;
   }
-  if(msg.msgid){
-    const existsAnywhere = Object.values(events)
-  .some(eventArray => eventArray.some(evt => evt.msgref === msg.msgid));
-  console.log(existsAnywhere); 
-  if(existsAnywhere){
+
+  const msgKey = msg.msgid || msg.tempmsgid;
+  if (msgKey && processedKeysRef.current.has(msgKey)) {
+    console.log("Message key already processed, skipping:", msgKey);
     return;
   }
+
+  if (msg.tempmsgid && processedKeysRef.current.has(msg.tempmsgid)) {
+    if (msg.msgid) processedKeysRef.current.add(msg.msgid);
+    return;
   }
+
+  const existsAnywhere = Object.values(events).some(eventArray =>
+    eventArray.some(evt =>
+      (msg.msgid && (evt.msgref === msg.msgid || evt.tempid === msg.msgid)) ||
+      (msg.tempmsgid && (evt.tempid === msg.tempmsgid || evt.msgref === msg.tempmsgid)) ||
+      (evt.chatid === msg.chatid && evt.description && evt.description.includes(text))
+    )
+  );
+  if (existsAnywhere) {
+    if (msg.msgid) processedKeysRef.current.add(msg.msgid);
+    if (msg.tempmsgid) processedKeysRef.current.add(msg.tempmsgid);
+    return;
+  }
+
+  if (msg.msgid) processedKeysRef.current.add(msg.msgid);
+  if (msg.tempmsgid) processedKeysRef.current.add(msg.tempmsgid);
+
+  const currentUserId = localStorage.getItem('userid');
+  const effectiveSenderName = (msg.userid && msg.userid === currentUserId)
+    ? (localStorage.getItem('username') || 'You')
+    : (msg.username || msg.sendername || 'User');
   
   console.log("Parsing text:", text);
   const lower = text.toLowerCase();
@@ -381,7 +409,8 @@ console.log(oldEvent)
           id: Date.now(),
           chatid: msg.chatid,
           msgref: msg.msgid,
-          message: `${msg.sendername?msg.sendername:'You'}: ${text}`,
+          message: `@${effectiveSenderName}: ${text}`,
+          creatorName: effectiveSenderName,
           purpose: oldEvent.title,
           dateTime: newDate,
  date: formatDateKey(newDate),
@@ -446,7 +475,8 @@ update(oldEvent);
           id: Date.now(),
           chatid: msg.chatid,
           msgref: msg.msgid,
-          message: `${msg.sendername?msg.sendername:'You'}: ${text}`,
+          message: `@${effectiveSenderName}: ${text}`,
+          creatorName: effectiveSenderName,
           purpose: oldEvent.title,
           dateTime: newDate,
           date: formatDateKey(newDate),
@@ -519,7 +549,8 @@ let newDate = parsedDate;
     dateTime,
     purpose,
     action:'scheduled',
-    message: `${msg.sendername?msg.sendername:'You'}: ${text}`,
+    message: `@${effectiveSenderName}: ${text}`,
+    creatorName: effectiveSenderName,
     msgref: msg.msgid,
     chatid: msg.chatid,
     tempid:msg.tempmsgid,

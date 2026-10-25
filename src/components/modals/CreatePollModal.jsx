@@ -83,6 +83,7 @@ const CreatePollModal = ({ isOpen, onClose, chatId, currentUserId, onPollCreated
   const [allowMultiple, setAllowMultiple] = useState(false);
   const [allowUserOptions, setAllowUserOptions] = useState(true); // Default ON
   const [isAnonymous, setIsAnonymous] = useState(false);
+  const [isHiddenVoting, setIsHiddenVoting] = useState(false);
   const [expiryPreset, setExpiryPreset] = useState('none');
   const [customExpiry, setCustomExpiry] = useState('');
   const [loading, setLoading] = useState(false);
@@ -101,6 +102,7 @@ const CreatePollModal = ({ isOpen, onClose, chatId, currentUserId, onPollCreated
     setAllowMultiple(false);
     setAllowUserOptions(true);
     setIsAnonymous(false);
+    setIsHiddenVoting(false);
     setExpiryPreset('none');
     setCustomExpiry('');
     setServerError('');
@@ -161,6 +163,8 @@ const CreatePollModal = ({ isOpen, onClose, chatId, currentUserId, onPollCreated
     formProblem = 'Add at least 2 options';
   } else if (duplicateIndices.size > 0) {
     formProblem = 'Options must be unique';
+  } else if (isHiddenVoting && expiryPreset === 'none') {
+    formProblem = 'Pick a deadline for hidden voting';
   } else if (expiryPreset === 'custom') {
     if (!customExpiry || isNaN(new Date(customExpiry).getTime()) || new Date(customExpiry) <= new Date()) {
       formProblem = 'Pick a deadline date and time';
@@ -239,6 +243,7 @@ const CreatePollModal = ({ isOpen, onClose, chatId, currentUserId, onPollCreated
         allow_multiple: allowMultiple,
         allow_user_options: isAnonymous ? false : allowUserOptions,
         anonymous: isAnonymous,
+        is_hidden_voting: isHiddenVoting,
         expires_at: expiresAt,
         options: validOptions
       };
@@ -267,6 +272,7 @@ const CreatePollModal = ({ isOpen, onClose, chatId, currentUserId, onPollCreated
         allow_multiple: allowMultiple,
         allow_user_options: isAnonymous ? false : allowUserOptions,
         anonymous: isAnonymous,
+        is_hidden_voting: isHiddenVoting,
         expires_at: expiresAt,
         options: resData.options || validOptions.map((text, i) => ({ option_id: i + 100, text }))
       });
@@ -832,7 +838,8 @@ const CreatePollModal = ({ isOpen, onClose, chatId, currentUserId, onPollCreated
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  gap: '12px'
+                  gap: '12px',
+                  borderBottom: '1px solid var(--border-color)'
                 }}
               >
                 <div>
@@ -876,6 +883,65 @@ const CreatePollModal = ({ isOpen, onClose, chatId, currentUserId, onPollCreated
                       backgroundColor: '#fff',
                       boxShadow: '0 1px 3px rgba(0, 0, 0, 0.3)',
                       transform: isAnonymous ? 'translateX(16px)' : 'translateX(0)',
+                      transition: 'transform 0.2s ease'
+                    }}
+                  />
+                </button>
+              </div>
+
+              {/* Row 4: Hidden Voting */}
+              <div
+                style={{
+                  padding: '12px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '12px'
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '15px', color: 'var(--text-primary)', fontWeight: 500 }}>
+                    Hidden voting
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                    Hide vote counts and voters until deadline expires
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isHiddenVoting}
+                  aria-label="Hidden voting"
+                  onClick={() => {
+                    const nextHidden = !isHiddenVoting;
+                    setIsHiddenVoting(nextHidden);
+                    if (nextHidden && expiryPreset === 'none') {
+                      setExpiryPreset('1d');
+                    }
+                  }}
+                  style={{
+                    width: '42px',
+                    height: '26px',
+                    borderRadius: '999px',
+                    padding: '3px',
+                    border: 'none',
+                    background: isHiddenVoting ? 'var(--accent-gradient)' : 'rgba(128,128,128,.4)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    boxSizing: 'border-box',
+                    transition: 'background 0.2s ease',
+                    flexShrink: 0
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '20px',
+                      height: '20px',
+                      borderRadius: '50%',
+                      backgroundColor: '#fff',
+                      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.3)',
+                      transform: isHiddenVoting ? 'translateX(16px)' : 'translateX(0)',
                       transition: 'transform 0.2s ease'
                     }}
                   />

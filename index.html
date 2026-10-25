@@ -137,6 +137,16 @@
 
   <div id="root"></div>
   <script type="module" src="src/main.jsx"></script>
+  <script>
+    // Fail-safe: ensure splash loader never permanently traps user on slow connections or script errors
+    setTimeout(function() {
+      var loader = document.getElementById('pwa-splash-loader');
+      if (loader && !loader.classList.contains('fade-out')) {
+        loader.classList.add('fade-out');
+        setTimeout(function() { if (loader && loader.parentNode) loader.remove(); }, 350);
+      }
+    }, 3500);
+  </script>
 </body>
 
 </html>

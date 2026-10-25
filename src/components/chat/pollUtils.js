@@ -18,6 +18,7 @@ export function normalizePoll(poll, currentUserId) {
   const allow_multiple = Boolean(poll.allow_multiple);
   const allow_user_options = Boolean(poll.allow_user_options);
   const anonymous = Boolean(poll.anonymous);
+  const is_hidden_voting = Boolean(poll.is_hidden_voting || poll.isHiddenVoting);
   const is_expired = Boolean(poll.is_expired);
   const expires_at = poll.expires_at || null;
 
@@ -36,7 +37,10 @@ export function normalizePoll(poll, currentUserId) {
   const hasMyOther = Boolean(myOtherText);
 
   const total_voters = typeof poll.total_voters === 'number' ? poll.total_voters : 0;
-  const total_members = typeof poll.total_members === 'number' ? poll.total_members : 0;
+  let total_members = typeof poll.total_members === 'number' ? poll.total_members : 0;
+  if (total_members <= 1) {
+    total_members = 2; // Default to 2 participants for direct 1-on-1 chats
+  }
 
   return {
     poll_id,
@@ -44,6 +48,7 @@ export function normalizePoll(poll, currentUserId) {
     allow_multiple,
     allow_user_options,
     anonymous,
+    is_hidden_voting,
     is_expired,
     expires_at,
     isClosed,

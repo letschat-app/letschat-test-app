@@ -27,8 +27,8 @@ export const useNotifications = () => {
   const requestPermissionAndGetToken = async () => {
     console.log('[useNotifications] requestPermissionAndGetToken called...');
     try {
-      if (!('Notification' in window)) {
-        console.warn('[useNotifications] Notifications not supported in this browser.');
+      if (!('Notification' in window) || !messaging) {
+        console.warn('[useNotifications] Notifications or Firebase messaging not supported in this browser.');
         setPermissionStatus('unsupported');
         return;
       }
@@ -90,7 +90,7 @@ export const useNotifications = () => {
   const disableNotifications = async () => {
     console.log('[useNotifications] Disabling notifications...');
     try {
-      if (fcmToken) {
+      if (fcmToken && messaging) {
         // Try to delete token, but don't crash if SW registration is missing (common on GH Pages)
         try {
           await deleteToken(messaging);
@@ -132,11 +132,12 @@ export const useNotifications = () => {
   };
 
   useEffect(() => {
+    const hasNotificationSupport = typeof window !== 'undefined' && 'Notification' in window;
     // Sync if granted but no token (or if we just updated the Service Worker)
     const isManuallyDisabled = localStorage.getItem('notificationsDisabled') === 'true';
     const justUpdated = localStorage.getItem('sw_just_updated') === 'true';
 
-    if (Notification.permission === 'granted' && (!fcmToken || justUpdated) && userId && !isManuallyDisabled) {
+    if (hasNotificationSupport && Notification.permission === 'granted' && (!fcmToken || justUpdated) && userId && !isManuallyDisabled && messaging) {
       if (justUpdated) {
         console.log('[useNotifications] Forced refresh detected after SW update.');
         localStorage.removeItem('sw_just_updated');
@@ -150,7 +151,7 @@ export const useNotifications = () => {
         console.log('[useNotifications] Service Worker controller changed (version update). Refreshing token...');
         // Only auto-refresh if the user previously had notifications active
         const savedToken = localStorage.getItem('fcmToken');
-        if (savedToken || Notification.permission === 'granted') {
+        if (savedToken || (hasNotificationSupport && Notification.permission === 'granted')) {
           await requestPermissionAndGetToken();
         }
       };
@@ -168,36 +169,39 @@ export const useNotifications = () => {
 
       console.log('[useNotifications] Service Worker listeners established.');
 
-      const unsubscribe = onMessage(messaging, async (payload) => {
-        console.log('Message received in foreground: ', payload);
-        if ('Notification' in window && Notification.permission === 'granted') {
-          const data = payload.data || {};
-          const { unread, msgs, chatId, type } = data;
+      let unsubscribe = () => {};
+      if (messaging) {
+        unsubscribe = onMessage(messaging, async (payload) => {
+          console.log('Message received in foreground: ', payload);
+          if ('Notification' in window && Notification.permission === 'granted') {
+            const data = payload.data || {};
+            const { unread, msgs, chatId, type } = data;
 
-          // 1. Broadast to Store for InAppToast and UI updates
-          if (type === 'CHAT' || type === 'EVENT' || type === 'DAILY' || type === 'ASSIGNMENT_MISSING') {
-            messageStore.notifyListeners({ ...data, fromFCM: true });
-          }
-
-          // 2. Handle legacy unread counts for rooms
-          if (unread && chatId) {
-            let messageList = [];
-            try {
-              messageList = typeof msgs === 'string' ? JSON.parse(msgs) : (msgs || []);
-            } catch (e) {
-              messageList = msgs ? [msgs] : [];
+            // 1. Broadast to Store for InAppToast and UI updates
+            if (type === 'CHAT' || type === 'EVENT' || type === 'DAILY' || type === 'ASSIGNMENT_MISSING') {
+              messageStore.notifyListeners({ ...data, fromFCM: true });
             }
 
-            const isIndicator = messageList.some(msg => 
-              typeof msg === 'string' && msg.includes('/%20/indicator/%20/')
-            );
+            // 2. Handle legacy unread counts for rooms
+            if (unread && chatId) {
+              let messageList = [];
+              try {
+                messageList = typeof msgs === 'string' ? JSON.parse(msgs) : (msgs || []);
+              } catch (e) {
+                messageList = msgs ? [msgs] : [];
+              }
 
-            if (!isIndicator) {
-              messageStore.setRoomUnreadCount(chatId, unread);
+              const isIndicator = messageList.some(msg => 
+                typeof msg === 'string' && msg.includes('/%20/indicator/%20/')
+              );
+
+              if (!isIndicator) {
+                messageStore.setRoomUnreadCount(chatId, unread);
+              }
             }
           }
-        }
-      });
+        });
+      }
 
       return () => {
         navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);

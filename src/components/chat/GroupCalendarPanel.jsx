@@ -155,30 +155,44 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
   const formatEventDate = (isoStr) => {
     if (!isoStr) return '';
     const d = new Date(isoStr);
-    return d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+    return new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric'
+    }).format(d);
   };
 
   const formatEventTime = (isoStr) => {
     if (!isoStr) return '';
     const d = new Date(isoStr);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    }).format(d);
   };
 
   // Filter events
-  const now = new Date().getTime();
-  const filteredEvents = events.filter((ev) => {
+  const now = Date.now();
+  let filteredEvents = events.filter((ev) => {
     if (selectedFilter === 'all') return true;
     const startMs = ev.startTime ? new Date(ev.startTime).getTime() : 0;
     if (selectedFilter === 'upcoming') {
       return startMs >= now - 15 * 60 * 1000;
     }
     if (selectedFilter === 'today') {
-      const todayStr = new Date().toISOString().split('T')[0];
-      const evDateStr = ev.startTime ? new Date(ev.startTime).toISOString().split('T')[0] : '';
-      return todayStr === evDateStr;
+      const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+      const evDateIST = ev.startTime ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(ev.startTime)) : '';
+      return todayIST === evDateIST;
     }
     return true;
   });
+
+  if (selectedFilter === 'upcoming') {
+    filteredEvents = [...filteredEvents].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()).slice(0, 5);
+  }
 
   return (
     <div style={{
@@ -308,7 +322,9 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
             border: '1px dashed var(--border-color)'
           }}>
             <Calendar size={36} color="var(--text-muted)" style={{ margin: '0 auto 12px' }} />
-            <h4 style={{ margin: '0 0 6px 0', fontSize: '15px', color: 'var(--text-primary)' }}>No events in this group</h4>
+            <h4 style={{ margin: '0 0 6px 0', fontSize: '15px', color: 'var(--text-primary)' }}>
+              {selectedFilter === 'today' ? 'No events for today' : selectedFilter === 'upcoming' ? 'No upcoming events' : 'No events in this group'}
+            </h4>
             <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)' }}>
               Events created in this group will appear here for all members.
             </p>
@@ -455,101 +471,60 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
                   </p>
                 )}
 
-                {/* RSVP Voting & Attendance Tally */}
+                {/* Creator Attribution */}
+                {(ev.creatorName || ev.creatorId) && (
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                    Created by @{ev.creatorName || ev.creatorId}
+                  </div>
+                )}
+
+                {/* Calendar Add / Added Status */}
                 <div style={{
                   borderTop: '1px solid var(--bg-hover)',
                   paddingTop: '12px',
                   display: 'flex',
-                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
                   gap: '8px'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: '600' }}>
-                      Will you attend?
-                    </span>
-                    {ev.rsvpCounts && (
-                      <div style={{ display: 'flex', gap: '8px', fontSize: '11px', color: 'var(--text-secondary)' }}>
-                        <span>✓ Going: {ev.rsvpCounts.going || 0}</span>
-                        <span>✕ Can't: {ev.rsvpCounts.cant_join || 0}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button
-                      onClick={() => handleVote(ev.groupEventId, 'going')}
-                      style={{
-                        flex: 1,
-                        padding: '6px 10px',
-                        borderRadius: '8px',
-                        border: ev.rsvpStatus === 'going' ? '1px solid var(--success-color)' : '1px solid var(--border-color)',
-                        backgroundColor: ev.rsvpStatus === 'going' ? 'rgba(16, 185, 129, 0.2)' : 'transparent',
-                        color: ev.rsvpStatus === 'going' ? 'var(--success-color)' : 'var(--text-secondary)',
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Going
-                    </button>
-                    <button
-                      onClick={() => handleVote(ev.groupEventId, 'maybe')}
-                      style={{
-                        flex: 1,
-                        padding: '6px 10px',
-                        borderRadius: '8px',
-                        border: ev.rsvpStatus === 'maybe' ? '1px solid var(--warning-color)' : '1px solid var(--border-color)',
-                        backgroundColor: ev.rsvpStatus === 'maybe' ? 'rgba(245, 158, 11, 0.2)' : 'transparent',
-                        color: ev.rsvpStatus === 'maybe' ? 'var(--warning-color)' : 'var(--text-secondary)',
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Maybe
-                    </button>
-                    <button
-                      onClick={() => handleVote(ev.groupEventId, 'cant_join')}
-                      style={{
-                        flex: 1,
-                        padding: '6px 10px',
-                        borderRadius: '8px',
-                        border: ev.rsvpStatus === 'cant_join' ? '1px solid var(--danger-color)' : '1px solid var(--border-color)',
-                        backgroundColor: ev.rsvpStatus === 'cant_join' ? 'var(--danger-tint)' : 'transparent',
-                        color: ev.rsvpStatus === 'cant_join' ? 'var(--danger-color)' : 'var(--text-secondary)',
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Can't Join
-                    </button>
-                  </div>
-                </div>
-
-                {/* Add for Me Button if not yet on user's calendar */}
-                {!hasJoined && !isCancelled && (
-                  <button
-                    onClick={() => handleAddForMe(ev)}
-                    style={{
-                      width: '100%',
-                      padding: '8px',
-                      borderRadius: '8px',
-                      backgroundColor: 'var(--accent-tint)',
-                      border: '1px solid var(--accent-tint-border)',
-                      color: 'var(--accent-text)',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
+                  {hasJoined ? (
+                    <div style={{
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    <Plus size={14} /> Add to My Calendar
-                  </button>
-                )}
+                      gap: '6px',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      color: 'var(--success-color)',
+                      fontSize: '12px',
+                      fontWeight: '600'
+                    }}>
+                      <Check size={14} /> Added to Calendar
+                    </div>
+                  ) : !isCancelled ? (
+                    <button
+                      onClick={() => handleAddForMe(ev)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        backgroundColor: 'var(--accent-tint)',
+                        border: '1px solid var(--accent-tint-border)',
+                        color: 'var(--accent-text)',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Plus size={14} /> + Add to Calendar
+                    </button>
+                  ) : null}
+                </div>
               </div>
             );
           })

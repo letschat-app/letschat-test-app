@@ -797,10 +797,11 @@ const messageStore = {
           allow_multiple: payload.allow_multiple !== undefined ? payload.allow_multiple : existingPoll.allow_multiple,
           allow_user_options: payload.allow_user_options !== undefined ? payload.allow_user_options : existingPoll.allow_user_options,
           anonymous: payload.anonymous !== undefined ? payload.anonymous : existingPoll.anonymous,
+          is_hidden_voting: payload.is_hidden_voting !== undefined ? payload.is_hidden_voting : existingPoll.is_hidden_voting,
           is_expired: payload.is_expired !== undefined ? payload.is_expired : existingPoll.is_expired,
           expires_at: payload.expires_at !== undefined ? payload.expires_at : existingPoll.expires_at,
           total_voters: payload.total_voters !== undefined ? payload.total_voters : existingPoll.total_voters,
-          total_members: payload.total_members !== undefined ? payload.total_members : existingPoll.total_members,
+          total_members: payload.total_members !== undefined ? Math.max(2, payload.total_members) : (existingPoll.total_members || 2),
           options: payload.options || existingPoll.options || [],
           other_votes: payload.other_votes !== undefined ? payload.other_votes : (existingPoll.other_votes || []),
           user_votes: user_votes !== undefined ? user_votes : (payload.option_ids || existingPoll.user_votes || [])
@@ -924,6 +925,15 @@ const messageStore = {
     // 1. Initialize structures
     if (!this.transientIndicators[chatid]) this.transientIndicators[chatid] = {};
     if (!this.indicatorTimeouts[chatid]) this.indicatorTimeouts[chatid] = {};
+
+    if (content === 'stop') {
+      if (this.transientIndicators[chatid] && this.transientIndicators[chatid][userid]) {
+        clearTimeout(this.indicatorTimeouts[chatid][userid]);
+        delete this.transientIndicators[chatid][userid];
+        this.notifyListeners({ type: 'indicator', chatid, userid, content: 'stop' });
+      }
+      return;
+    }
 
     // 2. Override Logic: typing/recording hide in-chat
     if (content === 'typing' || content === 'recording') {

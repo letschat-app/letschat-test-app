@@ -71,6 +71,9 @@ export default function PollVotesModal({
     total_voters = 0,
     allow_user_options = false,
     anonymous = false,
+    is_hidden_voting = false,
+    isClosed = false,
+    expires_at = null,
     other_votes = []
   } = poll;
 
@@ -328,7 +331,7 @@ export default function PollVotesModal({
           }}
         >
           <span style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>
-            {anonymous ? 'Results' : 'Votes'}
+            {is_hidden_voting && !isClosed ? 'Hidden Voting' : anonymous ? 'Results' : 'Votes'}
           </span>
           <button
             type="button"
@@ -353,8 +356,45 @@ export default function PollVotesModal({
           </button>
         </div>
 
-        {/* NON-ANONYMOUS VIEW */}
-        {!anonymous ? (
+        {/* HIDDEN VOTING (BEFORE DEADLINE) VIEW */}
+        {is_hidden_voting && !isClosed ? (
+          <div
+            className="poll-custom-scrollbar"
+            style={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: 'auto',
+              padding: '28px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center'
+            }}
+          >
+            <div
+              style={{
+                width: '52px',
+                height: '52px',
+                borderRadius: '50%',
+                background: 'rgba(99, 102, 241, 0.12)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: '16px'
+              }}
+            >
+              <Lock size={26} color="var(--accent-color)" />
+            </div>
+            <div style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
+              Hidden Voting Active
+            </div>
+            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', maxWidth: '300px', lineHeight: '1.5' }}>
+              Vote counts, percentages, and voters are hidden until the deadline passes
+              {expires_at ? ` on ${new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(expires_at))}` : ''}.
+            </div>
+          </div>
+        ) : !anonymous ? (
           <>
             {/* Tabs Row (Scrolls Horizontally) */}
             <div

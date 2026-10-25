@@ -176,7 +176,7 @@ export function initWebsocket() {
 
           if (isSameChat && isSameSpace) {
             const now = Date.now();
-            if (now - lastSoundTime > 10000) {
+            if (now - lastSoundTime > 800) {
               lastSoundTime = now;
               const audio = new Audio(`${import.meta.env.BASE_URL}Incoming.mpeg`);
               audio.volume = 0.7;

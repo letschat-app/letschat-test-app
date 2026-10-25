@@ -54,6 +54,7 @@ const PollWidget = ({ message, currentUserId, members = [] }) => {
     allow_multiple,
     allow_user_options,
     anonymous,
+    is_hidden_voting,
     isClosed,
     options,
     user_votes,
@@ -82,10 +83,12 @@ const PollWidget = ({ message, currentUserId, members = [] }) => {
   if (isClosed) {
     const parts = ['Closed'];
     if (anonymous) parts.push('anonymous');
+    if (is_hidden_voting) parts.push('hidden voting');
     metaText = parts.join(', ');
   } else {
     const parts = [allow_multiple ? 'Select one or more' : 'Select one'];
     if (anonymous) parts.push('anonymous');
+    if (is_hidden_voting) parts.push('hidden voting');
     const closingTime = formatClosingTime(poll?.expires_at);
     if (closingTime) {
       parts.push(`closing in ${closingTime}`);
@@ -320,6 +323,9 @@ const PollWidget = ({ message, currentUserId, members = [] }) => {
     setOtherError('');
   };
 
+  const hideResults = is_hidden_voting && !isClosed;
+  const displayTotalMembers = Math.max(2, total_members || 0, (members && members.length) || 0);
+
   const showOtherRow = allow_user_options && !anonymous && !isClosed;
   const isInputDuplicate = isOptionDuplicate(otherInput, options);
   const isSubmitDisabled = !otherInput.trim() || isInputDuplicate;
@@ -371,7 +377,7 @@ const PollWidget = ({ message, currentUserId, members = [] }) => {
               <div
                 style={{
                   ...progressFillStyle,
-                  width: `${pct}%`
+                  width: hideResults ? '0%' : `${pct}%`
                 }}
               />
 
@@ -411,9 +417,11 @@ const PollWidget = ({ message, currentUserId, members = [] }) => {
                 </div>
 
                 {/* Right side: "<count> · <pct>%" in 12px var(--text-secondary) */}
-                <span style={{ fontSize: '12px', color: 'var(--text-secondary)', flexShrink: 0, marginLeft: '8px' }}>
-                  {count} · {pct}%
-                </span>
+                {!hideResults && (
+                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)', flexShrink: 0, marginLeft: '8px' }}>
+                    {count} · {pct}%
+                  </span>
+                )}
               </div>
             </button>
           );
@@ -548,7 +556,7 @@ const PollWidget = ({ message, currentUserId, members = [] }) => {
                 </div>
 
                 {/* Right side: "<count> · <pct>%" when there are write-ins */}
-                {otherCount > 0 && (
+                {!hideResults && otherCount > 0 && (
                   <span style={{ fontSize: '12px', color: 'var(--text-secondary)', flexShrink: 0, marginLeft: '8px' }}>
                     {otherCount} · {otherPct}%
                   </span>
@@ -562,7 +570,7 @@ const PollWidget = ({ message, currentUserId, members = [] }) => {
       {/* Footer: no top divider, margin-top 10px, 13px, var(--text-secondary) */}
       <div style={footerStyle}>
         <span>
-          {total_members > 0 ? `${total_voters} of ${total_members} voted` : `${total_voters} voted`}
+          {displayTotalMembers > 0 ? `${total_voters} of ${displayTotalMembers} voted` : `${total_voters} voted`}
         </span>
         <button
           ref={viewVotesRef}

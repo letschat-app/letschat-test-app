@@ -20,14 +20,23 @@ import PendingOtpModal from "./components/modals/PendingOtpModal";
 // Custom lazy wrapper to remove splash screen ONLY when the first dynamic chunk resolves
 const lazyWithSplash = (importFunc) => {
   return lazy(() => 
-    importFunc().then((module) => {
-      const loader = document.getElementById('pwa-splash-loader');
-      if (loader && !loader.classList.contains('fade-out')) {
-        loader.classList.add('fade-out');
-        setTimeout(() => loader.remove(), 300);
-      }
-      return module;
-    })
+    importFunc()
+      .then((module) => {
+        const loader = document.getElementById('pwa-splash-loader');
+        if (loader && !loader.classList.contains('fade-out')) {
+          loader.classList.add('fade-out');
+          setTimeout(() => loader.remove(), 300);
+        }
+        return module;
+      })
+      .catch((err) => {
+        const loader = document.getElementById('pwa-splash-loader');
+        if (loader && !loader.classList.contains('fade-out')) {
+          loader.classList.add('fade-out');
+          setTimeout(() => loader.remove(), 300);
+        }
+        throw err;
+      })
   );
 };
 
@@ -64,6 +73,20 @@ import { badgeStore } from "./service/BadgeStore";
 
 function App() {
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  useEffect(() => {
+    // Fail-safe to ensure splash loader fades out once App mounts
+    const loader = document.getElementById('pwa-splash-loader');
+    if (loader && !loader.classList.contains('fade-out')) {
+      const timer = setTimeout(() => {
+        if (loader && !loader.classList.contains('fade-out')) {
+          loader.classList.add('fade-out');
+          setTimeout(() => loader.remove(), 300);
+        }
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
