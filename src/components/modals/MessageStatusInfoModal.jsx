@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, CheckCheck, Eye, Clock, Check, Info } from 'lucide-react';
 import Avatar from '../chat/Avatar';
-import { getUserFromDB } from '../../service/db';
+import { getUserFromDB, updateMessageStatusInDB } from '../../service/db';
+import { API } from '../../service/UserAuth';
 
 /**
  * MessageStatusInfoModal Component
@@ -15,11 +16,15 @@ import { getUserFromDB } from '../../service/db';
 const MessageStatusInfoModal = ({ isOpen, onClose, message, chat, members = [] }) => {
   const [userMap, setUserMap] = useState({});
   const [loading, setLoading] = useState(true);
+  const [liveTrack, setLiveTrack] = useState(null);
 
   const currentUserId = localStorage.getItem('userid');
 
   useEffect(() => {
-    if (!isOpen || !message) return;
+    if (!isOpen || !message) {
+      setLiveTrack(null);
+      return;
+    }
 
     const resolveUsers = async () => {
       setLoading(true);
@@ -37,10 +42,52 @@ const MessageStatusInfoModal = ({ isOpen, onClose, message, chat, members = [] }
         });
       }
 
-      // 2. Identify all user IDs from ACK arrays
-      const pendingIds = message.pending_users || [];
-      const deliveredIds = message.delivered_users || [];
-      const readIds = message.read_users || [];
+      // 1.5. Always fetch live, authoritative track info from backend for the message
+      let trackData = null;
+      if (message.msgid) {
+        try {
+          const res = await fetch(`${API}/user/chatbox/message/${encodeURIComponent(message.msgid)}/track-info`, {
+            headers: { 'ngrok-skip-browser-warning': 'true' }
+          });
+          if (res.ok) {
+            trackData = await res.json();
+            if (trackData) {
+              setLiveTrack(trackData);
+              if (Array.isArray(trackData.recipients)) {
+                trackData.recipients.forEach(r => {
+                  if (r.userId) {
+                    map[r.userId] = {
+                      userName: r.userName || map[r.userId]?.userName || r.userId,
+                      profile: r.profile || map[r.userId]?.profile || null,
+                      deliverTime: r.delivertime,
+                      readTime: r.readtime,
+                      mediaOpenedTime: r.mediaopenedtime
+                    };
+                  }
+                });
+              }
+              // Update IndexedDB silently so subsequent opens have fresh data
+              updateMessageStatusInDB({
+                msgid: message.msgid,
+                status: trackData.status,
+                delivertime: trackData.delivertime,
+                readtime: trackData.readtime,
+                mediaopenedtime: trackData.mediaopenedtime,
+                read_users: trackData.read_users,
+                delivered_users: trackData.delivered_users,
+                pending_users: trackData.pending_users
+              }).catch(() => {});
+            }
+          }
+        } catch (e) {
+          console.warn("[MessageStatusInfoModal] Live track info fetch failed:", e);
+        }
+      }
+
+      // 2. Identify all user IDs from ACK arrays (combining local message and backend trackData)
+      const pendingIds = trackData?.pending_users || message.pending_users || [];
+      const deliveredIds = trackData?.delivered_users || message.delivered_users || [];
+      const readIds = trackData?.read_users || message.read_users || [];
       const allIds = Array.from(new Set([...pendingIds, ...deliveredIds, ...readIds]));
 
       // 3. Fetch missing users from IndexedDB usersCache
@@ -82,13 +129,18 @@ const MessageStatusInfoModal = ({ isOpen, onClose, message, chat, members = [] }
 
   if (!isOpen || !message) return null;
 
-  // Format time utility
+  // Format time utility - strictly 12-hour Indian Standard Time (IST)
   const formatTime = (ts) => {
     if (!ts) return '';
     try {
       const date = new Date(ts);
       if (isNaN(date.getTime())) return String(ts);
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      return new Intl.DateTimeFormat('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      }).format(date);
     } catch (e) {
       return String(ts);
     }
@@ -100,11 +152,14 @@ const MessageStatusInfoModal = ({ isOpen, onClose, message, chat, members = [] }
 
   const isPrivate = !chat || chat.type === 'private' || chat.type === 'direct';
 
-  // Extract key timestamps from message object
-  const sentTime = message.timestamp;
-  const deliverTime = message.delivertime;
-  const readTime = message.readtime;
-  const mediaOpenedTime = message.mediaopenedtime;
+  // Merge authoritative live track details if fetched
+  const effectiveMessage = liveTrack ? { ...message, ...liveTrack } : message;
+
+  // Extract key timestamps from effective message object
+  const sentTime = effectiveMessage.timestamp;
+  const deliverTime = effectiveMessage.delivertime;
+  const readTime = effectiveMessage.readtime;
+  const mediaOpenedTime = effectiveMessage.mediaopenedtime;
 
   // ── PRIVATE (1-on-1) CHAT SINGLE STATUS VIEW ──
   if (isPrivate) {
@@ -214,9 +269,9 @@ const MessageStatusInfoModal = ({ isOpen, onClose, message, chat, members = [] }
   }
 
   // ── GROUP CHAT MULTI-SECTION CATEGORIZATION (Opened/Played -> Read -> Delivered -> Pending) ──
-  const rawPending = message.pending_users || [];
-  const rawDelivered = message.delivered_users || [];
-  const rawRead = message.read_users || [];
+  const rawPending = liveTrack?.pending_users || message.pending_users || [];
+  const rawDelivered = liveTrack?.delivered_users || message.delivered_users || [];
+  const rawRead = liveTrack?.read_users || message.read_users || [];
 
   const readSet = new Set(rawRead);
   const deliveredSet = new Set(rawDelivered);
@@ -231,35 +286,40 @@ const MessageStatusInfoModal = ({ isOpen, onClose, message, chat, members = [] }
     // For media messages, recipients in readSet are listed under Opened / Played
     readSet.forEach(uid => {
       if (uid === currentUserId) return;
+      const uReadTime = userMap[uid]?.readTime || userMap[uid]?.mediaOpenedTime;
+      const uDeliverTime = userMap[uid]?.deliverTime;
       openedList.push({
         userId: uid,
         userName: userMap[uid]?.userName || uid,
         profile: userMap[uid]?.profile || null,
-        mainTime: mediaOpenedTime || readTime || deliverTime || sentTime,
-        deliverTime: deliverTime
+        mainTime: uReadTime || mediaOpenedTime || readTime || uDeliverTime || deliverTime || sentTime,
+        deliverTime: uDeliverTime || deliverTime
       });
     });
   } else {
     // For text messages, recipients in readSet are listed under Read
     readSet.forEach(uid => {
       if (uid === currentUserId) return;
+      const uReadTime = userMap[uid]?.readTime;
+      const uDeliverTime = userMap[uid]?.deliverTime;
       readList.push({
         userId: uid,
         userName: userMap[uid]?.userName || uid,
         profile: userMap[uid]?.profile || null,
-        mainTime: readTime || deliverTime || sentTime,
-        deliverTime: deliverTime
+        mainTime: uReadTime || readTime || uDeliverTime || deliverTime || sentTime,
+        deliverTime: uDeliverTime || deliverTime
       });
     });
   }
 
   deliveredSet.forEach(uid => {
     if (uid === currentUserId || readSet.has(uid)) return;
+    const uDeliverTime = userMap[uid]?.deliverTime;
     deliveredList.push({
       userId: uid,
       userName: userMap[uid]?.userName || uid,
       profile: userMap[uid]?.profile || null,
-      deliverTime: deliverTime || sentTime
+      deliverTime: uDeliverTime || deliverTime || sentTime
     });
   });
 

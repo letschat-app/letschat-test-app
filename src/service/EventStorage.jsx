@@ -72,6 +72,8 @@ export const EventStorage = ({ children }) => {
             meetingLink: evt.meetingLink,
             location: evt.location,
             groupEventId: evt.groupEventId,
+            creatorId: evt.creatorId,
+            creatorName: evt.creatorName,
             externalStatus: evt.externalStatus
           };
 

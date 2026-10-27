@@ -1,5 +1,5 @@
 import messageStore from "../pages/MessageStore";
-import { updateMessageStatusInDB, bulkUpdateMessageStatusInDB } from "./db";
+import { updateMessageStatusInDB, bulkUpdateMessageStatusInDB, isChatMuted } from "./db";
 import * as SyncService from "./SyncService";
 
 let socket = null;
@@ -10,6 +10,20 @@ let volatileQueue = []; // Queue for messages while CONNECTING
 let pingInterval = null;
 let lastSoundTime = 0;
 let pongTimeout = null;
+let incomingAudio = null;
+
+function playIncomingSound() {
+  try {
+    if (!incomingAudio) {
+      incomingAudio = new Audio(`${import.meta.env.BASE_URL}Incoming.mpeg`);
+      incomingAudio.volume = 0.7;
+    }
+    incomingAudio.currentTime = 0;
+    incomingAudio.play().catch(e => console.warn("Audio play blocked by browser:", e));
+  } catch (e) {
+    console.warn("Audio creation error:", e);
+  }
+}
 
 function startPingPong() {
   stopPingPong();
@@ -163,7 +177,12 @@ export function initWebsocket() {
       const senderId = msg.userid || msg.senderid;
       const myId = localStorage.getItem('userid');
 
-      if (senderId && senderId !== myId && !msg.isold) {
+      const msgTime = msg.timestamp ? new Date(msg.timestamp).getTime() : Date.now();
+      const msgAge = Date.now() - msgTime;
+      const isFresh = !isNaN(msgAge) && msgAge <= 12000;
+      const isMutedGlobally = localStorage.getItem('mute_all') === 'true' || localStorage.getItem('mute_sound') === 'true' || localStorage.getItem('sound_enabled') === 'false';
+
+      if (senderId && senderId !== myId && !msg.isold && isFresh && !isMutedGlobally) {
         if (actualMsgType !== 'reaction' && actualMsgType !== 'indicator' && !msg.isIndicator) {
           const activeChat = messageStore.getActivechatbox();
           const activeSpace = messageStore.getActiveSpace();
@@ -175,13 +194,16 @@ export function initWebsocket() {
           const isSameSpace = activeSpace != null && Number(activeSpace) === Number(msgSpaceId);
 
           if (isSameChat && isSameSpace) {
-            const now = Date.now();
+            isChatMuted(msgChatId).then(muted => {
+              if (muted) return;
+              const now = Date.now();
             if (now - lastSoundTime > 800) {
               lastSoundTime = now;
-              const audio = new Audio(`${import.meta.env.BASE_URL}Incoming.mpeg`);
-              audio.volume = 0.7;
-              audio.play().catch(e => console.warn("Audio play blocked by browser:", e));
+              playIncomingSound();
             }
+
+
+            });
           }
         }
       }

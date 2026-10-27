@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { getsocket, isSocketOpen, sendSafe } from "../service/Websocket";
 import { API } from "../service/UserAuth";
 import messageStore from "./MessageStore";
-import { getMessagesFromDB, syncChatsMapToDB } from "../service/db";
+import { getMessagesFromDB, syncChatsMapToDB, getTotalMessageCountFromDB } from "../service/db";
 import { getMediaInfo, getMediaBlob, memoryThumbCache } from "../service/MediaCache";
 import { getChatIcon, getChatColor } from "../service/ChatUtils";
 import MediaViewer from "../components/chat/MediaViewer";
@@ -17,34 +17,15 @@ import { usePWA } from "../context/PWAContext";
 import { useEventMediator } from "../service/EventStorage";
 import spaceStore from "../service/SpaceStore";
 
-let loadedChats = {};
-
-
-
 export const getchat = (chatid, spaceId = 0, timestampOverride = null, type = null) => {
-  const loadKey = `${chatid}_${spaceId}`;
-  const isLoaded = loadedChats[loadKey];
-  const signal = isLoaded ? 'check-in' : 'load';
-
-  console.log(`[getchat] ▶ signal="${signal}" | key=${loadKey} | socketOpen=${isSocketOpen()}`);
-
+  if (!chatid) return;
+  console.log(`[getchat] ▶ Always load on check-in: chatid=${chatid} spaceId=${spaceId}`);
   const json = {
-    purpose: signal,
+    purpose: "load",
     userchatId: chatid,
     usermsgId: spaceId
   };
-
   sendSafe(json);
-
-  const socket = getsocket();
-  const socketExists = socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING);
-
-  if (!isLoaded && socketExists) {
-    loadedChats[loadKey] = true;
-    console.log(`[getchat] ✔ Marked ${loadKey} as loaded (signal: ${signal})`);
-  } else if (!isLoaded) {
-    console.warn(`[getchat] ⚠ Socket not ready — ${loadKey} NOT marked as loaded`);
-  }
 };
 
 
@@ -697,22 +678,54 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
     scheduleLocalStorageWrite('messageCounts', initialCounts);
 
     // ── Real-time listener: batches both state updates in one callback ─────
-    const unsubscribe = messageStore.addListener(() => {
+    const unsubscribe = messageStore.addListener((update) => {
       if (!isMounted.current) return;
 
       const lastMsgs = messageStore.getLastMessage() || {};
       const counts = messageStore.getCount() || {};
 
-      // Merge with current state — never overwrite with null/0
-      // Attach _ts on insert so sort never calls new Date() again
+      // Merge with current state — always favor newer incoming messages
       setLastMessages(prev => {
         const merged = { ...prev };
+
+        // 1. If update is an individual message (incoming/outgoing/reaction)
+        if (update && update.chatid && (update.content !== undefined || update.type)) {
+          const incomingTs = resolveTimestamp(update);
+          const currentTs = merged[update.chatid] ? resolveTimestamp(merged[update.chatid]) : 0;
+          if (incomingTs >= currentTs) {
+            merged[update.chatid] = { ...update, _ts: incomingTs };
+          }
+        }
+
+        // 2. Also check if update was a batch_loaded event
+        if (update && update.type === 'batch_loaded' && update.chatid) {
+          const storeLatest = messageStore.getChatLastMessage(update.chatid);
+          if (storeLatest) {
+            const storeTs = resolveTimestamp(storeLatest);
+            const currentTs = merged[update.chatid] ? resolveTimestamp(merged[update.chatid]) : 0;
+            if (storeTs >= currentTs) {
+              merged[update.chatid] = { ...storeLatest, _ts: storeTs };
+            }
+          }
+        }
+
+        // 3. Merge from lastMsgs
         Object.keys(lastMsgs).forEach(chatId => {
           if (lastMsgs[chatId] && lastMsgs[chatId] !== 0) {
             const m = lastMsgs[chatId];
-            merged[chatId] = m._ts != null ? m : { ...m, _ts: resolveTimestamp(m) };
+            const mLatest = (m && !m.msgid && !m.tempmsgid && typeof m === 'object')
+              ? Object.values(m).reduce((a, b) => resolveTimestamp(b) >= resolveTimestamp(a) ? b : a, Object.values(m)[0])
+              : m;
+            if (mLatest) {
+              const mTs = resolveTimestamp(mLatest);
+              const currentTs = merged[chatId] ? resolveTimestamp(merged[chatId]) : 0;
+              if (mTs >= currentTs) {
+                merged[chatId] = { ...mLatest, _ts: mTs };
+              }
+            }
           }
         });
+
         scheduleLocalStorageWrite('lastMessages', merged);
         return merged;
       });
@@ -793,6 +806,62 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
         // Deduplicate data by chatId to prevent UI duplicates
         const uniqueData = Array.from(new Map(data.map(item => [item.chatId, item])).values());
         setChatNames(uniqueData);
+
+        // Pre-populate last messages from API to show in chat preview immediately without waiting
+        setLastMessages(prev => {
+          const merged = { ...prev };
+          uniqueData.forEach(chat => {
+            if (chat.lastMessage && !merged[chat.chatId]) {
+              const ts = chat.lastMessageTimestamp ? new Date(chat.lastMessageTimestamp).getTime() : (chat.timestamp ? new Date(chat.timestamp).getTime() : Date.now());
+              merged[chat.chatId] = {
+                content: chat.lastMessage,
+                type: chat.lastMessageType || 'text',
+                sendername: chat.lastMessageSender,
+                userid: chat.lastMessageSenderId,
+                timestamp: chat.lastMessageTimestamp,
+                msgid: chat.lastMessageId,
+                _ts: ts
+              };
+            }
+          });
+          scheduleLocalStorageWrite('lastMessages', merged);
+          return merged;
+        });
+
+        // Conditionally fetch recent messages via HTTP API ONLY if user has chats AND IndexedDB has 0 messages
+        if (uniqueData.length > 0) {
+          getTotalMessageCountFromDB().then(totalMsgCount => {
+            if (!isMounted.current) return;
+            if (totalMsgCount === 0) {
+              if (import.meta.env.DEV) console.log("[ChatNames] Fresh device/login: IndexedDB has 0 messages. Fetching last 20 msgs via recent-messages API...");
+              fetch(`${API}/user/chatbox/${userId}/recent-messages?limit=20`, {
+                signal: controller.signal,
+                headers: {
+                  "Content-Type": "application/json",
+                  "ngrok-skip-browser-warning": "true"
+                }
+              })
+                .then(res => res.json())
+                .then(batches => {
+                  if (!isMounted.current) return;
+                  if (Array.isArray(batches)) {
+                    batches.forEach(batch => {
+                      messageStore.handleBatch(batch);
+                    });
+                  }
+                })
+                .catch(err => {
+                  if (err.name !== 'AbortError' && import.meta.env.DEV) {
+                    console.warn("[ChatNames] Recent messages API error:", err);
+                  }
+                });
+            } else {
+              if (import.meta.env.DEV) console.log(`[ChatNames] IndexedDB already has ${totalMsgCount} messages. Skipping recent-messages API.`);
+            }
+          }).catch(err => {
+            if (import.meta.env.DEV) console.error("[ChatNames] Error querying DB message count:", err);
+          });
+        }
 
         // Refresh with latest items
         loadIDBMsgs(uniqueData, controller.signal);
@@ -1065,9 +1134,18 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
       if (isPinnedA && !isPinnedB) return -1;
       if (!isPinnedA && isPinnedB) return 1;
 
-      // Use precomputed _ts — avoids Date parsing on every comparison
-      const timeA = lastMessages[a.chatId]?._ts ?? 0;
-      const timeB = lastMessages[b.chatId]?._ts ?? 0;
+      const storeMsgA = a.type === 'classroom'
+        ? messageStore.getSpaceLastMessage(a.chatId, 0)
+        : messageStore.getChatLastMessage(a.chatId);
+      const storeMsgB = b.type === 'classroom'
+        ? messageStore.getSpaceLastMessage(b.chatId, 0)
+        : messageStore.getChatLastMessage(b.chatId);
+
+      const msgA = [storeMsgA, lastMessages[a.chatId], a.lastMessage ? { timestamp: a.lastMessageTimestamp } : null, a.timestamp ? { timestamp: a.timestamp } : null].filter(Boolean);
+      const msgB = [storeMsgB, lastMessages[b.chatId], b.lastMessage ? { timestamp: b.lastMessageTimestamp } : null, b.timestamp ? { timestamp: b.timestamp } : null].filter(Boolean);
+
+      const timeA = Math.max(0, ...msgA.map(m => resolveTimestamp(m)));
+      const timeB = Math.max(0, ...msgB.map(m => resolveTimestamp(m)));
 
       return timeB - timeA;
     });
@@ -1389,17 +1467,25 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
     const spaces = selectedChatForSpaces.spaces || [];
     const highestId = spaces.reduce((max, s) => Math.max(max, s.id), 0);
     const newSpaceId = highestId + 1;
+    const myId = localStorage.getItem('userid');
+    const myName = localStorage.getItem('username') || localStorage.getItem('name');
 
     try {
       const res = await fetch(`${API}/user/add-space`, {
         method: 'POST',
-        headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
+        headers: { 
+          "Content-Type": "application/json", 
+          "ngrok-skip-browser-warning": "true",
+          ...(myId ? { "User-Id": myId } : {}),
+          ...(myName ? { "User-Name": myName } : {})
+        },
         body: JSON.stringify({
           chatId: selectedChatForSpaces.chatId,
           spaceId: newSpaceId,
           spaceName: newSpaceName.trim()
         })
       });
+
       if (res.ok) {
         const newSpace = { id: newSpaceId, name: newSpaceName.trim(), icon: "📌" };
         const updatedSpaces = [...spaces, newSpace];
@@ -1407,6 +1493,25 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
         setSpacesCache(prev => ({ ...prev, [selectedChatForSpaces.chatId]: updatedSpaces }));
         setSelectedChatForSpaces(prev => ({ ...prev, spaces: updatedSpaces }));
       } else {
+        // Fallback: check if the space was indeed created on the backend
+        try {
+          const checkRes = await fetch(`${API}/user/get-space/${selectedChatForSpaces.chatId}`, {
+            headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" }
+          });
+          if (checkRes.ok) {
+            const data = await checkRes.json();
+            if (Array.isArray(data) && data.some(s => s.spaceId === newSpaceId)) {
+              const fetchedSpaces = data.map(s => ({
+                id: s.spaceId,
+                name: s.spaceName,
+                icon: s.spaceId === 0 ? "💬" : "📌"
+              }));
+              setSpacesCache(prev => ({ ...prev, [selectedChatForSpaces.chatId]: fetchedSpaces }));
+              setSelectedChatForSpaces(prev => ({ ...prev, spaces: fetchedSpaces }));
+              return;
+            }
+          }
+        } catch (e) {}
         alert("Failed to create space");
       }
     } catch (err) {
@@ -1423,6 +1528,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
     navigate(`/chat/${chat.chatId}?space=${space.id}`);
     update(chat.chatId);
     messageStore.setActivechatbox(chat.chatId);
+    messageStore.setActiveSpace(space.id);
     localStorage.setItem(chat.chatId, JSON.stringify(chat));
     // Zero only the specific space count
     messageStore.setCount(chat.chatId, space.id);
@@ -1721,7 +1827,9 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                  spaceLastMsg = lMsg ? (lMsg.msgid || lMsg.tempmsgid || lMsg.timestamp ? lMsg : lMsg[0]) : null;
               }
 
-              const spaceCount = messageStore.getSpaceCount(selectedChatForSpaces.chatId, space.id);
+              const spaceCount = (count[selectedChatForSpaces.chatId] && typeof count[selectedChatForSpaces.chatId] === 'object')
+                ? (count[selectedChatForSpaces.chatId][space.id] || 0)
+                : messageStore.getSpaceCount(selectedChatForSpaces.chatId, space.id);
 
               const spaceChat = {
                 ...selectedChatForSpaces,
@@ -2045,7 +2153,25 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
               
               const lMsg = lastMessages[chat.chatId];
               const fallbackMsg = lMsg ? (lMsg.msgid || lMsg.tempmsgid || lMsg.timestamp ? lMsg : lMsg[0]) : null;
-              const msg = storeMsg || fallbackMsg;
+              const apiLastMsg = chat.lastMessage ? {
+                content: chat.lastMessage,
+                type: chat.lastMessageType || 'text',
+                sendername: chat.lastMessageSender,
+                userid: chat.lastMessageSenderId,
+                timestamp: chat.lastMessageTimestamp,
+                _ts: chat.lastMessageTimestamp ? new Date(chat.lastMessageTimestamp).getTime() : 0,
+                msgid: chat.lastMessageId
+              } : null;
+              // Pick the strictly latest message among storeMsg, fallbackMsg, and apiLastMsg
+              const candidates = [storeMsg, fallbackMsg, apiLastMsg].filter(Boolean);
+              let msg = null;
+              if (candidates.length > 0) {
+                msg = candidates.reduce((latest, current) => {
+                  const latestTs = resolveTimestamp(latest);
+                  const currentTs = resolveTimestamp(current);
+                  return currentTs >= latestTs ? current : latest;
+                }, candidates[0]);
+              }
 
               const chatCount = resolveTotalCount(count[chat.chatId]);
               const isPinned = pinnedSet.has(chat.chatId);

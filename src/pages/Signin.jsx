@@ -204,10 +204,46 @@ function Signin() {
     return { score: 4, label: "Strong", color: "var(--success-color)", percent: 100 };
   };
 
+  // Email Domain Validation Helper (.com, .in, .edu, etc.)
+  const isValidEmailDomain = (email) => {
+    if (!email || typeof email !== 'string') return false;
+    const trimmed = email.trim().toLowerCase();
+
+    // Standard email structure check: localpart@domain.tld
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(trimmed)) return false;
+
+    const parts = trimmed.split('@');
+    if (parts.length !== 2) return false;
+
+    const domain = parts[1];
+    if (domain.startsWith('.') || domain.endsWith('.') || domain.startsWith('-') || domain.endsWith('-')) {
+      return false;
+    }
+
+    const domainParts = domain.split('.');
+    if (domainParts.length < 2) return false;
+
+    // Top-Level Domain (TLD) must be at least 2 alphabet characters (e.g., com, in, edu, org, etc.)
+    const tld = domainParts[domainParts.length - 1];
+    if (!tld || tld.length < 2 || !/^[a-zA-Z]+$/.test(tld)) {
+      return false;
+    }
+
+    for (const part of domainParts) {
+      if (!part || !/^[a-zA-Z0-9]+(-[a-zA-Z0-9]+)*$/.test(part)) {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
   const passwordStrength = getPasswordStrength(form.password);
 
   const usernameCheck = useUsernameCheck({
     username: form.username,
+    minLength: 8, // Username must be more than 7 characters
     debounceMs: 400
   });
 
@@ -217,13 +253,25 @@ function Signin() {
     setErrorMsg("");
     setInfoMsg("");
 
-    if (!form.email.trim() || !form.email.includes("@")) {
-      setErrorMsg("Please enter a valid email address.");
+    // 1. Check if email has a valid domain like .com, .in, .edu before server API call
+    const cleanEmail = form.email.trim().toLowerCase();
+    if (!cleanEmail) {
+      setErrorMsg("Please enter your email address.");
+      return;
+    }
+    if (!isValidEmailDomain(cleanEmail)) {
+      setErrorMsg("Please enter an email with a valid domain (e.g., .com, .in, .edu).");
       return;
     }
 
-    if (!form.username.trim()) {
+    // 2. Check if username is more than 7 characters before server API call
+    const cleanUsername = form.username.trim().toLowerCase();
+    if (!cleanUsername) {
       setErrorMsg("Please choose a username.");
+      return;
+    }
+    if (cleanUsername.length <= 7) {
+      setErrorMsg("Username must be more than 7 characters.");
       return;
     }
 
@@ -234,6 +282,17 @@ function Signin() {
 
     if (usernameCheck.isChecking) {
       setErrorMsg("Validating username availability, please wait a moment...");
+      return;
+    }
+
+    // 3. Check if display name is more than 5 characters before server API call
+    const cleanDisplayName = form.displayName.trim();
+    if (!cleanDisplayName) {
+      setErrorMsg("Please enter a display name (more than 5 characters).");
+      return;
+    }
+    if (cleanDisplayName.length <= 5) {
+      setErrorMsg("Display name must be more than 5 characters.");
       return;
     }
 
@@ -254,12 +313,10 @@ function Signin() {
 
     setLoading(true);
 
-    const cleanUsername = form.username.trim().toLowerCase();
-    const effectiveDisplayName = form.displayName.trim() ? form.displayName.trim() : cleanUsername;
     const payload = {
-      email: form.email.trim().toLowerCase(),
+      email: cleanEmail,
       username: cleanUsername,
-      displayName: effectiveDisplayName,
+      displayName: cleanDisplayName,
       password: form.password,
     };
 
@@ -270,7 +327,7 @@ function Signin() {
       if (data?.status === "success" || res.status === 200 || res.status === 201) {
         savePendingOtpSession({
           flow: 'SIGNUP',
-          payload: { email: form.email.trim().toLowerCase(), ...payload },
+          payload: { email: cleanEmail, ...payload },
           promptMessage: `Enter the 6-digit verification code sent to ${form.email}`
         });
         setStep(2);
@@ -292,14 +349,31 @@ function Signin() {
   const handleResendOtp = async () => {
     setErrorMsg("");
     setInfoMsg("");
-    setResending(true);
+
+    const cleanEmail = form.email.trim().toLowerCase();
+    if (!cleanEmail || !isValidEmailDomain(cleanEmail)) {
+      setErrorMsg("Please enter an email with a valid domain (e.g., .com, .in, .edu).");
+      return;
+    }
 
     const cleanUsername = form.username.trim().toLowerCase();
-    const effectiveDisplayName = form.displayName.trim() ? form.displayName.trim() : cleanUsername;
+    if (!cleanUsername || cleanUsername.length <= 7) {
+      setErrorMsg("Username must be more than 7 characters.");
+      return;
+    }
+
+    const cleanDisplayName = form.displayName.trim();
+    if (!cleanDisplayName || cleanDisplayName.length <= 5) {
+      setErrorMsg("Display name must be more than 5 characters.");
+      return;
+    }
+
+    setResending(true);
+
     const payload = {
-      email: form.email.trim().toLowerCase(),
+      email: cleanEmail,
       username: cleanUsername,
-      displayName: effectiveDisplayName,
+      displayName: cleanDisplayName,
       password: form.password,
     };
 
@@ -415,9 +489,17 @@ function Signin() {
                     value={form.email}
                     onChange={handleChange}
                     placeholder="yokesh@letschat.com"
-                    style={styles.input}
+                    style={{
+                      ...styles.input,
+                      borderColor: (form.email.trim().length > 0 && form.email.includes('@') && !isValidEmailDomain(form.email)) ? 'var(--danger-color)' : undefined
+                    }}
                   />
                 </div>
+                {form.email.trim().length > 0 && form.email.includes('@') && !isValidEmailDomain(form.email) && (
+                  <span style={{ fontSize: "12px", color: "var(--danger-color)", marginTop: "4px", display: "block", fontWeight: "500" }}>
+                    Domain must end with a valid extension (e.g., .com, .in, .edu)
+                  </span>
+                )}
               </div>
 
               {/* Username Callout Note */}
@@ -448,11 +530,11 @@ function Signin() {
                     placeholder="yokesh_2513"
                     style={{
                       ...styles.input,
-                      borderColor: (usernameCheck.status === 'block' && form.username.trim().length >= 3) ? 'var(--danger-color)' : undefined
+                      borderColor: (usernameCheck.status === 'block' && form.username.trim().length > 0) ? 'var(--danger-color)' : undefined
                     }}
                   />
                 </div>
-                {usernameCheck.status === 'block' && form.username.trim().length >= 3 && (
+                {usernameCheck.status === 'block' && form.username.trim().length > 0 && (
                   <span style={{ fontSize: "12px", color: "var(--danger-color)", marginTop: "4px", display: "block", fontWeight: "500" }}>
                     {usernameCheck.message || "Username is already taken"}
                   </span>
@@ -468,19 +550,28 @@ function Signin() {
               <div style={styles.fieldGroup}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <label style={styles.label}>Display Name</label>
-                  <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Optional (defaults to @username)</span>
+                  <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>More than 5 characters</span>
                 </div>
                 <div style={styles.inputWrapper}>
                   <input
                     type="text"
                     name="displayName"
+                    required
                     value={form.displayName}
                     onChange={handleChange}
                     placeholder="e.g. Yokeshwar Ravindhiran"
                     maxLength={32}
-                    style={styles.input}
+                    style={{
+                      ...styles.input,
+                      borderColor: (form.displayName.trim().length > 0 && form.displayName.trim().length <= 5) ? 'var(--danger-color)' : undefined
+                    }}
                   />
                 </div>
+                {form.displayName.trim().length > 0 && form.displayName.trim().length <= 5 && (
+                  <span style={{ fontSize: "12px", color: "var(--danger-color)", marginTop: "4px", display: "block", fontWeight: "500" }}>
+                    Display name must be more than 5 characters ({form.displayName.trim().length}/6)
+                  </span>
+                )}
               </div>
 
               {/* Password Input with Strength Checker & Side-by-Side Weightlifter */}

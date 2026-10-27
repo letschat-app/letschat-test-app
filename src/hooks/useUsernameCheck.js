@@ -23,7 +23,8 @@ export const useUsernameCheck = ({
   username = '',
   originalName = '',
   excludeUserId = '',
-  debounceMs = 400
+  debounceMs = 400,
+  minLength = 3
 } = {}) => {
   const [status, setStatus] = useState('idle'); // 'idle' | 'checking' | 'allow' | 'warn' | 'block'
   const [decision, setDecision] = useState(null); // 'ALLOW' | 'WARN' | 'BLOCK' | null
@@ -179,12 +180,12 @@ export const useUsernameCheck = ({
       return;
     }
 
-    // 3. Client-side length rule (< 3 characters)
-    if (trimmed.length < 3) {
+    // 3. Client-side length rule (< minLength characters)
+    if (trimmed.length < minLength) {
       setStatus('block');
       setDecision('BLOCK');
       setScore(null);
-      setMessage('Username must be at least 3 characters');
+      setMessage(minLength > 3 ? `Username must be more than ${minLength - 1} characters` : 'Username must be at least 3 characters');
       setIsChecking(false);
       return;
     }
@@ -261,16 +262,16 @@ export const useUsernameCheck = ({
       if (timerRef.current) clearTimeout(timerRef.current);
       if (abortControllerRef.current) abortControllerRef.current.abort();
     };
-  }, [trimmed, isUnchanged, debounceMs, checkApi, excludeUserId]);
+  }, [trimmed, isUnchanged, debounceMs, checkApi, excludeUserId, minLength]);
 
   // Can the user proceed?
   const canProceed = Boolean(
     !isChecking &&
     (isUnchanged || status === 'allow' || status === 'warn') &&
-    trimmed.length >= 3
+    trimmed.length >= minLength
   );
 
-  const isBlocked = Boolean(status === 'block' || (!isUnchanged && trimmed.length > 0 && trimmed.length < 3));
+  const isBlocked = Boolean(status === 'block' || (!isUnchanged && trimmed.length > 0 && trimmed.length < minLength));
 
   return {
     status,        // 'idle' | 'checking' | 'allow' | 'warn' | 'block'

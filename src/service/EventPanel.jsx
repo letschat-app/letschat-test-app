@@ -556,6 +556,7 @@ let newDate = parsedDate;
     tempid:msg.tempmsgid,
     showFull: false,
     isSimulation: msg.isSimulation,
+    isAutoDetected: true,
   };
 
   console.log("Final newEvent object:", JSON.stringify(newEvent, null, 2));

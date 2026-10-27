@@ -29,7 +29,12 @@ const messaging = firebase.messaging();
 const API = "https://letschat-backend-69jf.onrender.com/api"; 
 const DB_VERSION = 16;
 
-// ─── Message Handler: User-Controlled Activation ─────────────────────────────
+// ─── Service Worker Lifecycle & Auto-Activation ─────────────────────────────
+self.addEventListener('install', (event) => {
+  console.log('[SW] New Service Worker installing — calling skipWaiting()');
+  self.skipWaiting();
+});
+
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') {
     console.log('[SW] Received SKIP_WAITING — activating now');
@@ -38,7 +43,19 @@ self.addEventListener('message', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    (async () => {
+      await self.clients.claim();
+      console.log('[SW] Activated & claimed clients — broadcasting SW_ACTIVATED');
+      const windowClients = await self.clients.matchAll({ type: 'window' });
+      for (const client of windowClients) {
+        client.postMessage({
+          type: 'SW_ACTIVATED',
+          version: Date.now()
+        });
+      }
+    })()
+  );
 });
 
 // ─── Web Share Target POST Handler ───────────────────────────────────────────

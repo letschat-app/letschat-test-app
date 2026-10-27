@@ -979,27 +979,27 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{
               width: '36px', height: '36px', borderRadius: '10px',
-              backgroundColor: pinned ? 'rgba(168, 85, 247, 0.15)' : 'var(--bg-hover)',
+              backgroundColor: pinned ? 'var(--accent-tint)' : 'var(--bg-hover)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: pinned ? '#a855f7' : 'var(--text-secondary)'
+              color: pinned ? 'var(--accent-text)' : 'var(--text-secondary)'
             }}>
               <Zap size={18} />
             </div>
             <div>
-              <div style={{ fontSize: '15px', fontWeight: '600', color: '#f3f4f6' }}>Pin to Quick Access</div>
+              <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-primary)' }}>Pin to Quick Access</div>
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{pinned ? 'Available on mobile radial menu' : 'Add to quick floating navigation'}</div>
             </div>
           </div>
           <div style={{
             width: '44px', height: '24px', borderRadius: '12px',
-            backgroundColor: pinned ? '#a855f7' : 'var(--border-color)',
+            backgroundColor: pinned ? 'var(--accent-solid)' : 'var(--border-color)',
             position: 'relative', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
             border: '1px solid var(--border-color)'
           }}>
             <div style={{
               position: 'absolute', top: '2px', left: pinned ? '22px' : '2px',
               width: '18px', height: '18px', borderRadius: '50%',
-              backgroundColor: '#fff', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              backgroundColor: 'var(--text-on-accent)', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
               boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
             }} />
           </div>

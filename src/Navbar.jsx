@@ -121,14 +121,39 @@ function Navbar() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Always reset bottom nav to visible on page navigation
+  useEffect(() => {
+    setBottomNavVisible(true);
+    lastScrollY.current = 0;
+  }, [location.pathname]);
+
   // Scroll to hide/show bottom nav
   useEffect(() => {
     const handleScroll = (e) => {
       const target = e.target;
       // Only react to scroll events from content divs (not from inputs, etc.)
       if (!target || target === document) return;
+
       const currentY = target.scrollTop ?? 0;
-      if (currentY > lastScrollY.current + 10) {
+      const scrollHeight = target.scrollHeight ?? 0;
+      const clientHeight = target.clientHeight ?? 0;
+      const maxScroll = scrollHeight - clientHeight;
+
+      // Do not hide bottom navbar if chat count/content is not enough to scroll down
+      if (maxScroll <= 150) {
+        setBottomNavVisible(true);
+        lastScrollY.current = currentY;
+        return;
+      }
+
+      // If near top or rubber-banding, always show
+      if (currentY <= 30) {
+        setBottomNavVisible(true);
+        lastScrollY.current = currentY;
+        return;
+      }
+
+      if (currentY > lastScrollY.current + 15 && currentY > 60) {
         setBottomNavVisible(false);
       } else if (currentY < lastScrollY.current - 10) {
         setBottomNavVisible(true);
@@ -555,9 +580,9 @@ function Navbar() {
       </nav>
 
       {/* ── Mobile Bottom Nav (Main Links) ── */}
-      {bottomNavVisible && (
-        <nav style={mobileBottomNavStyle(bottomNavVisible)}>
-          {mobileBottomPages.map((page) => (
+      {['/chats', '/pulses', '/rooms', '/calendar'].includes(location.pathname) && (
+      <nav style={mobileBottomNavStyle(bottomNavVisible)}>
+        {mobileBottomPages.map((page) => (
             <button
               key={page.path}
               onClick={() => {
@@ -936,17 +961,15 @@ const mobileBottomNavStyle = (visible) => ({
   display: 'flex',
   justifyContent: 'space-around',
   alignItems: 'center',
-  padding: visible ? '6px 0' : '0',
-  height: visible ? 'auto' : '0',
-  overflow: 'hidden',
+  padding: '6px 0',
   zIndex: 99,
   boxSizing: 'border-box',
   backdropFilter: 'blur(12px)',
   backgroundColor: 'var(--bg-secondary)',
   transform: visible ? 'translateY(0)' : 'translateY(100%)',
-  transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease',
   pointerEvents: visible ? 'auto' : 'none',
-  visibility: visible ? 'visible' : 'hidden',
+  opacity: visible ? 1 : 0,
 });
 
 const topRowStyle = {

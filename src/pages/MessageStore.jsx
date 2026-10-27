@@ -18,11 +18,34 @@ function getHigherStatus(currentStatus, incomingStatus) {
 }
 
 // MessageStore.js
-import { saveMessageToDB, getMessagesFromDB, getUnreadMessagesForChat, getLatestMessagesForAllSpaces, initDB } from "../service/db";
+import { saveMessageToDB, getMessagesFromDB, getUnreadMessagesForChat, getLatestMessagesForAllSpaces, getUnreadCountsBySpaceFromDB, initDB } from "../service/db";
 
 const messageStore = {
   messages: {},
   new: {},
+  hydrateUnreadCounts() {
+    try {
+      const stored = JSON.parse(localStorage.getItem('messageCounts') || '{}');
+      if (stored && typeof stored === 'object') {
+        this.new = { ...stored, ...this.new };
+      }
+    } catch {}
+    getUnreadCountsBySpaceFromDB().then(idbCounts => {
+      if (idbCounts && Object.keys(idbCounts).length > 0) {
+        Object.keys(idbCounts).forEach(cid => {
+          if (!this.new[cid] || typeof this.new[cid] !== 'object') {
+            this.new[cid] = idbCounts[cid];
+          } else {
+            this.new[cid] = { ...this.new[cid], ...idbCounts[cid] };
+          }
+        });
+        try {
+          localStorage.setItem('messageCounts', JSON.stringify(this.new));
+        } catch {}
+        this.notifyListeners();
+      }
+    }).catch(e => console.warn('[MessageStore] IDB unread counts hydration failed:', e));
+  },
   listeners: [],
   activeChat: null,
   volatileQueue: [],
@@ -62,6 +85,8 @@ const messageStore = {
       this.messages[chatid] = [];
     }
 
+    let hasAnyChange = false;
+
     if (msgs && msgs.length > 0) {
       const reversedMsgs = [...msgs].reverse();
       const existingIds = new Set(this.messages[chatid].map(m => m.msgid || m.tempmsgid || m.timestamp));
@@ -81,21 +106,32 @@ const messageStore = {
 
         const idToCheck = msg.msgid || msg.tempmsgid || msg.timestamp;
         
-        // Very basic differential check: if not exists, add it.
-        // (For full sync, you'd also check if existing msgs changed status/reactions,
-        // but since this is load-more history, new items are most critical)
+        // Silently update in IndexedDB for every received message
+        saveMessageToDB(msg, idToCheck).catch(err => console.error(err));
+
         if (!existingIds.has(idToCheck)) {
           freshMsgs.push(msg);
-          saveMessageToDB(msg, idToCheck).catch(err => console.error(err));
+          hasAnyChange = true;
         } else {
-          // If it exists, update it in DB and Memory if needed
+          // If it exists in memory, check if any field changed
           const existingMsgIndex = this.messages[chatid].findIndex(m => (m.msgid || m.tempmsgid || m.timestamp) === idToCheck);
           if (existingMsgIndex !== -1) {
             const existingMsg = this.messages[chatid][existingMsgIndex];
-            // Update if status changed or it's a newer version
-            if (existingMsg.status !== msg.status || JSON.stringify(existingMsg.reactions) !== JSON.stringify(msg.reactions)) {
+            const isChanged = 
+              existingMsg.status !== msg.status ||
+              existingMsg.isdeleted !== msg.isdeleted ||
+              existingMsg.isdeletedeone !== msg.isdeletedeone ||
+              existingMsg.revived !== msg.revived ||
+              existingMsg.delivertime !== msg.delivertime ||
+              existingMsg.readtime !== msg.readtime ||
+              existingMsg.mediaopenedtime !== msg.mediaopenedtime ||
+              existingMsg.content !== msg.content ||
+              JSON.stringify(existingMsg.reactions) !== JSON.stringify(msg.reactions) ||
+              JSON.stringify(existingMsg.poll) !== JSON.stringify(msg.poll);
+
+            if (isChanged) {
+              hasAnyChange = true;
               this.messages[chatid][existingMsgIndex] = { ...existingMsg, ...msg };
-              saveMessageToDB(this.messages[chatid][existingMsgIndex], idToCheck).catch(err => console.error(err));
             }
           }
         }
@@ -107,12 +143,13 @@ const messageStore = {
       }
     }
 
-    // Single notification for the batch
+    // Single notification for the batch: carries hasChanges flag for UI
     this.notifyListeners({ 
       type: 'batch_loaded', 
       chatid, 
       hasmore: hasmore === undefined ? true : hasmore, 
-      count: msgs ? msgs.length : 0 
+      count: msgs ? msgs.length : 0,
+      hasChanges: hasAnyChange
     });
   },
 
@@ -454,17 +491,17 @@ const messageStore = {
         return;
       }
 
-      if (!isold && !msg.tempmsgid && (this.activeChat != msg.chatid)) {
-        const sId = msg.spaceid || 0;
-        if (isold === false) {
-          if (!this.new[chatid]) this.new[chatid] = {};
-          this.new[chatid][sId] = (this.new[chatid][sId] || 0) + 1;
-        } else {
-          if (this.isNew(msg.timestamp, this.getChatEpoch(msg.chatid))) {
-            if (!this.new[chatid]) this.new[chatid] = {};
-            this.new[chatid][sId] = (this.new[chatid][sId] || 0) + 1;
-          }
+      const sId = msg.spaceid !== undefined ? Number(msg.spaceid) : 0;
+      const isCurrentView = (this.activeChat != null && String(this.activeChat) === String(chatid)) &&
+                            (this.activeSpace != null && Number(this.activeSpace) === Number(sId));
+      if (!isold && !msg.tempmsgid && !isCurrentView) {
+        if (typeof this.new[chatid] !== 'object' || this.new[chatid] === null) {
+          this.new[chatid] = {};
         }
+        this.new[chatid][sId] = (this.new[chatid][sId] || 0) + 1;
+        try {
+          localStorage.setItem('messageCounts', JSON.stringify(this.new));
+        } catch {}
       }
       if (this.parseCallback) {
         try {
@@ -554,13 +591,17 @@ const messageStore = {
 
   setCount(chatid, spaceid = null) {
     if (!this.new) this.new = {};
-    if (spaceid !== null) {
-      if (this.new[chatid] && typeof this.new[chatid] === 'object') {
-        this.new[chatid][spaceid] = 0;
+    if (spaceid !== null && spaceid !== undefined) {
+      if (typeof this.new[chatid] !== 'object' || this.new[chatid] === null) {
+        this.new[chatid] = {};
       }
+      this.new[chatid][spaceid] = 0;
     } else {
       this.new[chatid] = 0;
     }
+    try {
+      localStorage.setItem('messageCounts', JSON.stringify(this.new));
+    } catch {}
     this.notifyListeners();
     return this.new;
   },
@@ -684,7 +725,7 @@ const messageStore = {
   },
 
   handleBatchAck(batchAck) {
-    const { chatid, msgids, status, timestamp } = batchAck;
+    const { chatid, msgids, status, timestamp, read_users, delivered_users, pending_users } = batchAck;
     if (!msgids || !Array.isArray(msgids) || msgids.length === 0) return;
 
     const targetChatId = chatid || (this.messages ? Object.keys(this.messages).find(cid => {
@@ -700,12 +741,41 @@ const messageStore = {
       const idx = messages.findIndex(m => m.msgid === id || m.tempmsgid === id);
       if (idx !== -1) {
         const existing = messages[idx];
+
+        let updatedReadUsers = existing.read_users ? [...existing.read_users] : [];
+        if (Array.isArray(read_users)) {
+          const rSet = new Set(updatedReadUsers);
+          read_users.forEach(u => rSet.add(u));
+          updatedReadUsers = Array.from(rSet);
+        }
+
+        let updatedDeliveredUsers = existing.delivered_users ? [...existing.delivered_users] : [];
+        if (Array.isArray(delivered_users)) {
+          const dSet = new Set(updatedDeliveredUsers);
+          delivered_users.forEach(u => dSet.add(u));
+          updatedDeliveredUsers = Array.from(dSet).filter(u => !updatedReadUsers.includes(u));
+        } else {
+          updatedDeliveredUsers = updatedDeliveredUsers.filter(u => !updatedReadUsers.includes(u));
+        }
+
+        let updatedPendingUsers = existing.pending_users ? [...existing.pending_users] : [];
+        if (Array.isArray(pending_users)) {
+          const pSet = new Set(updatedPendingUsers);
+          pending_users.forEach(u => pSet.add(u));
+          updatedPendingUsers = Array.from(pSet).filter(u => !updatedReadUsers.includes(u) && !updatedDeliveredUsers.includes(u));
+        } else {
+          updatedPendingUsers = updatedPendingUsers.filter(u => !updatedReadUsers.includes(u) && !updatedDeliveredUsers.includes(u));
+        }
+
         messages[idx] = {
           ...existing,
           status: getHigherStatus(existing.status, status),
           ...(timestamp && status === 'delivered' ? { delivertime: timestamp } : {}),
-          ...(timestamp && status === 'read' ? { readtime: timestamp } : {}),
-          ...(timestamp && status === 'media-opened' ? { mediaopenedtime: timestamp } : {})
+          ...(timestamp && (status === 'read' || status === 'media-opened') ? { readtime: timestamp } : {}),
+          ...(timestamp && status === 'media-opened' ? { mediaopenedtime: timestamp } : {}),
+          read_users: updatedReadUsers,
+          delivered_users: updatedDeliveredUsers,
+          pending_users: updatedPendingUsers
         };
         updatedCount++;
       }
@@ -716,7 +786,8 @@ const messageStore = {
         chatid: targetChatId,
         type: 'batch_ack_updated',
         status,
-        msgids
+        msgids,
+        read_users
       });
     }
   },
@@ -981,4 +1052,5 @@ const messageStore = {
   }
 };
 
+messageStore.hydrateUnreadCounts();
 export default messageStore;

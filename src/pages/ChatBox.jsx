@@ -8,7 +8,7 @@ import { getsocket, initWebsocket, sendSafe, sendMediaOpenedEvent } from "../ser
 import messageStore from "./MessageStore";
 import StreakBadge from "../components/pulse/StreakBadge";
 import { getPulseFromStore, pulsePreviewCache } from '../service/PulseMediaCache';
-import { initDB, saveUsersBatchToDB, saveGroupMembersToDB, markMessagesAsOldInDB, getGroupMembersFromDB, isChatMuted, toggleMuteChat } from '../service/db';
+import { initDB, saveUsersBatchToDB, saveGroupMembersToDB, markMessagesAsOldInDB, markSpaceMessagesAsOldInDB, getGroupMembersFromDB, isChatMuted, toggleMuteChat } from '../service/db';
 import { useNotifications } from '../hooks/useNotifications';
 import { useTheme } from '../context/ThemeContext';
 import {
@@ -393,6 +393,9 @@ const ReactorsModal = ({ reactionInfo, onClose, onSendReaction, isMobile }) => {
   );
 };
 
+// Module-level throttle tracker: records last sync timestamp per `${chatId}_${spaceId}`
+const lastChatSyncTimes = {};
+
 const ChatBox = () => {
   const { chatid } = useParams();
   const navigate = useNavigate();
@@ -469,6 +472,15 @@ const ChatBox = () => {
   const [activeMentions, setActiveMentions] = useState([]);
   const [spaceNames, setSpaceNames] = useState({});
   const [isQuickAccessPinned, setIsQuickAccessPinned] = useState(false);
+  const [isSyncingMessages, setIsSyncingMessages] = useState(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (chatid) {
@@ -1264,6 +1276,118 @@ const ChatBox = () => {
     }
   };
 
+  const syncChatOnOpen = async (targetChatId, targetSpaceId) => {
+    if (!targetChatId || targetChatId === SIMULATION_ID || targetChatId === "BROADCAST_SYSTEM") return;
+
+    const sId = Number(targetSpaceId || 0);
+    const syncKey = `${targetChatId}_${sId}`;
+    const now = Date.now();
+    const lastSync = lastChatSyncTimes[syncKey] || 0;
+    if (now - lastSync < 60000) {
+      console.log(`[ChatBox] Skipping sync for ${syncKey}, last synced ${Math.round((now - lastSync) / 1000)}s ago`);
+      return;
+    }
+    lastChatSyncTimes[syncKey] = now;
+
+    if (isMountedRef.current) setIsSyncingMessages(true);
+
+    try {
+      // Find latest message timestamp in store for targetChatId and sId
+      let cursorTimestamp = null;
+      const existing = (messageStore.getMessages(targetChatId) || []).filter(m => {
+        const msgSpace = m.spaceid !== undefined ? m.spaceid : (m.spaceId !== undefined ? m.spaceId : 0);
+        return Number(msgSpace) === sId;
+      });
+
+      if (existing.length > 0) {
+        for (const m of existing) {
+          if (m.timestamp && (!cursorTimestamp || new Date(m.timestamp) > new Date(cursorTimestamp))) {
+            cursorTimestamp = m.timestamp;
+          }
+        }
+      }
+
+      let hasMore = true;
+      while (hasMore) {
+        let url = `${API}/user/chatbox/${encodeURIComponent(targetChatId)}/sync-messages?spaceId=${sId}`;
+        if (cursorTimestamp) {
+          url += `&lastTimestamp=${encodeURIComponent(cursorTimestamp)}`;
+        }
+
+        const res = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Id': currentUserId || localStorage.getItem('userid'),
+            'ngrok-skip-browser-warning': 'true'
+          }
+        });
+
+        if (!res.ok) {
+          console.warn('[ChatBox] sync-messages failed with status:', res.status);
+          break;
+        }
+
+        const data = await res.json();
+        if (!data || !data.msgs) {
+          break;
+        }
+
+        data.usermsgId = data.spaceId;
+        messageStore.handleBatch(data);
+
+        // Refresh event or poll data if present
+        if (Array.isArray(data.msgs) && data.msgs.length > 0) {
+          data.msgs.forEach(m => {
+            if (m.poll && messageStore.handlePollUpdate) {
+              try {
+                messageStore.handlePollUpdate({
+                  ...m.poll,
+                  chatid: targetChatId,
+                  msgid: m.msgid || m.messageId || m.tempmsgid
+                });
+              } catch (e) {
+                console.warn('[ChatBox] handlePollUpdate error:', e);
+              }
+            }
+            if (m.content && messageStore.parseCallback) {
+              try {
+                messageStore.parseCallback({
+                  ...m,
+                  chatid: targetChatId,
+                  msgid: m.msgid || m.messageId || m.tempmsgid
+                });
+              } catch (e) {
+                console.warn('[ChatBox] parseCallback error:', e);
+              }
+            }
+          });
+          // Dispatch group calendar & event refresh
+          window.dispatchEvent(new CustomEvent('letschat_refresh_events'));
+          window.dispatchEvent(new CustomEvent('letschat_event_sync'));
+        }
+
+        if (data.hasmore === true && data.msgs && data.msgs.length > 0) {
+          const lastMsg = data.msgs[data.msgs.length - 1];
+          if (lastMsg && lastMsg.timestamp) {
+            cursorTimestamp = lastMsg.timestamp;
+            hasMore = true;
+          } else {
+            hasMore = false;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+    } catch (err) {
+      console.warn('[ChatBox] syncChatOnOpen error:', err);
+    } finally {
+      if (isMountedRef.current) {
+        setIsSyncingMessages(false);
+      }
+    }
+  };
+
   let socket = getsocket();
 
   useEffect(() => {
@@ -1298,7 +1422,7 @@ const ChatBox = () => {
 
       // Mark all isold:false messages as old in IDB only.
       // This ensures that on the next session, these messages are treated as history.
-      markMessagesAsOldInDB(chatid).catch(err =>
+      markSpaceMessagesAsOldInDB(chatid, activeSpace).catch(err =>
         console.warn('[ChatBox] markMessagesAsOldInDB failed:', err)
       );
     });
@@ -2807,17 +2931,22 @@ const ChatBox = () => {
 
 
   const formatTime12Hour = (timestamp, showSeconds = false) => {
-    const date = new Date(timestamp);
-    const hours = date.getHours() % 12 || 12; // Convert to 12-hour format
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    const ampm = date.getHours() >= 12 ? 'PM' : 'AM';
-
-    if (showSeconds) {
-      const seconds = date.getSeconds().toString().padStart(2, '0');
-      return `${hours}:${minutes}:${seconds} ${ampm}`;
+    if (!timestamp) return '';
+    try {
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) return String(timestamp);
+      return new Intl.DateTimeFormat('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        hour: 'numeric',
+        minute: '2-digit',
+        second: showSeconds ? '2-digit' : undefined,
+        hour12: true
+      }).format(date);
+    } catch (e) {
+      return String(timestamp);
     }
-    return `${hours}:${minutes} ${ampm}`;
   };
+
   const [visited, setVisited] = useState(() => {
     return JSON.parse(localStorage.getItem("visited") || "{}");
   });
@@ -3332,7 +3461,43 @@ const ChatBox = () => {
   const [EventRecived, setEventRecived] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false)
-  const [showCancelDialog, setShowCancelDialog] = useState(false)
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const handleConfirmCancelEvent = async () => {
+    setShowCancelDialog(false);
+    setShowEventModal(false);
+    setHasChanges(false);
+
+    const eventToCancel = SelectedEvent || draftEvent;
+    if (!eventToCancel) return;
+
+    try {
+      const payload = {
+        groupEventId: eventToCancel.groupEventId || eventToCancel.id,
+        eventId: eventToCancel.eventId || eventToCancel.id,
+        chatId: chatid,
+        eventTitle: eventToCancel.eventTitle || eventToCancel.title,
+        action: 'cancelled',
+        startTime: eventToCancel.startTime,
+        endTime: eventToCancel.endTime,
+        scope: eventToCancel.scope || 'ALL'
+      };
+
+      await fetch(`${API}/user/event/update`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Id': currentUserId,
+          'ngrok-skip-browser-warning': 'true'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      window.dispatchEvent(new CustomEvent('letschat_refresh_events'));
+    } catch (e) {
+      console.warn('Failed to cancel event:', e);
+    }
+  };
+
   const [draftEvent, setDraftEvent] = useState(null);
 
   const saveChanges = () => {
@@ -3508,12 +3673,72 @@ const ChatBox = () => {
     } catch (err) {}
   };
 
+  const isEventBannerPin = useCallback((m) => {
+    if (!m) return false;
+    if (m.type === "event-banner-pin") return true;
+    if (m.type === "banner-pin" || m.type === "banner") {
+      if (m.eventid || m.groupEventId) return true;
+      if (typeof m.content === 'string') {
+        const lower = m.content.toLowerCase();
+        if (lower.includes("scheduled") || lower.includes("postponed") || lower.includes("cancelled")) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }, []);
+
   const activeBannerPins = useMemo(() => {
     if (!messages || messages.length === 0) return [];
     return messages
-      .filter((m) => m && m.type === "banner-pin" && isWithin24Hours(m.timestamp) && !dismissedBannerPinIds.includes(m.msgid || m.tempmsgid))
+      .filter((m) => {
+        if (!m || dismissedBannerPinIds.includes(m.msgid || m.tempmsgid)) return false;
+        // Event banner pins: stay pinned indefinitely ("no time when click remove X it goes")
+        if (isEventBannerPin(m)) {
+          return true;
+        }
+        // General banner pins (e.g. name changes): 24-hour expiration
+        if (m.type === "banner-pin" && isWithin24Hours(m.timestamp)) {
+          return true;
+        }
+        return false;
+      })
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  }, [messages, isWithin24Hours, dismissedBannerPinIds]);
+  }, [messages, isWithin24Hours, dismissedBannerPinIds, isEventBannerPin]);
+
+  const handleBannerPinClick = useCallback(async (pin) => {
+    if (!pin) return;
+    if (isEventBannerPin(pin)) {
+      const eventId = pin.repliedto || pin.repliedTo || pin.eventid || pin.groupEventId;
+      setShowGroupCalendar(true);
+      if (chatid) {
+        try {
+          const res = await fetch(`${API}/user/event/group/${chatid}`, {
+            headers: { 'User-Id': currentUserId, 'ngrok-skip-browser-warning': 'true' }
+          });
+          if (res.ok) {
+            const groupEvents = await res.json();
+            let found = null;
+            if (eventId) {
+              found = groupEvents.find(e => e.groupEventId === eventId || String(e.eventId) === String(eventId));
+            }
+            if (!found && pin.content) {
+              const cleaned = (pin.content.split('/')[0] || pin.content).toLowerCase();
+              found = groupEvents.find(e => e.eventTitle && cleaned.includes(e.eventTitle.toLowerCase()));
+            }
+            if (found) {
+              setSelectedEvent({ ...found, chatid, isGroup: true });
+              setShowEventModal(true);
+            }
+          }
+        } catch (err) {
+          console.warn('Failed to load event details for banner click:', err);
+        }
+      }
+    } else {
+      scrollToMessage(pin.msgid);
+    }
+  }, [chatid, currentUserId, isEventBannerPin]);
 
   // Member Entrance Highlight: When entering chat, highlight unread banner-pin
   useEffect(() => {
@@ -4808,7 +5033,7 @@ const ChatBox = () => {
                   if (activeBannerPins.length > 1) {
                     setIsBannerPinsExpanded(true);
                   } else {
-                    scrollToMessage(activeBannerPins[0].msgid);
+                    handleBannerPinClick(activeBannerPins[0]);
                   }
                 }}
                 title={activeBannerPins.length > 1 ? "Click to view all pinned name changes" : "Click to jump to message"}
@@ -4917,7 +5142,7 @@ const ChatBox = () => {
                   {activeBannerPins.map((pin) => (
                     <div
                       key={pin.msgid || pin.tempmsgid || pin.timestamp}
-                      onClick={() => scrollToMessage(pin.msgid)}
+                      onClick={() => handleBannerPinClick(pin)}
                       style={{
                         display: "flex",
                         alignItems: "center",
@@ -5258,38 +5483,45 @@ const ChatBox = () => {
                         </span>
                       </div>
                     )}
-                    {msg.sendername === "server" || msg.type === "banner" || msg.type === "banner-pin" ? (
+                    {msg.sendername === "server" || msg.type === "banner" || msg.type === "banner-pin" || msg.type === "event-banner-pin" ? (
                       <div
                         ref={(el) => (messageRefs.current[msg.msgid] = el)}
                         className={highlightedPinId === msg.msgid ? "banner-pin-entrance-pulse" : undefined}
+                        onClick={() => {
+                          if (isEventBannerPin(msg)) {
+                            handleBannerPinClick(msg);
+                          }
+                        }}
                         style={{
                           alignSelf: "center",
-                          backgroundColor: (msg.type === "banner-pin" && isWithin24Hours(msg.timestamp))
+                          backgroundColor: (msg.type === "event-banner-pin" || isEventBannerPin(msg) || (msg.type === "banner-pin" && isWithin24Hours(msg.timestamp)))
                             ? "rgba(30, 58, 95, 0.4)"
                             : "var(--bg-card)",
-                          color: (msg.type === "banner-pin" && isWithin24Hours(msg.timestamp))
+                          color: (msg.type === "event-banner-pin" || isEventBannerPin(msg) || (msg.type === "banner-pin" && isWithin24Hours(msg.timestamp)))
                             ? "var(--text-primary)"
                             : "var(--text-secondary)",
                           padding: isMobile ? '6px 12px' : '8px 16px',
                           borderRadius: '16px',
                           fontSize: isMobile ? '12px' : '13px',
-                          border: (msg.type === "banner-pin" && isWithin24Hours(msg.timestamp))
+                          border: (msg.type === "event-banner-pin" || isEventBannerPin(msg) || (msg.type === "banner-pin" && isWithin24Hours(msg.timestamp)))
                             ? "1px solid var(--accent-tint-border)"
                             : "1px solid var(--border-color)",
                           display: "flex",
                           alignItems: "center",
                           gap: "8px",
-                          boxShadow: (msg.type === "banner-pin" && isWithin24Hours(msg.timestamp))
+                          boxShadow: (msg.type === "event-banner-pin" || isEventBannerPin(msg) || (msg.type === "banner-pin" && isWithin24Hours(msg.timestamp)))
                             ? "0 4px 12px var(--accent-tint)"
                             : undefined,
                           transition: "all 0.3s ease",
+                          cursor: isEventBannerPin(msg) ? 'pointer' : 'default'
                         }}
+                        title={isEventBannerPin(msg) ? "Click to view event in Group Calendar" : undefined}
                       >
-                        {msg.type === "banner-pin" && isWithin24Hours(msg.timestamp) && (
+                        {(msg.type === "event-banner-pin" || isEventBannerPin(msg) || (msg.type === "banner-pin" && isWithin24Hours(msg.timestamp))) && (
                           <span style={{ fontSize: "13px" }}>📌</span>
                         )}
                         <span>{formatBannerText(msg)}</span>
-                        {msg.type === "banner-pin" && isWithin24Hours(msg.timestamp) && (
+                        {(msg.type === "event-banner-pin" || isEventBannerPin(msg) || (msg.type === "banner-pin" && isWithin24Hours(msg.timestamp))) && (
                           <span style={{
                             fontSize: "10px",
                             fontWeight: "700",
@@ -7412,7 +7644,7 @@ const ChatBox = () => {
               <h3 style={{ margin: '0 0 12px 0', color: 'var(--text-primary)', fontSize: '18px' }}>Cancel Event?</h3>
               <p style={{ margin: '0 0 20px 0', color: 'var(--text-secondary)', fontSize: '14px' }}>Are you sure you want to cancel this event? This action cannot be undone.</p>
               <div style={{ display: 'flex', gap: '12px' }}>
-                <button onClick={() => { setShowCancelDialog(false); setShowEventModal(false); setHasChanges(false); }} style={{ flex: 1, padding: '12px', backgroundColor: 'var(--danger-color)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Yes, Cancel Event</button>
+                <button onClick={handleConfirmCancelEvent} style={{ flex: 1, padding: '12px', backgroundColor: 'var(--danger-color)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Yes, Cancel Event</button>
                 <button onClick={() => setShowCancelDialog(false)} style={{ flex: 1, padding: '12px', backgroundColor: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Go Back</button>
               </div>
             </div>

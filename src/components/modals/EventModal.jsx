@@ -18,6 +18,30 @@ const EventModal = ({
   isPanel = false
 }) => {
   const currentUserId = localStorage.getItem('userid');
+  const currentUsername = localStorage.getItem('username');
+
+  // Detect whether this event is an NLP/regex auto-detected event from a chat message
+  const isAutoDetected = Boolean(
+    event?.isAutoDetected === true ||
+    (event?.purpose && !event?.groupEventId) ||
+    (event?.tempid && !event?.groupEventId)
+  );
+
+  const eventCreatorId = event?.creatorId || event?.userId;
+  const isExplicitGroupEvent = Boolean(
+    event?.groupEventId ||
+    (eventCreatorId && eventCreatorId !== currentUserId) ||
+    (event?.isGroup && eventCreatorId && eventCreatorId !== currentUserId)
+  );
+
+  const isReceivingPerson = !isAutoDetected && (
+    (eventCreatorId && eventCreatorId !== currentUserId) ||
+    (event?.creatorName && currentUsername && event?.creatorName !== currentUsername && eventCreatorId !== currentUserId) ||
+    (isReceived && isExplicitGroupEvent)
+  );
+
+  // Enforce: only event creator can edit user-created events. Auto-detected events from messages can be edited by the user adding them.
+  const canEdit = isAutoDetected || !isReceivingPerson;
 
   // Compute default end time (1 hr default duration)
   const computeDefaultEndTime = (startTime) => {
@@ -97,6 +121,7 @@ const EventModal = ({
   }, [formData.date, formData.startTime, formData.endTime, currentUserId]);
 
   const handleChange = (field, value) => {
+    if (!canEdit) return;
     setFormData((prev) => {
       const updated = { ...prev, [field]: value };
       if (onDraftChange) onDraftChange(updated);
@@ -404,18 +429,43 @@ const EventModal = ({
         </div>
       )}
 
+      {/* Creator-only Lock Notice for Receiving Persons */}
+      {!canEdit && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          padding: '12px 16px',
+          borderRadius: '12px',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          border: '1px solid rgba(59, 130, 246, 0.25)',
+          color: 'var(--accent-text)',
+          fontSize: '13px',
+          fontWeight: '500',
+          marginBottom: '20px'
+        }}>
+          <Lock size={16} style={{ flexShrink: 0 }} />
+          <span>
+            Created by <strong>@{event?.creatorName || eventCreatorId || 'host'}</strong> • Only the event creator can edit the date, time, or details.
+          </span>
+        </div>
+      )}
+
       {/* Title */}
       <div style={{ marginBottom: '20px' }}>
         <label style={labelStyle}>Event Title</label>
         <input
           type="text"
           value={formData.title}
+          disabled={!canEdit}
           onChange={(e) => handleChange('title', e.target.value)}
           placeholder="What's happening?"
           style={{
             width: '100%', padding: '14px 16px', borderRadius: '12px',
             backgroundColor: 'var(--bg-hover)', border: '1px solid var(--border-color)',
-            color: '#f3f4f6', fontSize: '18px', fontWeight: '600', outline: 'none'
+            color: '#f3f4f6', fontSize: '18px', fontWeight: '600', outline: 'none',
+            cursor: !canEdit ? 'default' : 'text',
+            opacity: !canEdit ? 0.9 : 1
           }}
         />
       </div>
@@ -425,12 +475,15 @@ const EventModal = ({
         <label style={labelStyle}>Description</label>
         <textarea
           value={formData.description}
+          disabled={!canEdit}
           onChange={(e) => handleChange('description', e.target.value)}
           placeholder="Add agenda or details..."
           style={{
             width: '100%', padding: '12px 16px', borderRadius: '12px',
             backgroundColor: 'var(--bg-hover)', border: '1px solid var(--border-color)',
-            color: '#d1d5db', fontSize: '14px', outline: 'none', minHeight: '70px', resize: 'none'
+            color: '#d1d5db', fontSize: '14px', outline: 'none', minHeight: '70px', resize: 'none',
+            cursor: !canEdit ? 'default' : 'text',
+            opacity: !canEdit ? 0.9 : 1
           }}
         />
       </div>
@@ -450,11 +503,14 @@ const EventModal = ({
           <input
             type="date"
             value={formData.date}
+            disabled={!canEdit}
             onChange={(e) => handleChange('date', e.target.value)}
             style={{
               width: '100%', padding: '10px 14px', borderRadius: '10px',
               backgroundColor: 'rgba(0, 0, 0, 0.25)', border: '1px solid var(--border-color)',
-              color: '#f3f4f6', colorScheme: 'dark', cursor: 'pointer'
+              color: '#f3f4f6', colorScheme: 'dark',
+              cursor: !canEdit ? 'default' : 'pointer',
+              opacity: !canEdit ? 0.9 : 1
             }}
           />
         </div>
@@ -469,16 +525,18 @@ const EventModal = ({
               <span>{formatDisplayTime(formData.endTime)}</span>
               <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '400' }}>(1 hr default)</span>
             </div>
-            <button
-              onClick={startEditingTime}
-              style={{
-                padding: '6px 14px', borderRadius: '8px',
-                backgroundColor: 'var(--accent-tint)', color: 'var(--accent-text)',
-                border: '1px solid var(--accent-tint-border)', fontSize: '12px', fontWeight: '600', cursor: 'pointer'
-              }}
-            >
-              Change
-            </button>
+            {canEdit && (
+              <button
+                onClick={startEditingTime}
+                style={{
+                  padding: '6px 14px', borderRadius: '8px',
+                  backgroundColor: 'var(--accent-tint)', color: 'var(--accent-text)',
+                  border: '1px solid var(--accent-tint-border)', fontSize: '12px', fontWeight: '600', cursor: 'pointer'
+                }}
+              >
+                Change
+              </button>
+            )}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -592,7 +650,7 @@ const EventModal = ({
       </div>
 
       {/* GROUP VISIBILITY & SCOPE CONTROLS (IF CREATING IN GROUP) */}
-      {isGroupContext && (
+      {isGroupContext && canEdit && (
         <div style={{
           backgroundColor: 'var(--accent-tint)',
           border: '1px solid var(--accent-tint)',
@@ -705,26 +763,34 @@ const EventModal = ({
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   type="button"
-                  onClick={() => handleChange('meetingType', 'online')}
+                  disabled={!canEdit}
+                  onClick={() => canEdit && handleChange('meetingType', 'online')}
                   style={{
                     flex: 1, padding: '8px', borderRadius: '8px',
                     border: formData.meetingType === 'online' ? '1px solid var(--accent-solid)' : '1px solid var(--border-color)',
                     backgroundColor: formData.meetingType === 'online' ? 'var(--accent-tint-border)' : 'transparent',
                     color: formData.meetingType === 'online' ? 'var(--accent-text)' : 'var(--text-secondary)',
-                    fontWeight: '600', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                    fontWeight: '600', fontSize: '12px',
+                    cursor: !canEdit ? 'default' : 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                    opacity: !canEdit && formData.meetingType !== 'online' ? 0.5 : 1
                   }}
                 >
                   <Video size={14} /> Online
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleChange('meetingType', 'offline')}
+                  disabled={!canEdit}
+                  onClick={() => canEdit && handleChange('meetingType', 'offline')}
                   style={{
                     flex: 1, padding: '8px', borderRadius: '8px',
                     border: formData.meetingType === 'offline' ? '1px solid var(--success-color)' : '1px solid var(--border-color)',
                     backgroundColor: formData.meetingType === 'offline' ? 'rgba(16, 185, 129, 0.2)' : 'transparent',
                     color: formData.meetingType === 'offline' ? 'var(--success-color)' : 'var(--text-secondary)',
-                    fontWeight: '600', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                    fontWeight: '600', fontSize: '12px',
+                    cursor: !canEdit ? 'default' : 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                    opacity: !canEdit && formData.meetingType !== 'offline' ? 0.5 : 1
                   }}
                 >
                   <MapPin size={14} /> In-Person
@@ -739,11 +805,14 @@ const EventModal = ({
                   type="url"
                   placeholder="https://meet.google.com/xyz or Zoom link"
                   value={formData.meetingLink}
+                  disabled={!canEdit}
                   onChange={(e) => handleChange('meetingLink', e.target.value)}
                   style={{
                     width: '100%', padding: '10px 14px', borderRadius: '10px',
                     backgroundColor: 'var(--bg-hover)', border: '1px solid var(--border-color)',
-                    color: '#f3f4f6', fontSize: '13px', outline: 'none'
+                    color: '#f3f4f6', fontSize: '13px', outline: 'none',
+                    cursor: !canEdit ? 'default' : 'text',
+                    opacity: !canEdit ? 0.9 : 1
                   }}
                 />
               </div>
@@ -754,11 +823,14 @@ const EventModal = ({
                   type="text"
                   placeholder="e.g. Building 4, Conference Room B"
                   value={formData.location}
+                  disabled={!canEdit}
                   onChange={(e) => handleChange('location', e.target.value)}
                   style={{
                     width: '100%', padding: '10px 14px', borderRadius: '10px',
                     backgroundColor: 'var(--bg-hover)', border: '1px solid var(--border-color)',
-                    color: '#f3f4f6', fontSize: '13px', outline: 'none'
+                    color: '#f3f4f6', fontSize: '13px', outline: 'none',
+                    cursor: !canEdit ? 'default' : 'text',
+                    opacity: !canEdit ? 0.9 : 1
                   }}
                 />
               </div>
@@ -769,7 +841,7 @@ const EventModal = ({
 
       {/* Action Buttons */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: isPanel ? '40px' : '0' }}>
-        {isReceived || !formData.isAdded ? (
+        {!canEdit || isReceived || !formData.isAdded ? (
           <button
             onClick={handleAddToggle}
             style={{

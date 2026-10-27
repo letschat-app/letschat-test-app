@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Video, MapPin, Plus, Check, X, Bell, BellOff, Users, ExternalLink, ChevronRight } from 'lucide-react';
+import { Calendar, Clock, Video, MapPin, Plus, Check, X, Bell, BellOff, Users, ExternalLink, ChevronRight, Edit2 } from 'lucide-react';
 import { API } from '../../service/UserAuth';
 
-const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) => {
+const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onOpenEvent }) => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState('upcoming'); // 'all', 'upcoming', 'today'
@@ -333,10 +333,16 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
           filteredEvents.map((ev) => {
             const hasJoined = ev.isAdded || ev.rsvpStatus === 'going';
             const isCancelled = ev.action === 'cancelled';
+            const currentUsername = localStorage.getItem('username');
+            const isCreator = Boolean(
+              (ev.creatorId && ev.creatorId === userId) ||
+              (ev.creatorName && currentUsername && ev.creatorName === currentUsername)
+            );
 
             return (
               <div
                 key={ev.eventId || ev.groupEventId}
+                onClick={() => onOpenEvent && onOpenEvent(ev)}
                 style={{
                   backgroundColor: 'var(--bg-hover)',
                   borderRadius: '16px',
@@ -346,7 +352,8 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
                   flexDirection: 'column',
                   gap: '12px',
                   position: 'relative',
-                  opacity: isCancelled ? 0.7 : 1
+                  opacity: isCancelled ? 0.7 : 1,
+                  cursor: onOpenEvent ? 'pointer' : 'default'
                 }}
               >
                 {/* Event Top Badge */}
@@ -478,7 +485,7 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
                   </div>
                 )}
 
-                {/* Calendar Add / Added Status */}
+                {/* Calendar Add / Added Status & Creator Edit */}
                 <div style={{
                   borderTop: '1px solid var(--bg-hover)',
                   paddingTop: '12px',
@@ -487,27 +494,58 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
                   justifyContent: 'space-between',
                   gap: '8px'
                 }}>
-                  {hasJoined ? (
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                      border: '1px solid rgba(16, 185, 129, 0.3)',
-                      color: 'var(--success-color)',
-                      fontSize: '12px',
-                      fontWeight: '600'
-                    }}>
-                      <Check size={14} /> Added to Calendar
-                    </div>
-                  ) : !isCancelled ? (
-                    <button
-                      onClick={() => handleAddForMe(ev)}
-                      style={{
-                        width: '100%',
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                    {hasJoined ? (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
                         padding: '8px 12px',
+                        borderRadius: '8px',
+                        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                        color: 'var(--success-color)',
+                        fontSize: '12px',
+                        fontWeight: '600'
+                      }}>
+                        <Check size={14} /> Added to Calendar
+                      </div>
+                    ) : !isCancelled ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddForMe(ev);
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '8px 12px',
+                          borderRadius: '8px',
+                          backgroundColor: 'var(--accent-tint)',
+                          border: '1px solid var(--accent-tint-border)',
+                          color: 'var(--accent-text)',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <Plus size={14} /> + Add to Calendar
+                      </button>
+                    ) : null}
+                  </div>
+
+                  {/* Creator-only Edit button */}
+                  {isCreator && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onOpenEvent) onOpenEvent(ev);
+                      }}
+                      style={{
+                        padding: '8px 14px',
                         borderRadius: '8px',
                         backgroundColor: 'var(--accent-tint)',
                         border: '1px solid var(--accent-tint-border)',
@@ -517,13 +555,13 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent }) =
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center',
                         gap: '6px'
                       }}
+                      title="Edit date, time, and details"
                     >
-                      <Plus size={14} /> + Add to Calendar
+                      <Edit2 size={13} /> Edit
                     </button>
-                  ) : null}
+                  )}
                 </div>
               </div>
             );

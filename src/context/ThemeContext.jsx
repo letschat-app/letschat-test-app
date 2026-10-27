@@ -15,9 +15,26 @@ export const ThemeProvider = ({ children }) => {
     return 'dark';
   });
 
+  const themeColors = {
+    dark: '#09090b',
+    blue: '#0b0f19',
+    light: '#f8fafc',
+    pink: '#170b14',
+  };
+
   useEffect(() => {
     localStorage.setItem('app-theme', theme);
     document.documentElement.setAttribute('data-theme', theme);
+
+    // Dynamically update mobile status bar & navigation bar theme color
+    const color = themeColors[theme] || '#09090b';
+    let metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    if (!metaThemeColor) {
+      metaThemeColor = document.createElement('meta');
+      metaThemeColor.name = 'theme-color';
+      document.head.appendChild(metaThemeColor);
+    }
+    metaThemeColor.setAttribute('content', color);
   }, [theme]);
 
   // Provide themes array for easy iteration in UI

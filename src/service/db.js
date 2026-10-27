@@ -420,6 +420,64 @@ export const markMessagesAsOldInDB = async (chatid) => {
   }
 };
 
+/**
+ * Marks all isold:false messages for a specific chatid and spaceid as isold:true in IndexedDB.
+ */
+export const markSpaceMessagesAsOldInDB = async (chatid, spaceid = 0) => {
+  const db = await initDB();
+  const tx = db.transaction('messages', 'readwrite');
+  const store = tx.objectStore('messages');
+  const targetSpace = spaceid !== undefined && spaceid !== null ? Number(spaceid) : 0;
+
+  let cursor = await store.openCursor();
+  let count = 0;
+
+  while (cursor) {
+    const m = cursor.value;
+    const mSpace = m.spaceid !== undefined && m.spaceid !== null ? Number(m.spaceid) : 0;
+    if (String(m.chatid) === String(chatid) && mSpace === targetSpace && m.isold === false) {
+      cursor.update({ ...m, isold: true });
+      count++;
+    }
+    cursor = await cursor.continue();
+  }
+
+  await tx.done;
+  if (count > 0) {
+    console.log(`[DB] markSpaceMessagesAsOldInDB: marked ${count} messages as old for chatid=${chatid} space=${targetSpace}`);
+  }
+};
+
+/**
+ * Returns a map of unread message counts grouped by { [chatid]: { [spaceid]: count } } from IndexedDB.
+ */
+export const getUnreadCountsBySpaceFromDB = async () => {
+  try {
+    const db = await initDB();
+    const tx = db.transaction('messages', 'readonly');
+    const store = tx.objectStore('messages');
+    const myId = localStorage.getItem('userid');
+    const counts = {};
+
+    let cursor = await store.openCursor();
+    while (cursor) {
+      const m = cursor.value;
+      if (m && m.isold === false && m.userid && String(m.userid) !== String(myId)) {
+        const cid = String(m.chatid);
+        const sid = m.spaceid !== undefined && m.spaceid !== null ? Number(m.spaceid) : 0;
+        if (!counts[cid]) counts[cid] = {};
+        counts[cid][sid] = (counts[cid][sid] || 0) + 1;
+      }
+      cursor = await cursor.continue();
+    }
+    await tx.done;
+    return counts;
+  } catch (err) {
+    console.error("[DB] Error calculating unread counts by space:", err);
+    return {};
+  }
+};
+
 export const getStarredMessages = async (chatid = null) => {
   const db = await initDB();
   const tx = db.transaction('messages', 'readonly');
@@ -531,7 +589,7 @@ export const updateMessageStatusInDB = async (ack) => {
  * Bulk updates message statuses for a Batch ACK frame (e.g. onconnect, check-in, media-opened)
  */
 export const bulkUpdateMessageStatusInDB = async (batchAck) => {
-  const { chatid, msgids, status, timestamp } = batchAck;
+  const { chatid, msgids, status, timestamp, read_users, delivered_users, pending_users } = batchAck;
   if (!msgids || !Array.isArray(msgids) || msgids.length === 0) return;
 
   try {
@@ -556,6 +614,40 @@ export const bulkUpdateMessageStatusInDB = async (batchAck) => {
           if (status === 'read') msg.readtime = timestamp;
           if (status === 'media-opened') msg.mediaopenedtime = timestamp;
         }
+
+        // Categorized recipient lists
+        if (Array.isArray(read_users)) {
+          const rSet = new Set(msg.read_users || []);
+          read_users.forEach(u => rSet.add(u));
+          msg.read_users = Array.from(rSet);
+          if (Array.isArray(msg.delivered_users)) {
+            msg.delivered_users = msg.delivered_users.filter(u => !rSet.has(u));
+          }
+          if (Array.isArray(msg.pending_users)) {
+            msg.pending_users = msg.pending_users.filter(u => !rSet.has(u));
+          }
+        }
+        if (Array.isArray(delivered_users)) {
+          const rSet = new Set(msg.read_users || []);
+          const dSet = new Set(msg.delivered_users || []);
+          delivered_users.forEach(u => {
+            if (!rSet.has(u)) dSet.add(u);
+          });
+          msg.delivered_users = Array.from(dSet);
+          if (Array.isArray(msg.pending_users)) {
+            msg.pending_users = msg.pending_users.filter(u => !dSet.has(u) && !rSet.has(u));
+          }
+        }
+        if (Array.isArray(pending_users)) {
+          const rSet = new Set(msg.read_users || []);
+          const dSet = new Set(msg.delivered_users || []);
+          const pSet = new Set(msg.pending_users || []);
+          pending_users.forEach(u => {
+            if (!rSet.has(u) && !dSet.has(u)) pSet.add(u);
+          });
+          msg.pending_users = Array.from(pSet);
+        }
+
         const idToCheck = msg.msgid || msg.tempmsgid || msg.timestamp;
         await store.put(msg);
       }
@@ -620,4 +712,17 @@ export const clearSharedData = async () => {
 export const getSharedData = async () => {
   const db = await initDB();
   return db.getAll('sharedData');
+};
+
+/**
+ * Returns the total count of messages in the 'messages' IndexedDB object store.
+ */
+export const getTotalMessageCountFromDB = async () => {
+  try {
+    const db = await initDB();
+    return await db.count('messages');
+  } catch (err) {
+    console.error('Failed to get message count from DB:', err);
+    return 0;
+  }
 };

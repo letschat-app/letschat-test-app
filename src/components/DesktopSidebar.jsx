@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getsocket } from '../service/Websocket';
 import { MessageSquare, Users, Search, Calendar, LogOut, User, Star, FlaskConical } from 'lucide-react';
 import { removeFCMToken } from '../service/UserAuth';
 import { useBadges } from '../service/BadgeStore';
+import LogoutConfirmModal from './modals/LogoutConfirmModal';
 
 const PulsesIcon = ({ size = 22, color = 'currentColor', strokeWidth = 2 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
@@ -30,8 +31,11 @@ const DesktopSidebar = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { calendarUnread, pulsesUnread } = useBadges();
+    const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
 
     const handleLogout = async () => {
+        setIsLoggingOut(true);
         try {
             const socket = getsocket();
             if (socket) socket.close();
@@ -176,13 +180,20 @@ const DesktopSidebar = () => {
                     );
                 })}
                 <div
-                    onClick={handleLogout}
+                    onClick={() => setShowLogoutModal(true)}
                     style={navItemStyle(false)}
                     title="Logout"
                 >
                     <LogOut size={22} strokeWidth={2} color="var(--text-secondary)" />
                 </div>
             </div>
+
+            <LogoutConfirmModal
+                isOpen={showLogoutModal}
+                onClose={() => setShowLogoutModal(false)}
+                onConfirm={handleLogout}
+                loading={isLoggingOut}
+            />
         </div>
     );
 };
