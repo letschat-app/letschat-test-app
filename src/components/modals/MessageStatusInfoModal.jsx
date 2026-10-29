@@ -132,15 +132,38 @@ const MessageStatusInfoModal = ({ isOpen, onClose, message, chat, members = [] }
   // Format time utility - strictly 12-hour Indian Standard Time (IST)
   const formatTime = (ts) => {
     if (!ts) return '';
+    if (typeof ts === 'string' && /^(0?[1-9]|1[0-2]):[0-5][0-9]\s*(AM|PM)$/i.test(ts.trim())) {
+      return ts.trim().toUpperCase();
+    }
     try {
-      const date = new Date(ts);
-      if (isNaN(date.getTime())) return String(ts);
+      let d;
+      if (typeof ts === 'number') {
+        d = new Date(ts < 1e11 ? ts * 1000 : ts);
+      } else if (typeof ts === 'string') {
+        const trimmed = ts.trim();
+        if (/^\d+(\.\d+)?$/.test(trimmed)) {
+          const num = parseFloat(trimmed);
+          d = new Date(num < 1e11 ? num * 1000 : num);
+        } else if (trimmed.includes('T') || trimmed.includes('-')) {
+          let str = trimmed;
+          if (!str.endsWith('Z') && !/[+-]\d{2}(:?\d{2})?$/.test(str)) {
+            str = str.replace(' ', 'T') + '+05:30';
+          }
+          d = new Date(str);
+        } else {
+          d = new Date(ts);
+        }
+      } else {
+        d = new Date(ts);
+      }
+
+      if (isNaN(d.getTime())) return String(ts);
       return new Intl.DateTimeFormat('en-IN', {
         timeZone: 'Asia/Kolkata',
         hour: 'numeric',
         minute: '2-digit',
         hour12: true
-      }).format(date);
+      }).format(d);
     } catch (e) {
       return String(ts);
     }

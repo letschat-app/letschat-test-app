@@ -182,12 +182,16 @@ const EventModal = ({
         });
         if (res.ok) {
           window.dispatchEvent(new CustomEvent('letschat_refresh_events'));
+          if (setHasChanges) setHasChanges(false);
+          if (onClose) onClose();
+          return;
         }
       } catch (err) {
         console.error('Failed to create group event:', err);
       }
     } else if (updateEventApi) {
       updateEventApi(payload);
+      if (setHasChanges) setHasChanges(false);
     }
 
     if (onDraftChange) onDraftChange(payload);

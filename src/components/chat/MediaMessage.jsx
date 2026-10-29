@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Download, FileText, Play, Pause, Music, ExternalLink, Loader2, Mic, RotateCcw } from 'lucide-react';
 import { API } from '../../service/UserAuth';
-import { downloadFile } from '../../service/MediaUploader';
-import { getMediaInfo, getMediaBlob, memoryThumbCache } from '../../service/MediaCache';
+import { downloadFile, getPdfThumbnail } from '../../service/MediaUploader';
+import { getMediaInfo, getMediaBlob, saveBlobToCache, memoryThumbCache } from '../../service/MediaCache';
 
 /**
  * Format bytes to human readable size
@@ -31,8 +31,19 @@ const isPdfFile = (name) => {
 };
 
 export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMode, onOpenViewer, onRetry }) {
-  const [mediaInfo, setMediaInfo] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [mediaInfo, setMediaInfo] = useState(() => {
+    if (msg.isOptimistic || msg.optimisticUrl) {
+      return {
+        fileType: msg.type,
+        fileName: msg.fileName,
+        fileSize: msg.fileSize,
+        fileKey: msg.optimisticUrl,
+        thumbnailKey: msg.optimisticThumbUrl || msg.optimisticUrl,
+      };
+    }
+    return null;
+  });
+  const [loading, setLoading] = useState(!msg.isOptimistic && !msg.optimisticUrl && !msg.optimisticThumbUrl);
   const [showFull, setShowFull] = useState(false);
   const [error, setError] = useState(null);
   const [thumbError, setThumbError] = useState(false);
@@ -45,10 +56,27 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
   // Resolution states for cached URLs
   const [resolvedThumb, setResolvedThumb] = useState(() => {
     const idbKey = isOptimistic ? `${msg.tempmsgid}_thumb` : `${mediaId}_thumb`;
-    return memoryThumbCache?.get(idbKey) || null;
+    return (
+      memoryThumbCache?.get(idbKey) ||
+      (msg.tempmsgid ? memoryThumbCache?.get(`${msg.tempmsgid}_thumb`) : null) ||
+      msg.optimisticThumbUrl ||
+      null
+    );
   });
-  const [resolvedMain, setResolvedMain] = useState(null);
+  const [resolvedMain, setResolvedMain] = useState(() => {
+    return msg.optimisticUrl || null;
+  });
   const blobUrls = useRef(new Set());
+
+  // Keep optimistic blob URLs synced if they arrive after mount
+  useEffect(() => {
+    if (msg.optimisticThumbUrl && !resolvedThumb) {
+      setResolvedThumb(msg.optimisticThumbUrl);
+    }
+    if (msg.optimisticUrl && !resolvedMain) {
+      setResolvedMain(msg.optimisticUrl);
+    }
+  }, [msg.optimisticThumbUrl, msg.optimisticUrl]);
 
   // Audio playback state
   const [isPlaying, setIsPlaying] = useState(false);
@@ -143,6 +171,9 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
           if (isMounted && url) {
             setResolvedThumb(url);
             // DO NOT track thumbCache blob URLs here! MediaCache manages their memory globally.
+          } else if (isMounted && msg.tempmsgid) {
+            const tempUrl = await getMediaBlob(`${msg.tempmsgid}_thumb`, null, 'thumbCache');
+            if (isMounted && tempUrl) setResolvedThumb(tempUrl);
           }
         }
 
@@ -160,8 +191,11 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
 
           if (fetchUrl) {
             const url = await getMediaBlob(cacheKey, fetchUrl, 'mainCache');
-            if (isMounted) setResolvedMain(url);
+            if (isMounted && url) setResolvedMain(url);
             if (url && url.startsWith('blob:')) blobUrls.current.add(url);
+          } else if (!isOptimistic && msg.tempmsgid) {
+            const cachedUrl = await getMediaBlob(msg.tempmsgid, null, 'mainCache');
+            if (isMounted && cachedUrl) setResolvedMain(cachedUrl);
           }
         }
       } catch (err) {
@@ -173,6 +207,41 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
 
     return () => { isMounted = false; };
   }, [mediaInfo, showFull, isOptimistic, msg.tempmsgid, msg.optimisticUrl, msg.optimisticThumbUrl]);
+
+  // 3. Fallback: Generate PDF thumbnail client-side if missing on receiver
+  useEffect(() => {
+    const isPDF = isPdfFile(fileName) || fileType === 'pdf' || fileType === 'application/pdf';
+    if (!isPDF) return;
+    if (resolvedThumb || thumbnailUrl || thumbError) return;
+    if (isOptimistic) return;
+
+    const sourceUrl = resolvedMain || fileUrl;
+    if (!sourceUrl || !mediaId) return;
+
+    let isMounted = true;
+    const generateFallbackThumb = async () => {
+      try {
+        const cacheKey = `${mediaId}_thumb`;
+        const cached = await getMediaBlob(cacheKey, null, 'thumbCache');
+        if (cached && isMounted) {
+          setResolvedThumb(cached);
+          return;
+        }
+
+        const result = await getPdfThumbnail(sourceUrl);
+        if (result?.blob && isMounted) {
+          await saveBlobToCache(cacheKey, result.blob, 'thumbCache');
+          const blobUrl = URL.createObjectURL(result.blob);
+          setResolvedThumb(blobUrl);
+        }
+      } catch (err) {
+        console.warn('[MediaMessage] PDF client-side thumbnail generation failed:', err);
+      }
+    };
+
+    generateFallbackThumb();
+    return () => { isMounted = false; };
+  }, [mediaId, isOptimistic, fileType, fileName, resolvedThumb, thumbnailUrl, thumbError, resolvedMain, fileUrl]);
 
   // 3. Final Cleanup: Revoke all tracked Blob URLs when component truly unmounts
   useEffect(() => {
@@ -229,7 +298,7 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
     setThumbError(false);
   }, [resolvedThumb, thumbnailUrl]);
 
-  if (loading) {
+  if (loading && !resolvedMain && !resolvedThumb && !msg.optimisticUrl && !msg.optimisticThumbUrl) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: 'rgba(0,0,0,0.1)', borderRadius: '8px' }}>
         <Loader2 className="animate-spin" size={18} color="var(--text-secondary)" />
@@ -238,7 +307,7 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
     );
   }
 
-  if (error || !mediaInfo) {
+  if ((error || !mediaInfo) && !resolvedMain && !resolvedThumb && !msg.optimisticUrl && !msg.optimisticThumbUrl) {
     return (
       <div style={{ padding: '8px', borderLeft: '3px solid var(--danger-color)', background: 'var(--danger-tint)', fontSize: '12px' }}>
         Media unavailable
@@ -310,7 +379,7 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
       }}
     >
       <img
-        src={resolvedMain || resolvedThumb || thumbnailUrl || fileUrl}
+        src={resolvedMain || resolvedThumb || thumbnailUrl || fileUrl || msg.optimisticThumbUrl || msg.optimisticUrl}
         alt={fileName}
         style={{
           width: '100%',
@@ -318,7 +387,7 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
           display: 'block',
           maxHeight: '400px',
           objectFit: 'contain',
-          transition: 'filter 0.3s ease',
+          transition: 'filter 0.3s ease, opacity 0.3s ease',
           opacity: status === 'uploading' ? 0.6 : 1
         }}
       />
@@ -412,7 +481,7 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
       }}
     >
       <img 
-        src={resolvedThumb || thumbnailUrl} 
+        src={resolvedThumb || thumbnailUrl || msg.optimisticThumbUrl} 
         style={{ 
           width: '100%', 
           height: 'auto',
@@ -619,7 +688,7 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
     const isPDF = isPdfFile(fileName) || fileType === 'pdf' || fileType === 'application/pdf';
 
     // 2. Resolve thumbnail presence logic — only show thumbnail for PDFs, not generic docs
-    const hasThumb = isPDF && !!(resolvedThumb || thumbnailUrl) && !thumbError;
+    const hasThumb = isPDF && !!(resolvedThumb || thumbnailUrl || msg.optimisticThumbUrl) && !thumbError;
 
     const docColor = isPDF ? 'var(--danger-color)' : 'var(--accent-text)';
 
@@ -656,7 +725,7 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
             overflow: 'hidden'
           }}>
             <img
-              src={resolvedThumb || thumbnailUrl}
+              src={resolvedThumb || thumbnailUrl || msg.optimisticThumbUrl}
               style={{
                 width: '100%', height: '100%',
                 objectFit: 'cover',

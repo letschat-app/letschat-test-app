@@ -166,6 +166,15 @@ export const saveBlobToCache = async (id, blob, storeName) => {
  */
 export const renameCacheKey = async (oldKey, newKey, storeName) => {
   if (!oldKey || !newKey) return;
+  if (storeName === 'thumbCache') {
+    const memUrl = memoryThumbCache.get(oldKey);
+    if (memUrl) {
+      memoryThumbCache.set(newKey, memUrl);
+      if (!memoryThumbKeys.includes(newKey)) {
+        memoryThumbKeys.push(newKey);
+      }
+    }
+  }
   const db = await initDB();
   try {
     const cached = await db.get(storeName, oldKey);

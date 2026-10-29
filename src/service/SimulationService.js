@@ -25,6 +25,7 @@ class SimulationService {
       localStorage.setItem('simulation_progress', JSON.stringify({ stepIndex, completed }));
       if (completed) {
         localStorage.setItem('walkthrough_completed', 'true');
+        localStorage.removeItem('isNewSignup');
       }
     } catch (e) {
       console.error("[SimulationService] Failed to save progress", e);
@@ -32,6 +33,9 @@ class SimulationService {
   }
 
   ensureInitialWelcome() {
+    const isNewSignup = localStorage.getItem('isNewSignup') === 'true';
+    if (!isNewSignup) return;
+
     const progress = this.getSavedProgress();
     if (progress.completed) return;
 
@@ -95,6 +99,12 @@ class SimulationService {
 
   start(onGuideUpdate) {
     if (this.isActive) return;
+
+    const isNewSignup = localStorage.getItem('isNewSignup') === 'true';
+    if (!isNewSignup) {
+      this.isActive = false;
+      return;
+    }
 
     const progress = this.getSavedProgress();
     if (progress.completed) {

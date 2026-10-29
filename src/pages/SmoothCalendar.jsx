@@ -693,14 +693,14 @@ const SmoothCalendar = () => {
             ) : bellUnread ? (
               <span style={{
                 position: 'absolute',
-                top: '6px',
-                right: '6px',
-                width: '8px',
-                height: '8px',
+                top: '4px',
+                right: '4px',
+                width: '11px',
+                height: '11px',
                 borderRadius: '50%',
                 backgroundColor: 'var(--accent-solid)',
-                boxShadow: '0 0 6px 1px var(--accent-text)',
-                border: '1.5px solid var(--bg-card)',
+                boxShadow: '0 0 8px 2px var(--accent-text)',
+                border: '2px solid var(--bg-card)',
                 zIndex: 5
               }} />
             ) : null}
@@ -964,11 +964,11 @@ const SmoothCalendar = () => {
                                       <div
                                         key={event.id}
                                         style={{
-                                          width: '4px',
-                                          height: '4px',
+                                          width: '6px',
+                                          height: '6px',
                                           borderRadius: '50%',
                                           backgroundColor: event.color,
-                                          boxShadow: `0 0 4px ${event.color}`
+                                          boxShadow: `0 0 5px ${event.color}`
                                         }}
                                       />
                                     ))}

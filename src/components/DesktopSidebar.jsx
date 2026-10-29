@@ -127,14 +127,14 @@ const DesktopSidebar = () => {
                                 <span
                                     style={{
                                         position: 'absolute',
-                                        top: '8px',
-                                        right: '8px',
-                                        width: '8px',
-                                        height: '8px',
+                                        top: '7px',
+                                        right: '7px',
+                                        width: '11px',
+                                        height: '11px',
                                         borderRadius: '50%',
                                         backgroundColor: 'var(--accent-solid)',
-                                        boxShadow: '0 0 6px 1px var(--accent-text)',
-                                        border: '1.5px solid var(--bg-secondary)',
+                                        boxShadow: '0 0 8px 2px var(--accent-text)',
+                                        border: '2px solid var(--bg-secondary)',
                                         zIndex: 5,
                                     }}
                                 />

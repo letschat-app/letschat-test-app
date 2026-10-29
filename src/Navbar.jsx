@@ -586,11 +586,7 @@ function Navbar() {
             <button
               key={page.path}
               onClick={() => {
-                if (page.path === '/chats') {
-                  navigate(page.path, { replace: true });
-                } else {
-                  navigate(page.path, { replace: location.pathname !== '/chats' });
-                }
+                navigate(page.path, { replace: true });
               }}
               style={{
                 ...navLinkStyle,
@@ -631,14 +627,14 @@ function Navbar() {
                       <span
                         style={{
                           position: 'absolute',
-                          top: '-2px',
-                          right: '-3px',
-                          width: '8px',
-                          height: '8px',
+                          top: '-3px',
+                          right: '-4px',
+                          width: '11px',
+                          height: '11px',
                           borderRadius: '50%',
                           backgroundColor: 'var(--accent-solid)',
-                          boxShadow: '0 0 6px 1px var(--accent-text)',
-                          border: '1.5px solid var(--bg-primary)',
+                          boxShadow: '0 0 8px 2px var(--accent-text)',
+                          border: '2px solid var(--bg-primary)',
                           zIndex: 5
                         }}
                       />

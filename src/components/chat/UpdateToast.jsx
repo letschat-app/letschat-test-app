@@ -39,12 +39,6 @@ function injectStyles() {
     .sw-update-btn:not(:disabled):active {
       transform: scale(0.97);
     }
-    .sw-dismiss-btn {
-      transition: background 0.15s ease;
-    }
-    .sw-dismiss-btn:not(:disabled):hover {
-      background: var(--border-color) !important;
-    }
     .sw-toast-spinner {
       width: 10px;
       height: 10px;
@@ -75,7 +69,7 @@ function injectStyles() {
  *  5. Updating button uses a clearly distinct muted gradient.
  */
 const UpdateToast = () => {
-  const { updateAvailable, applyUpdate, dismissUpdate, currentVersion } = usePWA();
+  const { updateAvailable, applyUpdate, currentVersion } = usePWA();
 
   const [visible, setVisible] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -118,12 +112,6 @@ const UpdateToast = () => {
     if (isUpdating) return; // Anti-spam guard
     setIsUpdating(true);
     applyUpdate();
-  };
-
-  const handleLater = () => {
-    if (isUpdating) return; // Prevent "Later" while update is in progress
-    setVisible(false);
-    setTimeout(() => dismissUpdate(), 350);
   };
 
   return (
@@ -192,31 +180,8 @@ const UpdateToast = () => {
         )}
       </div>
 
-      {/* Buttons */}
+      {/* Action Button */}
       <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-
-        {/* Later — disabled while updating to prevent state conflict */}
-        <button
-          className="sw-dismiss-btn"
-          onClick={handleLater}
-          disabled={isUpdating}
-          aria-label="Dismiss update notification"
-          style={{
-            background: 'transparent',
-            border: '1px solid var(--border-color)',
-            color: isUpdating ? 'var(--text-muted)' : 'var(--text-secondary)',
-            padding: '6px 12px',
-            borderRadius: '8px',
-            fontSize: '13px',
-            cursor: isUpdating ? 'not-allowed' : 'pointer',
-            fontFamily: 'Inter, system-ui, sans-serif',
-            whiteSpace: 'nowrap',
-            opacity: isUpdating ? 0.5 : 1,
-          }}
-        >
-          Later
-        </button>
-
         {/* Update — muted gradient when updating for clearer visual feedback */}
         <button
           className="sw-update-btn"

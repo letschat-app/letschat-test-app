@@ -157,6 +157,10 @@ export function initWebsocket() {
       window.dispatchEvent(new CustomEvent('letschat_booking_update', { detail: msg }));
       return;
     }
+    if (msg.type === 'username_change' || msg.msgtype === 'username_change' || (msg.content && typeof msg.content === 'string' && msg.content.includes('changed display name'))) {
+      console.log("[Websocket] Username change received:", msg);
+      window.dispatchEvent(new CustomEvent('letschat_refresh_chatnames', { detail: msg }));
+    }
 
     // 4. Single Message ACK Response (onrecieve ACK payload)
     if (('tempmsgid' in msg || 'msgid' in msg) && 'status' in msg && !('sendername' in msg) && !('content' in msg)) {

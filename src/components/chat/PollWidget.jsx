@@ -4,6 +4,7 @@ import PollVotesModal from './PollVotesModal';
 import { sendSafe } from '../../service/Websocket';
 import messageStore from '../../pages/MessageStore';
 import { normalizePoll, isOptionDuplicate, formatClosingTime } from './pollUtils';
+import { API } from '../../service/UserAuth';
 
 /**
  * PollWidget Component
@@ -21,12 +22,40 @@ const PollWidget = ({ message, currentUserId, members = [] }) => {
   const [otherInput, setOtherInput] = useState('');
   const [otherError, setOtherError] = useState('');
   const [showVotesModal, setShowVotesModal] = useState(false);
+  const [fetchedPoll, setFetchedPoll] = useState(null);
+  const [loadingPoll, setLoadingPoll] = useState(false);
   const viewVotesRef = useRef(null);
+
+  const targetMsgId = message?.msgid || message?.tempmsgid;
+
+  // Fallback API fetch when poll data is missing
+  useEffect(() => {
+    if (!message?.poll && !fetchedPoll && !loadingPoll && targetMsgId) {
+      setLoadingPoll(true);
+      fetch(`${API}/api/polls/by-msg/${encodeURIComponent(targetMsgId)}`, {
+        headers: {
+          'User-Id': currentUserId || localStorage.getItem('userid'),
+          'ngrok-skip-browser-warning': 'true'
+        }
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data) {
+            setFetchedPoll(data);
+            if (messageStore.handlePollUpdate) {
+              messageStore.handlePollUpdate(data);
+            }
+          }
+        })
+        .catch((err) => console.error('Failed to fetch fallback poll data:', err))
+        .finally(() => setLoadingPoll(false));
+    }
+  }, [message?.poll, fetchedPoll, loadingPoll, targetMsgId, currentUserId]);
 
   if (!message) return null;
 
-  // Extract poll object from message
-  let rawPoll = message.poll;
+  // Extract poll object from message or fallback fetched poll
+  let rawPoll = message.poll || fetchedPoll;
   if (!rawPoll && message.content) {
     try {
       const parsed = typeof message.content === 'string' ? JSON.parse(message.content) : message.content;
@@ -42,7 +71,7 @@ const PollWidget = ({ message, currentUserId, members = [] }) => {
         style={{ padding: '12px', fontSize: '13px', color: 'var(--text-secondary)' }}
         onClick={(e) => e.stopPropagation()}
       >
-        [Poll Message]
+        {loadingPoll ? 'Loading poll data...' : '[Poll Message]'}
       </div>
     );
   }
@@ -260,12 +289,11 @@ const PollWidget = ({ message, currentUserId, members = [] }) => {
     });
 
     sendSafe({
-      purpose: 'vote-poll',
+      purpose: 'add-poll-option',
       userchatid: String(chatId),
       msgid: String(msgId),
       poll_id: Number(poll_id),
-      option_ids: nextVotes,
-      other_text: trimmed
+      option_text: trimmed
     });
 
     setIsTypingOther(false);

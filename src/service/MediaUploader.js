@@ -98,7 +98,7 @@ export const getVideoThumbnail = (file) =>
     resolve = (blob) => metaPromise.then(duration => originalResolve({ blob, duration }));
   });
 
-/** Render page 1 of a PDF to a JPEG Blob using pdf.js. */
+/** Render page 1 of a PDF to a high-resolution WebP Blob using pdf.js. */
 export const getPdfThumbnail = async (file) => {
   try {
     if (!window.pdfjsLib) {
@@ -116,17 +116,34 @@ export const getPdfThumbnail = async (file) => {
     window.pdfjsLib.GlobalWorkerOptions.workerSrc =
       'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.mjs';
 
-    const arrayBuffer = await file.arrayBuffer();
+    let arrayBuffer;
+    if (typeof file === 'string') {
+      const res = await fetch(file);
+      if (!res.ok) throw new Error(`Failed to fetch PDF for thumbnail: ${res.status}`);
+      arrayBuffer = await res.arrayBuffer();
+    } else if (file instanceof ArrayBuffer) {
+      arrayBuffer = file;
+    } else if (file && typeof file.arrayBuffer === 'function') {
+      arrayBuffer = await file.arrayBuffer();
+    } else {
+      return { blob: null, noOfPages: 0 };
+    }
+
     const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     const page = await pdf.getPage(1);
-    const viewport = page.getViewport({ scale: 0.6 });
+    const unscaledViewport = page.getViewport({ scale: 1.0 });
+    // Crisp preview: scale up to sharp resolution (target ~1000px width or scale 1.5 - 2.5)
+    const targetWidth = 1000;
+    const scale = Math.max(1.5, Math.min(2.5, targetWidth / unscaledViewport.width));
+    const viewport = page.getViewport({ scale });
     const canvas = document.createElement('canvas');
     canvas.width = viewport.width;
     canvas.height = viewport.height;
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-    const blob = await new Promise(resolve => canvas.toBlob(blob => resolve(blob ?? null), 'image/webp', 0.3));
+    const blob = await new Promise(resolve => canvas.toBlob(blob => resolve(blob ?? null), 'image/webp', 0.8));
     return { blob, noOfPages: pdf.numPages };
-  } catch {
+  } catch (err) {
+    console.warn('[getPdfThumbnail] Error generating PDF thumbnail:', err);
     return { blob: null, noOfPages: 0 };
   }
 };

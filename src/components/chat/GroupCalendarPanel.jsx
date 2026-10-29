@@ -2,6 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Video, MapPin, Plus, Check, X, Bell, BellOff, Users, ExternalLink, ChevronRight, Edit2 } from 'lucide-react';
 import { API } from '../../service/UserAuth';
 
+export const parseEventDate = (val) => {
+  if (!val) return null;
+  if (typeof val === 'number') {
+    return new Date(val < 1e11 ? val * 1000 : val);
+  }
+  if (typeof val === 'string' && /^\d+(\.\d+)?$/.test(val.trim())) {
+    const num = parseFloat(val.trim());
+    return new Date(num < 1e11 ? num * 1000 : num);
+  }
+  return new Date(val);
+};
+
 const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onOpenEvent }) => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -14,7 +26,8 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onO
       setLoading(true);
       const res = await fetch(`${API}/user/event/group/${chatId}`, {
         headers: {
-          'User-Id': userId
+          'User-Id': userId,
+          'ngrok-skip-browser-warning': 'true'
         }
       });
       if (res.ok) {
@@ -154,7 +167,8 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onO
 
   const formatEventDate = (isoStr) => {
     if (!isoStr) return '';
-    const d = new Date(isoStr);
+    const d = parseEventDate(isoStr);
+    if (!d || isNaN(d.getTime())) return '';
     return new Intl.DateTimeFormat('en-IN', {
       timeZone: 'Asia/Kolkata',
       weekday: 'short',
@@ -165,7 +179,8 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onO
 
   const formatEventTime = (isoStr) => {
     if (!isoStr) return '';
-    const d = new Date(isoStr);
+    const d = parseEventDate(isoStr);
+    if (!d || isNaN(d.getTime())) return '';
     return new Intl.DateTimeFormat('en-IN', {
       timeZone: 'Asia/Kolkata',
       hour: '2-digit',
@@ -176,22 +191,62 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onO
 
   // Filter events
   const now = Date.now();
+  const ongoingCount = events.filter((ev) => {
+    if (ev.action === 'cancelled') return false;
+    const dStart = parseEventDate(ev.startTime);
+    const startMs = dStart && !isNaN(dStart.getTime()) ? dStart.getTime() : 0;
+    const dEnd = parseEventDate(ev.endTime);
+    const endMs = dEnd && !isNaN(dEnd.getTime()) ? dEnd.getTime() : (startMs + 60 * 60 * 1000);
+    return startMs <= now && endMs >= now;
+  }).length;
+
   let filteredEvents = events.filter((ev) => {
     if (selectedFilter === 'all') return true;
-    const startMs = ev.startTime ? new Date(ev.startTime).getTime() : 0;
+    const dStart = parseEventDate(ev.startTime);
+    const startMs = dStart && !isNaN(dStart.getTime()) ? dStart.getTime() : 0;
+    const dEnd = parseEventDate(ev.endTime);
+    const endMs = dEnd && !isNaN(dEnd.getTime()) ? dEnd.getTime() : (startMs + 60 * 60 * 1000);
+
+    if (selectedFilter === 'ongoing') {
+      return startMs <= now && endMs >= now && ev.action !== 'cancelled';
+    }
     if (selectedFilter === 'upcoming') {
+      // Include events starting from 15 minutes ago onwards
       return startMs >= now - 15 * 60 * 1000;
     }
     if (selectedFilter === 'today') {
       const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
-      const evDateIST = ev.startTime ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date(ev.startTime)) : '';
+      const evDateIST = dStart && !isNaN(dStart.getTime()) ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(dStart) : '';
       return todayIST === evDateIST;
     }
     return true;
   });
 
-  if (selectedFilter === 'upcoming') {
-    filteredEvents = [...filteredEvents].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()).slice(0, 5);
+  if (selectedFilter === 'ongoing') {
+    filteredEvents = [...filteredEvents].sort((a, b) => {
+      const ta = parseEventDate(a.startTime)?.getTime() || 0;
+      const tb = parseEventDate(b.startTime)?.getTime() || 0;
+      return ta - tb;
+    });
+  } else if (selectedFilter === 'upcoming') {
+    filteredEvents = [...filteredEvents].sort((a, b) => {
+      const ta = parseEventDate(a.startTime)?.getTime() || 0;
+      const tb = parseEventDate(b.startTime)?.getTime() || 0;
+      return ta - tb;
+    }).slice(0, 5);
+  } else if (selectedFilter === 'today') {
+    filteredEvents = [...filteredEvents].sort((a, b) => {
+      const ta = parseEventDate(a.startTime)?.getTime() || 0;
+      const tb = parseEventDate(b.startTime)?.getTime() || 0;
+      return ta - tb;
+    });
+  } else {
+    // 'all' section: show past and upcoming events in order of recent at top, old at bottom
+    filteredEvents = [...filteredEvents].sort((a, b) => {
+      const ta = parseEventDate(a.startTime)?.getTime() || 0;
+      const tb = parseEventDate(b.startTime)?.getTime() || 0;
+      return tb - ta;
+    });
   }
 
   return (
@@ -234,7 +289,10 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onO
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
-            onClick={() => onOpenCreateEvent && onOpenCreateEvent({ chatId, isGroup: true })}
+            onClick={() => {
+              if (onClose) onClose();
+              if (onOpenCreateEvent) onOpenCreateEvent({ chatId, isGroup: true });
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -277,9 +335,10 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onO
         display: 'flex',
         padding: '10px 16px',
         gap: '8px',
-        borderBottom: '1px solid var(--bg-hover)'
+        borderBottom: '1px solid var(--bg-hover)',
+        overflowX: 'auto'
       }}>
-        {['upcoming', 'today', 'all'].map((filter) => (
+        {['upcoming', 'ongoing', 'today', 'all'].map((filter) => (
           <button
             key={filter}
             onClick={() => setSelectedFilter(filter)}
@@ -290,12 +349,33 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onO
               fontWeight: '600',
               textTransform: 'capitalize',
               cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              flexShrink: 0,
               backgroundColor: selectedFilter === filter ? 'color-mix(in srgb, var(--accent-solid) 45%, transparent)' : 'transparent',
               color: selectedFilter === filter ? 'var(--accent-text)' : 'var(--text-secondary)',
               border: selectedFilter === filter ? '1px solid color-mix(in srgb, var(--accent-solid) 45%, transparent)' : '1px solid transparent'
             }}
           >
-            {filter}
+            {filter === 'ongoing' ? (
+              <>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: ongoingCount > 0 ? 'var(--success-color)' : 'currentColor', display: 'inline-block' }} />
+                <span>Ongoing</span>
+                {ongoingCount > 0 && (
+                  <span style={{
+                    padding: '1px 5px',
+                    borderRadius: '10px',
+                    fontSize: '10px',
+                    backgroundColor: 'var(--success-color)',
+                    color: '#ffffff',
+                    fontWeight: '700'
+                  }}>
+                    {ongoingCount}
+                  </span>
+                )}
+              </>
+            ) : filter}
           </button>
         ))}
       </div>
@@ -323,7 +403,13 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onO
           }}>
             <Calendar size={36} color="var(--text-muted)" style={{ margin: '0 auto 12px' }} />
             <h4 style={{ margin: '0 0 6px 0', fontSize: '15px', color: 'var(--text-primary)' }}>
-              {selectedFilter === 'today' ? 'No events for today' : selectedFilter === 'upcoming' ? 'No upcoming events' : 'No events in this group'}
+              {selectedFilter === 'ongoing'
+                ? 'No ongoing events right now'
+                : selectedFilter === 'today'
+                ? 'No events for today'
+                : selectedFilter === 'upcoming'
+                ? 'No upcoming events'
+                : 'No events in this group'}
             </h4>
             <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)' }}>
               Events created in this group will appear here for all members.
@@ -333,6 +419,10 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onO
           filteredEvents.map((ev) => {
             const hasJoined = ev.isAdded || ev.rsvpStatus === 'going';
             const isCancelled = ev.action === 'cancelled';
+            const startMs = parseEventDate(ev.startTime)?.getTime() || 0;
+            const endMs = parseEventDate(ev.endTime)?.getTime() || (startMs + 60 * 60 * 1000);
+            const isPast = endMs < now;
+            const isOngoing = startMs <= now && endMs >= now && !isCancelled;
             const currentUsername = localStorage.getItem('username');
             const isCreator = Boolean(
               (ev.creatorId && ev.creatorId === userId) ||
@@ -346,13 +436,13 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onO
                 style={{
                   backgroundColor: 'var(--bg-hover)',
                   borderRadius: '16px',
-                  border: `1px solid ${isCancelled ? 'var(--danger-tint-border)' : 'var(--bg-hover)'}`,
+                  border: `1px solid ${isCancelled ? 'var(--danger-tint-border)' : isOngoing ? 'rgba(16, 185, 129, 0.3)' : 'var(--bg-hover)'}`,
                   padding: '16px',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '12px',
                   position: 'relative',
-                  opacity: isCancelled ? 0.7 : 1,
+                  opacity: isCancelled ? 0.7 : isPast ? 0.82 : 1,
                   cursor: onOpenEvent ? 'pointer' : 'default'
                 }}
               >
@@ -365,32 +455,42 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onO
                       fontSize: '11px',
                       fontWeight: '700',
                       textTransform: 'uppercase',
-                      backgroundColor: isCancelled ? 'var(--danger-tint)' : 'var(--accent-tint)',
-                      color: isCancelled ? 'var(--danger-color)' : 'var(--accent-text)'
+                      backgroundColor: isCancelled ? 'var(--danger-tint)' : isOngoing ? 'rgba(16, 185, 129, 0.15)' : isPast ? 'rgba(255, 255, 255, 0.08)' : 'var(--accent-tint)',
+                      color: isCancelled ? 'var(--danger-color)' : isOngoing ? 'var(--success-color)' : isPast ? 'var(--text-secondary)' : 'var(--accent-text)',
+                      border: isOngoing ? '1px solid rgba(16, 185, 129, 0.3)' : 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px'
                     }}>
-                      {isCancelled ? 'Cancelled' : ev.scope === 'ALL' ? 'Group Event (All)' : 'Group Event'}
+                      {isOngoing && <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--success-color)' }} />}
+                      {isCancelled ? 'Cancelled' : isOngoing ? 'Ongoing Now' : isPast ? 'Past Event' : ev.scope === 'ALL' ? 'Group Event (All)' : 'Group Event'}
                     </span>
                     <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '500' }}>
                       {formatEventDate(ev.startTime)}
                     </span>
                   </div>
 
-                  {/* Reminder Toggle */}
-                  <button
-                    onClick={() => handleToggleReminder(ev)}
-                    title={ev.reminderEnabled ? 'Turn Reminder OFF' : 'Turn Reminder ON (1 hr before)'}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: ev.reminderEnabled ? 'var(--warning-color)' : 'var(--text-muted)',
-                      padding: '4px',
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}
-                  >
-                    {ev.reminderEnabled ? <Bell size={16} /> : <BellOff size={16} />}
-                  </button>
+                  {/* Reminder Toggle (Only for upcoming events) */}
+                  {!isPast && !isCancelled && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleReminder(ev);
+                      }}
+                      title={ev.reminderEnabled ? 'Turn Reminder OFF' : 'Turn Reminder ON (1 hr before)'}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: ev.reminderEnabled ? 'var(--warning-color)' : 'var(--text-muted)',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      {ev.reminderEnabled ? <Bell size={16} /> : <BellOff size={16} />}
+                    </button>
+                  )}
                 </div>
 
                 {/* Title & Time */}

@@ -28,6 +28,7 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 const API = "https://letschat-backend-69jf.onrender.com/api"; 
 const DB_VERSION = 16;
+const APP_VERSION = '1.0.0';
 
 // ─── Service Worker Lifecycle & Auto-Activation ─────────────────────────────
 self.addEventListener('install', (event) => {
@@ -51,7 +52,7 @@ self.addEventListener('activate', (event) => {
       for (const client of windowClients) {
         client.postMessage({
           type: 'SW_ACTIVATED',
-          version: Date.now()
+          version: APP_VERSION
         });
       }
     })()
@@ -295,6 +296,7 @@ messaging.onBackgroundMessage((payload) => {
     if (typeof msgStr !== 'string') return msgStr;
     const parts = msgStr.split('/%20/');
     if (parts.length < 4) return msgStr;
+    const [spaceId, type, username, content] = parts;
     const displayMap = { image: '📷 Image', video: '🎥 Video', audio: '🎤 Voice Message', voice: '🎤 Voice Message', file: '📁 File', assignment: '📚 Assignment', poll: '📊 Poll' };
     const resolvedContent = displayMap[type] || (typeof content === 'string' && content.trim().startsWith('{"poll_id"') ? '📊 Poll' : content);
     return `${username}: ${resolvedContent}`;

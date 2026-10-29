@@ -7,6 +7,7 @@ import { getMessagesFromDB, syncChatsMapToDB, getTotalMessageCountFromDB } from 
 import { getMediaInfo, getMediaBlob, memoryThumbCache } from "../service/MediaCache";
 import { getChatIcon, getChatColor } from "../service/ChatUtils";
 import MediaViewer from "../components/chat/MediaViewer";
+import InfoModal from "../components/modals/InfoModal";
 import Avatar from "../components/chat/Avatar";
 import StreakBadge from "../components/pulse/StreakBadge";
 import userDiscoveryStore from "../service/UserDiscoveryStore";
@@ -415,6 +416,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
     return JSON.parse(localStorage.getItem("visited") || "{}");
   });
   const [selectedChatForSpaces, setSelectedChatForSpaces] = useState(null);
+  const [infoModalChat, setInfoModalChat] = useState(null);
   const [spaceGroupEvents, setSpaceGroupEvents] = useState([]);
   const { events: allEvents } = useEventMediator();
   const [spacesCache, setSpacesCache] = useState(() => {
@@ -434,6 +436,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
   const [isCreatingSpace, setIsCreatingSpace] = useState(false);
   const [newSpaceName, setNewSpaceName] = useState("");
   const [isAddingSpace, setIsAddingSpace] = useState(false);
+  const isCreatingSpaceRef = useRef(false);
   const [spaceLastMessages, setSpaceLastMessages] = useState({});
 
   useEffect(() => {
@@ -638,6 +641,30 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
   // Mark unmounted so async callbacks don't setState after cleanup
   useEffect(() => () => { isMounted.current = false; }, []);
 
+  const handleRefreshChatNames = useCallback(() => {
+    const userId = userIdRef.current || localStorage.getItem('userid');
+    if (!userId) return;
+    fetch(`${API}/user/chatbox/${userId}`, {
+      headers: {
+        "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true"
+      }
+    })
+      .then(res => (res.ok ? res.json() : []))
+      .then(data => {
+        if (!isMounted.current || !Array.isArray(data)) return;
+        const uniqueData = Array.from(new Map(data.map(item => [item.chatId, item])).values());
+        setChatNames(uniqueData);
+        localStorage.setItem('chatNames', JSON.stringify(uniqueData));
+      })
+      .catch(err => console.warn('Failed to refresh chat names:', err));
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('letschat_refresh_chatnames', handleRefreshChatNames);
+    return () => window.removeEventListener('letschat_refresh_chatnames', handleRefreshChatNames);
+  }, [handleRefreshChatNames]);
+
   // ── Guard: redirect if not logged in — runs ONCE on mount ────────────────
   useEffect(() => {
     if (!userIdRef.current) navigate("/login");
@@ -680,6 +707,10 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
     // ── Real-time listener: batches both state updates in one callback ─────
     const unsubscribe = messageStore.addListener((update) => {
       if (!isMounted.current) return;
+
+      if (update && (update.type === 'username_change' || update.msgtype === 'username_change' || (update.content && typeof update.content === 'string' && update.content.includes('changed display name')))) {
+        handleRefreshChatNames();
+      }
 
       const lastMsgs = messageStore.getLastMessage() || {};
       const counts = messageStore.getCount() || {};
@@ -856,7 +887,30 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                   }
                 });
             } else {
-              if (import.meta.env.DEV) console.log(`[ChatNames] IndexedDB already has ${totalMsgCount} messages. Skipping recent-messages API.`);
+              if (import.meta.env.DEV) console.log(`[ChatNames] IndexedDB already has ${totalMsgCount} messages. Syncing recent messages for active chats with timestamp...`);
+              uniqueData.slice(0, 15).forEach(chat => {
+                const cId = chat.chatId;
+                if (!cId) return;
+                const latestMsg = messageStore.getChatLastMessage(cId);
+                const lastTs = latestMsg?.timestamp || null;
+                let syncUrl = `${API}/user/chatbox/${encodeURIComponent(cId)}/sync-messages?spaceId=0`;
+                if (lastTs) syncUrl += `&lastTimestamp=${encodeURIComponent(lastTs)}`;
+                fetch(syncUrl, {
+                  signal: controller.signal,
+                  headers: {
+                    "Content-Type": "application/json",
+                    "User-Id": userId,
+                    "ngrok-skip-browser-warning": "true"
+                  }
+                })
+                  .then(r => (r.ok ? r.json() : null))
+                  .then(batch => {
+                    if (batch && batch.msgs) {
+                      messageStore.handleBatch(batch);
+                    }
+                  })
+                  .catch(() => {});
+              });
             }
           }).catch(err => {
             if (import.meta.env.DEV) console.error("[ChatNames] Error querying DB message count:", err);
@@ -1462,6 +1516,8 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
       setIsCreatingSpace(false);
       return;
     }
+    if (isCreatingSpaceRef.current) return;
+    isCreatingSpaceRef.current = true;
     setIsAddingSpace(true);
 
     const spaces = selectedChatForSpaces.spaces || [];
@@ -1518,6 +1574,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
       console.error(err);
       alert("Network error");
     } finally {
+      isCreatingSpaceRef.current = false;
       setIsAddingSpace(false);
       setIsCreatingSpace(false);
       setNewSpaceName("");
@@ -1802,15 +1859,25 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                 style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', WebkitTapHighlightColor: 'transparent', outline: 'none' }}
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (selectedChatForSpaces.type === 'private') {
-                    navigate('/profileupdate', { state: { user: selectedChatForSpaces } });
-                  } else {
-                    navigate(`/chat/${selectedChatForSpaces.chatId}`, { state: { openInfo: true } });
-                  }
+                  setInfoModalChat(selectedChatForSpaces);
                 }}
               >
-                <Avatar chat={selectedChatForSpaces} size={36} />
-                <span style={{ fontWeight: '700', fontSize: '16px', color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                <Avatar
+                  chat={selectedChatForSpaces}
+                  size={36}
+                  style={{ cursor: 'pointer' }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setInfoModalChat(selectedChatForSpaces);
+                  }}
+                />
+                <span
+                  style={{ fontWeight: '700', fontSize: '16px', color: 'var(--text-primary)', display: 'inline-flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setInfoModalChat(selectedChatForSpaces);
+                  }}
+                >
                   {selectedChatForSpaces.chatName}
                   {isVerifiedChat(selectedChatForSpaces) && (
                     <VerifiedBadge size={16} />
@@ -1899,7 +1966,8 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                   alignItems: 'center',
                   gap: '12px',
                   padding: '8px 16px',
-                  marginTop: '4px'
+                  marginTop: '4px',
+                  position: 'relative'
                 }}>
                   <div style={{
                     width: '36px',
@@ -1944,14 +2012,25 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                       background: 'none',
                       border: 'none',
                       color: newSpaceName.trim() ? 'var(--success-color)' : 'var(--text-secondary)',
-                      cursor: newSpaceName.trim() ? 'pointer' : 'not-allowed',
+                      cursor: (isAddingSpace || !newSpaceName.trim()) ? 'not-allowed' : 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       padding: '8px'
                     }}
                   >
-                    <Check size={20} />
+                    {isAddingSpace ? (
+                      <div style={{
+                        width: '18px',
+                        height: '18px',
+                        border: '2px solid rgba(255,255,255,0.2)',
+                        borderTopColor: 'var(--accent-color)',
+                        borderRadius: '50%',
+                        animation: 'spin 0.8s linear infinite'
+                      }} />
+                    ) : (
+                      <Check size={20} />
+                    )}
                   </button>
                   <button
                     onClick={() => {
@@ -1972,6 +2051,25 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                   >
                     <X size={20} />
                   </button>
+                  {isAddingSpace && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      left: '16px',
+                      right: '16px',
+                      height: '2px',
+                      backgroundColor: 'var(--border-color)',
+                      overflow: 'hidden',
+                      borderRadius: '2px'
+                    }}>
+                      <div style={{
+                        width: '40%',
+                        height: '100%',
+                        backgroundColor: 'var(--accent-color)',
+                        animation: 'loadingProgress 1s infinite ease-in-out'
+                      }} />
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div
@@ -2412,6 +2510,16 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
         <MediaViewer
           media={viewingMedia}
           onClose={() => setViewingMedia(null)}
+        />
+      )}
+
+      {infoModalChat && (
+        <InfoModal
+          chat={infoModalChat}
+          onClose={() => setInfoModalChat(null)}
+          API={API}
+          navigate={navigate}
+          getchat={getchat}
         />
       )}
 

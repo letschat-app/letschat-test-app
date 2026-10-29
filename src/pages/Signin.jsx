@@ -429,6 +429,7 @@ function Signin() {
         localStorage.setItem("username", form.username.trim().toLowerCase());
         localStorage.setItem("displayName", form.displayName.trim() || form.username.trim());
         localStorage.setItem("profile", responseData?.profile || form.username.trim().toLowerCase());
+        localStorage.setItem("isNewSignup", "true");
 
         initWebsocket();
         navigate("/chats", { replace: true });

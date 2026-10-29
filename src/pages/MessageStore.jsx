@@ -400,6 +400,7 @@ const messageStore = {
       const targetIndex = messages.findIndex(m => m.msgid === actualRepliedTo || m.tempmsgid === actualRepliedTo);
       if (targetIndex !== -1) {
         const targetMsg = { ...messages[targetIndex] };
+        targetMsg.chatid = targetMsg.chatid || targetMsg.chatId || chatid;
         if (!targetMsg.reactions) targetMsg.reactions = {};
         
         const reactionText = content;

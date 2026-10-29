@@ -1236,6 +1236,7 @@ const ChatBox = () => {
 
     // Update local store immediately for feedback
     messageStore.addMessage(reactionMsg);
+    setMessages([...messageStore.getMessages(chatid)]);
 
     // Send via websocket
     sendSafe(reactionMsg);
@@ -1283,7 +1284,7 @@ const ChatBox = () => {
     const syncKey = `${targetChatId}_${sId}`;
     const now = Date.now();
     const lastSync = lastChatSyncTimes[syncKey] || 0;
-    if (now - lastSync < 60000) {
+    if (now - lastSync < 25000) {
       console.log(`[ChatBox] Skipping sync for ${syncKey}, last synced ${Math.round((now - lastSync) / 1000)}s ago`);
       return;
     }
@@ -1444,7 +1445,8 @@ const ChatBox = () => {
         return;
       }
 
-      if (msg && msg.chatid === chatid) {
+      const incomingChatId = msg ? (msg.chatid || msg.chatId || msg.userchatId) : null;
+      if (msg && String(incomingChatId) === String(chatid)) {
         console.log("[ChatBox] Global store updated for chatid:", chatid);
         const updatedMessages = [...messageStore.getMessages(chatid)];
         setMessages(updatedMessages);
@@ -2932,16 +2934,39 @@ const ChatBox = () => {
 
   const formatTime12Hour = (timestamp, showSeconds = false) => {
     if (!timestamp) return '';
+    if (typeof timestamp === 'string' && /^(0?[1-9]|1[0-2]):[0-5][0-9]\s*(AM|PM)$/i.test(timestamp.trim())) {
+      return timestamp.trim().toUpperCase();
+    }
     try {
-      const date = new Date(timestamp);
-      if (isNaN(date.getTime())) return String(timestamp);
+      let d;
+      if (typeof timestamp === 'number') {
+        d = new Date(timestamp < 1e11 ? timestamp * 1000 : timestamp);
+      } else if (typeof timestamp === 'string') {
+        const trimmed = timestamp.trim();
+        if (/^\d+(\.\d+)?$/.test(trimmed)) {
+          const num = parseFloat(trimmed);
+          d = new Date(num < 1e11 ? num * 1000 : num);
+        } else if (trimmed.includes('T') || trimmed.includes('-')) {
+          let str = trimmed;
+          if (!str.endsWith('Z') && !/[+-]\d{2}(:?\d{2})?$/.test(str)) {
+            str = str.replace(' ', 'T') + '+05:30';
+          }
+          d = new Date(str);
+        } else {
+          d = new Date(timestamp);
+        }
+      } else {
+        d = new Date(timestamp);
+      }
+
+      if (isNaN(d.getTime())) return String(timestamp);
       return new Intl.DateTimeFormat('en-IN', {
         timeZone: 'Asia/Kolkata',
         hour: 'numeric',
         minute: '2-digit',
         second: showSeconds ? '2-digit' : undefined,
         hour12: true
-      }).format(date);
+      }).format(d);
     } catch (e) {
       return String(timestamp);
     }
@@ -3513,6 +3538,10 @@ const ChatBox = () => {
     console.log("[ChatBox] Updating event:", event);
     if (!event) {
       console.warn("[ChatBox] Update called with null event");
+      return;
+    }
+    if (!event.id && !event.eventId && !event.groupEventId && (!event.msgref || String(event.msgref).trim() === '')) {
+      console.log("[ChatBox] Skipping update for event without ID or msgref");
       return;
     }
 
@@ -4436,10 +4465,17 @@ const ChatBox = () => {
               style={{ cursor: 'pointer' }}
               showStatus={chat.type === 'private'}
               isOnline={isOnline}
+              onClick={(e) => { e.stopPropagation(); clickInfo(); }}
             />
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div
+              style={{ display: 'flex', flexDirection: 'column', cursor: 'pointer' }}
+              onClick={(e) => { e.stopPropagation(); clickInfo(); }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ color: 'var(--text-primary)', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                <span
+                  style={{ color: 'var(--text-primary)', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}
+                  onClick={(e) => { e.stopPropagation(); clickInfo(); }}
+                >
                   {chatid === SIMULATION_ID ? "LetsChat" : (chat?.chatName || "Chat")}
                   {(chatid === SIMULATION_ID || chat?.id === SIMULATION_ID || chat?.isSimulation || chat?.isSystem || chat?.verified || /letschat/i.test(chat?.chatName || '')) && (
                     <span title="Official Verified Channel" style={{
@@ -4498,8 +4534,10 @@ const ChatBox = () => {
               {isMobile && (
                 <span
                   onClick={(e) => {
-                    e.stopPropagation();
-                    if (activeSpace !== 0 && chat?.type !== 'classroom') handleRenameSpace();
+                    if (activeSpace !== 0 && chat?.type !== 'classroom') {
+                      e.stopPropagation();
+                      handleRenameSpace();
+                    }
                   }}
                   style={{
                     fontSize: '10px',
@@ -4730,13 +4768,14 @@ const ChatBox = () => {
               {hasNewGroupEvent && (
                 <span style={{
                   position: 'absolute',
-                  top: '6px',
-                  right: '6px',
-                  width: '8px',
-                  height: '8px',
+                  top: '5px',
+                  right: '5px',
+                  width: '11px',
+                  height: '11px',
                   borderRadius: '50%',
                   backgroundColor: '#3b82f6',
-                  boxShadow: '0 0 0 2px var(--bg-card)'
+                  boxShadow: '0 0 0 2px var(--bg-card), 0 0 8px 2px #3b82f6',
+                  zIndex: 2
                 }} />
               )}
             </button>
@@ -5236,9 +5275,12 @@ const ChatBox = () => {
             const oldScrollHeight = el.scrollHeight;
 
             if (el.scrollTop < threshold && !isLoadingMoreRef.current) {
-              const chatMessages = messageStore.getMessages(chatid);
-              if (!chatMessages || chatMessages.length === 0) return;
-              const oldestTimestamp = messageStore.getBatchFrontier(chatid, activeSpace) || chatMessages[0].timestamp;
+              const spaceMessages = (messageStore.getMessages(chatid) || []).filter(m => {
+                const msgSpace = m.spaceid !== undefined ? m.spaceid : (m.spaceId !== undefined ? m.spaceId : 0);
+                return Number(msgSpace) === Number(activeSpace || 0);
+              });
+              if (!spaceMessages || spaceMessages.length === 0) return;
+              const oldestTimestamp = messageStore.getBatchFrontier(chatid, activeSpace) || spaceMessages[0].timestamp;
 
               isLoadingMoreRef.current = true;
 
@@ -5400,7 +5442,7 @@ const ChatBox = () => {
             }
 
             return (
-              <React.Fragment key={msg.msgid || msg.tempmsgid}>
+              <React.Fragment key={msg.tempmsgid || msg.msgid}>
                 {showDate && (
                   <div
                     style={{
@@ -5547,7 +5589,10 @@ const ChatBox = () => {
                       }}>
                         {msg.isdeleted || msg.isdeletedeone ? (
                           <div
-                            ref={(el) => (messageRefs.current[msg.msgid] = el)}
+                            ref={(el) => {
+                              if (msg.msgid) messageRefs.current[msg.msgid] = el;
+                              if (msg.tempmsgid) messageRefs.current[msg.tempmsgid] = el;
+                            }}
                             style={{
                               alignSelf: isReceived ? "flex-start" : "flex-end",
                               backgroundColor: isReceived ? "var(--message-bg-incoming)" : "var(--bg-card)",
@@ -5582,7 +5627,10 @@ const ChatBox = () => {
                           </div>
                         ) : (
                           <div
-                            ref={(el) => (messageRefs.current[msg.msgid] = el)}
+                            ref={(el) => {
+                              if (msg.msgid) messageRefs.current[msg.msgid] = el;
+                              if (msg.tempmsgid) messageRefs.current[msg.tempmsgid] = el;
+                            }}
                             className={msgFireClass || undefined}
                             style={{
                               alignSelf: isReceived ? "flex-start" : "flex-end",
@@ -7550,6 +7598,12 @@ const ChatBox = () => {
                 onClose={() => setShowGroupCalendar(false)}
                 onOpenCreateEvent={(params) => {
                   setSelectedEvent({ chatid, isGroup: true, title: '', description: '', ...params });
+                  setShowGroupCalendar(false);
+                  setShowEventModal(true);
+                }}
+                onOpenEvent={(ev) => {
+                  setSelectedEvent({ ...ev, chatid, isGroup: true });
+                  setShowGroupCalendar(false);
                   setShowEventModal(true);
                 }}
               />
@@ -7692,6 +7746,11 @@ const ChatBox = () => {
               onClose={() => setShowGroupCalendar(false)}
               onOpenCreateEvent={(params) => {
                 setSelectedEvent({ chatid, isGroup: true, title: '', description: '', ...params });
+                setShowGroupCalendar(false);
+                setShowEventModal(true);
+              }}
+              onOpenEvent={(ev) => {
+                setSelectedEvent({ ...ev, chatid, isGroup: true });
                 setShowGroupCalendar(false);
                 setShowEventModal(true);
               }}

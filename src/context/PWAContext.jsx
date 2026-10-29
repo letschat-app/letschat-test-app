@@ -16,7 +16,7 @@ export const PWAProvider = ({ children }) => {
 
   // ── Update State ──────────────────────────────────────────────────────────
   const [updateAvailable, setUpdateAvailable] = useState(false);
-  const [currentVersion, setCurrentVersion] = useState(null);
+  const [currentVersion, setCurrentVersion] = useState(() => localStorage.getItem(VERSION_KEY) || null);
 
   // ── Internal Refs (NOT state — they must not cause re-renders) ────────────
   const waitingWorkerRef = useRef(null);   // The new SW waiting to activate
