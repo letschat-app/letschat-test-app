@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  X, Calendar, Clock, Check, AlertTriangle, Trash2, ArrowRight,
+  X, Calendar, Clock, Check, AlertTriangle, Trash2, ArrowRight, Plus,
   Video, MapPin, Users, Globe, Lock, Bell, ExternalLink, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { getChatName } from '../../service/ChatUtils';
@@ -9,6 +9,7 @@ import { API } from '../../service/UserAuth';
 const EventModal = ({
   event,
   onClose,
+  onEventCreated,
   isReceived,
   hasChanges,
   setHasChanges,
@@ -40,8 +41,17 @@ const EventModal = ({
     (isReceived && isExplicitGroupEvent)
   );
 
-  // Enforce: only event creator can edit user-created events. Auto-detected events from messages can be edited by the user adding them.
-  const canEdit = isAutoDetected || !isReceivingPerson;
+  const isNewEvent = Boolean(
+    !isAutoDetected &&
+    !event?.msgref &&
+    !event?.id &&
+    !event?.groupEventId &&
+    !event?.eventId &&
+    (event?.isGroup || event?.chatid || event?.chatId)
+  );
+
+  // Enforce: creator or new events can edit freely
+  const canEdit = isNewEvent || isAutoDetected || !isReceivingPerson;
 
   // Compute default end time (1 hr default duration)
   const computeDefaultEndTime = (startTime) => {
@@ -143,6 +153,69 @@ const EventModal = ({
       chatid: newVis ? (event?.chatid || event?.chatId) : null
     }));
     if (setHasChanges) setHasChanges(true);
+  };
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleCreateEvent = async () => {
+    if (!formData.title || !formData.title.trim()) {
+      alert("Please enter an event title");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const dateStr = typeof formData.date === 'string' ? formData.date : new Date(formData.date).toISOString().split('T')[0];
+      const startIso = new Date(`${dateStr}T${formData.startTime}:00`).toISOString();
+      const endIso = new Date(`${dateStr}T${formData.endTime}:00`).toISOString();
+      const targetChatId = formData.chatid || event?.chatid || event?.chatId;
+
+      const payload = {
+        chatId: targetChatId,
+        eventTitle: formData.title.trim(),
+        eventDetails: formData.description || '',
+        eventColor: formData.color || '#3b82f6',
+        startTime: startIso,
+        endTime: endIso,
+        scope: formData.scope || 'ALL',
+        isGroupVisible: formData.isGroupVisible !== false,
+        meetingType: formData.meetingType || 'online',
+        meetingLink: formData.meetingLink?.trim() || null,
+        location: formData.location?.trim() || null,
+        reminderOffset: formData.reminderOffset || 60,
+        action: 'scheduled'
+      };
+
+      const res = await fetch(`${API}/user/event/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Id': currentUserId || localStorage.getItem('userid'),
+          'ngrok-skip-browser-warning': 'true'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        window.dispatchEvent(new CustomEvent('letschat_refresh_events'));
+        window.dispatchEvent(new CustomEvent('letschat_event_sync', { detail: { chatId: targetChatId } }));
+        if (setHasChanges) setHasChanges(false);
+        if (onEventCreated) {
+          onEventCreated();
+        } else if (onClose) {
+          onClose();
+        }
+      } else {
+        const errorText = await res.text();
+        console.error("Failed to create event:", res.status, errorText);
+        alert("Failed to create event. Please try again.");
+      }
+    } catch (err) {
+      console.error("Network error creating group event:", err);
+      alert("Network error creating group event.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleAddToggle = async () => {
@@ -845,8 +918,25 @@ const EventModal = ({
 
       {/* Action Buttons */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingBottom: isPanel ? '40px' : '0' }}>
-        {!canEdit || isReceived || !formData.isAdded ? (
+        {isNewEvent ? (
           <button
+            type="button"
+            onClick={handleCreateEvent}
+            disabled={isSubmitting}
+            style={{
+              width: '100%', padding: '16px', borderRadius: '14px',
+              backgroundColor: 'var(--accent-solid)',
+              color: '#ffffff', border: 'none', fontWeight: '700', fontSize: '16px',
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+              boxShadow: '0 10px 20px -5px color-mix(in srgb, var(--accent-solid) 45%, transparent)'
+            }}
+          >
+            {isSubmitting ? <span>Creating Event...</span> : <><Plus size={20} /> Create Event</>}
+          </button>
+        ) : (!canEdit || isReceived || !formData.isAdded ? (
+          <button
+            type="button"
             onClick={handleAddToggle}
             style={{
               width: '100%', padding: '16px', borderRadius: '14px',
@@ -872,7 +962,7 @@ const EventModal = ({
               <Trash2 size={18} /> Cancel Event
             </button>
           </div>
-        )}
+        ))}
       </div>
     </div>
   );

@@ -9,28 +9,33 @@ import { getMediaInfo, getMediaBlob, saveBlobToCache, memoryThumbCache } from '.
  */
 const formatSize = (bytes) => {
   if (!bytes) return '0 B';
+  const num = typeof bytes === 'number' ? bytes : parseFloat(bytes);
+  if (isNaN(num) || num <= 0) return '0 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  const i = Math.min(Math.floor(Math.log(num) / Math.log(k)), sizes.length - 1);
+  return parseFloat((num / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 };
 
 /**
  * Format seconds to MM:SS
  */
 const formatDuration = (seconds) => {
-  if (!seconds) return '0:00';
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
+  const num = typeof seconds === 'number' ? seconds : parseFloat(seconds);
+  if (isNaN(num) || num <= 0) return '0:00';
+  const mins = Math.floor(num / 60);
+  const secs = Math.floor(num % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
 const isPdfFile = (name) => {
-  if (!name) return false;
+  if (!name || typeof name !== 'string') return false;
   return name.toLowerCase().endsWith('.pdf');
 };
 
 export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMode, onOpenViewer, onRetry }) {
+  if (!msg) return null;
+
   const [mediaInfo, setMediaInfo] = useState(() => {
     if (msg.isOptimistic || msg.optimisticUrl) {
       return {
@@ -178,7 +183,7 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
         } else {
           // Finalized message
           const cacheKey = `${mediaId}_thumb`;
-          const fetchUrl = getFetchUrl(thumbnailKey, mediaInfo.thumbnailUrl);
+          const fetchUrl = getFetchUrl(thumbnailKey, mediaInfo?.thumbnailUrl);
 
           // ALWAYS check cache first, even if fetchUrl is null (since we locally generate & cache PDF thumbs)
           const url = await getMediaBlob(cacheKey, fetchUrl, 'thumbCache');
@@ -199,9 +204,9 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
           fileType === 'pdf';
 
         if (shouldResolveMain) {
-          const mainSrc = isOptimistic ? msg.optimisticUrl : null;
-          const cacheKey = isOptimistic ? msg.tempmsgid : `${mediaId}_full`;
-          const fetchUrl = isOptimistic ? mainSrc : getFetchUrl(fileKey, mediaInfo.url || mediaInfo.fileUrl);
+          const mainSrc = isOptimistic ? msg?.optimisticUrl : null;
+          const cacheKey = isOptimistic ? msg?.tempmsgid : `${mediaId}_full`;
+          const fetchUrl = isOptimistic ? mainSrc : getFetchUrl(fileKey, mediaInfo?.url || mediaInfo?.fileUrl);
 
           if (fetchUrl) {
             const url = await getMediaBlob(cacheKey, fetchUrl, 'mainCache');
@@ -276,10 +281,17 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
     if (!audioRef.current) return;
     if (isPlaying) {
       audioRef.current.pause();
+      setIsPlaying(false);
     } else {
-      audioRef.current.play();
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn('[MediaMessage] Audio play failed:', err);
+          setIsPlaying(false);
+        });
+      }
+      setIsPlaying(true);
     }
-    setIsPlaying(!isPlaying);
   };
 
   const onTimeUpdate = () => {
@@ -431,6 +443,7 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
                 if (isSelectionMode) return;
                 e.stopPropagation();
                 const url = resolvedMain || fileUrl;
+                if (!url) return;
                 if (url.startsWith('blob:')) {
                   const link = document.createElement('a');
                   link.href = url;
@@ -711,7 +724,7 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
           if (isSelectionMode) return;
           e.stopPropagation();
           const url = resolvedMain || fileUrl;
-          window.open(url, '_blank');
+          if (url) window.open(url, '_blank');
         }}
       >
         {renderOptimisticOverlay()}
@@ -784,10 +797,10 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
               fontSize: '14px', fontWeight: '600', color: isReceived ? 'var(--text-primary)' : '#ffffff',
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
             }}>
-              {fileName}
+              {fileName || 'Document'}
             </div>
             <div style={{ fontSize: '11px', color: isReceived ? 'var(--text-secondary)' : 'rgba(255, 255, 255, 0.85)', fontWeight: '500' }}>
-              {mediaInfo.noOfPages ? `${mediaInfo.noOfPages} pages • ` : ''}
+              {noOfPages ? `${noOfPages} pages • ` : ''}
               {isPDF ? 'PDF' : (fileType || 'Doc').toUpperCase()} • {formatSize(fileSize)}
             </div>
           </div>
@@ -841,7 +854,7 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
                   if (isSelectionMode) return;
                   e.stopPropagation();
                   const url = resolvedMain || fileUrl;
-                  downloadFile(url, fileName);
+                  if (url) downloadFile(url, fileName);
                 }}
                 style={{
                   padding: '8px', borderRadius: '50%', background: isReceived ? 'var(--bg-hover)' : 'var(--border-color)',

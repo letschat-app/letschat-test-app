@@ -3526,12 +3526,64 @@ const ChatBox = () => {
 
   const [draftEvent, setDraftEvent] = useState(null);
 
-  const saveChanges = () => {
+  const saveChanges = async () => {
+    if (!draftEvent) return;
+    const targetChatId = draftEvent.chatid || draftEvent.chatId || chatid;
+    const isNewGroupEvent = !draftEvent.id && !draftEvent.eventId && !draftEvent.groupEventId && targetChatId;
+
+    if (isNewGroupEvent) {
+      try {
+        const dateStr = typeof draftEvent.date === 'string' ? draftEvent.date : new Date(draftEvent.date).toISOString().split('T')[0];
+        const startIso = draftEvent.startTime && String(draftEvent.startTime).includes('T')
+          ? draftEvent.startTime
+          : new Date(`${dateStr}T${draftEvent.startTime || '10:00'}:00`).toISOString();
+        const endIso = draftEvent.endTime && String(draftEvent.endTime).includes('T')
+          ? draftEvent.endTime
+          : new Date(`${dateStr}T${draftEvent.endTime || '11:00'}:00`).toISOString();
+
+        const payload = {
+          chatId: targetChatId,
+          eventTitle: (draftEvent.title || draftEvent.eventTitle || 'Event').trim(),
+          eventDetails: draftEvent.description || draftEvent.eventDetails || '',
+          eventColor: draftEvent.color || '#3b82f6',
+          startTime: startIso,
+          endTime: endIso,
+          scope: draftEvent.scope || 'ALL',
+          isGroupVisible: draftEvent.isGroupVisible !== false,
+          meetingType: draftEvent.meetingType || 'online',
+          meetingLink: draftEvent.meetingLink?.trim() || null,
+          location: draftEvent.location?.trim() || null,
+          reminderOffset: draftEvent.reminderOffset || 60,
+          action: 'scheduled'
+        };
+
+        const res = await fetch(`${API}/user/event/create`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Id': currentUserId || localStorage.getItem('userid'),
+            'ngrok-skip-browser-warning': 'true'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          window.dispatchEvent(new CustomEvent('letschat_refresh_events'));
+          window.dispatchEvent(new CustomEvent('letschat_event_sync', { detail: { chatId: targetChatId } }));
+        }
+      } catch (err) {
+        console.error('Failed to create group event on save:', err);
+      }
+      setDraftEvent(null);
+      setShowEventModal(false);
+      setShowGroupCalendar(true);
+      return;
+    }
+
     const dateKey = typeof draftEvent.date === 'string' ? draftEvent.date : draftEvent.date.toISOString().split('T')[0];
     updateEvent(dateKey, draftEvent);
     console.log(draftEvent);
     update(draftEvent);
-    // setDraftEvent(null);
   }
 
 
@@ -7626,6 +7678,8 @@ const ChatBox = () => {
                 groupName={chat?.chatname || 'Group Calendar'}
                 onClose={() => setShowGroupCalendar(false)}
                 onOpenCreateEvent={(params) => {
+                  setEventRecived(false);
+                  setHasChanges(false);
                   setSelectedEvent({ chatid, isGroup: true, title: '', description: '', ...params });
                   setShowGroupCalendar(false);
                   setShowEventModal(true);
@@ -7656,7 +7710,16 @@ const ChatBox = () => {
                     setShowSaveDialog(true);
                   } else {
                     setShowEventModal(false);
+                    if (SelectedEvent?.isGroup) {
+                      setShowGroupCalendar(true);
+                    }
                   }
+                }}
+                onEventCreated={() => {
+                  setShowEventModal(false);
+                  setHasChanges(false);
+                  setDraftEvent(null);
+                  setShowGroupCalendar(true);
                 }}
                 hasChanges={hasChanges}
                 setHasChanges={setHasChanges}
@@ -7714,7 +7777,7 @@ const ChatBox = () => {
               <p style={{ margin: '0 0 20px 0', color: 'var(--text-secondary)', fontSize: '14px' }}>You have unsaved changes. Do you want to save them before closing?</p>
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button onClick={() => { setShowSaveDialog(false); setShowEventModal(false); setHasChanges(false); saveChanges(); }} style={{ flex: 1, padding: '12px', backgroundColor: 'var(--accent-color)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Save</button>
-                <button onClick={() => { setShowSaveDialog(false); setShowEventModal(false); setHasChanges(false); }} style={{ flex: 1, padding: '12px', backgroundColor: 'var(--danger-color)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Discard</button>
+                <button onClick={() => { setShowSaveDialog(false); setShowEventModal(false); setHasChanges(false); if (SelectedEvent?.isGroup) setShowGroupCalendar(true); }} style={{ flex: 1, padding: '12px', backgroundColor: 'var(--danger-color)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Discard</button>
                 <button onClick={() => setShowSaveDialog(false)} style={{ flex: 1, padding: '12px', backgroundColor: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
               </div>
             </div>
@@ -7752,7 +7815,16 @@ const ChatBox = () => {
                 setShowSaveDialog(true);
               } else {
                 setShowEventModal(false);
+                if (SelectedEvent?.isGroup) {
+                  setShowGroupCalendar(true);
+                }
               }
+            }}
+            onEventCreated={() => {
+              setShowEventModal(false);
+              setHasChanges(false);
+              setDraftEvent(null);
+              setShowGroupCalendar(true);
             }}
             hasChanges={hasChanges}
             setHasChanges={setHasChanges}
@@ -7774,6 +7846,8 @@ const ChatBox = () => {
               groupName={chat?.chatname || 'Group Calendar'}
               onClose={() => setShowGroupCalendar(false)}
               onOpenCreateEvent={(params) => {
+                setEventRecived(false);
+                setHasChanges(false);
                 setSelectedEvent({ chatid, isGroup: true, title: '', description: '', ...params });
                 setShowGroupCalendar(false);
                 setShowEventModal(true);
