@@ -28,7 +28,7 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 const API = "https://letschat-backend-69jf.onrender.com/api"; 
 const DB_VERSION = 16;
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '2.0.4';
 
 // ─── Service Worker Lifecycle & Auto-Activation ─────────────────────────────
 self.addEventListener('install', (event) => {

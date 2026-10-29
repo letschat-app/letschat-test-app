@@ -1334,7 +1334,7 @@ const ChatBox = () => {
           break;
         }
 
-        data.usermsgId = data.spaceId;
+        data.usermsgId = data.usermsgId !== undefined ? data.usermsgId : sId;
         messageStore.handleBatch(data);
 
         // Refresh event or poll data if present
@@ -1399,6 +1399,7 @@ const ChatBox = () => {
     if (isSimulation) return;
     // Notify server of check-in to this specific chat and space
     getchat(chatid, activeSpace, null, chat?.type);
+    syncChatOnOpen(chatid, activeSpace);
   }, [chatid, activeSpace, isSimulation]);
 
   useEffect(() => {
@@ -5240,6 +5241,34 @@ const ChatBox = () => {
         )}
 
         {/* Space navigation removed - handled in ChatNames list */}
+
+        {isSyncingMessages && (
+          <div style={{
+            position: 'absolute',
+            top: '74px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 90,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '6px 14px',
+            borderRadius: '20px',
+            backgroundColor: 'rgba(17, 24, 39, 0.92)',
+            backdropFilter: 'blur(8px)',
+            border: '1px solid var(--border-color)',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.35)',
+            color: 'var(--text-primary)',
+            fontSize: '12px',
+            fontWeight: '500',
+            pointerEvents: 'none',
+            userSelect: 'none',
+            animation: 'fadeIn 0.2s ease-out'
+          }}>
+            <Loader2 size={13} className="animate-spin" color="var(--accent-color)" />
+            <span>Loading messages...</span>
+          </div>
+        )}
 
 
 

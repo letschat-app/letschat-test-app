@@ -83,6 +83,20 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
   const [currentTime, setCurrentTime] = useState(0);
   const audioRef = useRef(null);
 
+  const s = (val) => val === 'null' || val === 'undefined' ? null : val;
+
+  const fileKey = mediaInfo?.fileKey;
+  const thumbnailKey = mediaInfo?.thumbnailKey;
+  const fileType = mediaInfo?.fileType;
+  const fileName = mediaInfo?.fileName;
+  const fileSize = mediaInfo?.fileSize;
+  const duration = mediaInfo?.duration;
+  const noOfPages = mediaInfo?.noOfPages;
+
+  // Final fallback URLs (if not resolved to blob, and preserving exact presigned URLs if backend gave them)
+  const fileUrl = s(mediaInfo?.url) || s(mediaInfo?.fileUrl) || (s(fileKey) ? (fileKey.startsWith('http') || fileKey.startsWith('blob:') ? fileKey : `${API}/files/media/serve/${fileKey}`) : null);
+  const thumbnailUrl = s(mediaInfo?.thumbnailUrl) || (s(thumbnailKey) ? (thumbnailKey.startsWith('http') || thumbnailKey.startsWith('blob:') ? thumbnailKey : `${API}/files/media/serve/${thumbnailKey}`) : null);
+
   // 1. Fetch Media Info (Metadata)
   useEffect(() => {
     // If optimistic, we already have basic info from msg object
@@ -278,20 +292,6 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
     setIsPlaying(false);
     setCurrentTime(0);
   };
-
-  const s = (val) => val === 'null' || val === 'undefined' ? null : val;
-
-  const fileKey = mediaInfo?.fileKey;
-  const thumbnailKey = mediaInfo?.thumbnailKey;
-  const fileType = mediaInfo?.fileType;
-  const fileName = mediaInfo?.fileName;
-  const fileSize = mediaInfo?.fileSize;
-  const duration = mediaInfo?.duration;
-  const noOfPages = mediaInfo?.noOfPages;
-
-  // Final fallback URLs (if not resolved to blob, and preserving exact presigned URLs if backend gave them)
-  const fileUrl = s(mediaInfo?.url) || s(mediaInfo?.fileUrl) || (s(fileKey) ? (fileKey.startsWith('http') || fileKey.startsWith('blob:') ? fileKey : `${API}/files/media/serve/${fileKey}`) : null);
-  const thumbnailUrl = s(mediaInfo?.thumbnailUrl) || (s(thumbnailKey) ? (thumbnailKey.startsWith('http') || thumbnailKey.startsWith('blob:') ? thumbnailKey : `${API}/files/media/serve/${thumbnailKey}`) : null);
 
   // 4. Recover from transient errors if the image source successfully recovers/swaps
   useEffect(() => {

@@ -888,7 +888,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                 });
             } else {
               if (import.meta.env.DEV) console.log(`[ChatNames] IndexedDB already has ${totalMsgCount} messages. Syncing recent messages for active chats with timestamp...`);
-              uniqueData.slice(0, 15).forEach(chat => {
+              uniqueData.forEach(chat => {
                 const cId = chat.chatId;
                 if (!cId) return;
                 const latestMsg = messageStore.getChatLastMessage(cId);
