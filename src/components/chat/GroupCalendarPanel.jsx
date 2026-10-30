@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Video, MapPin, Plus, Check, X, Bell, BellOff, Users, ExternalLink, ChevronRight, Edit2 } from 'lucide-react';
 import { API } from '../../service/UserAuth';
+import { saveEventToDB } from '../../service/db';
 
 export const parseEventDate = (val) => {
   if (!val) return null;
@@ -15,15 +16,31 @@ export const parseEventDate = (val) => {
 };
 
 const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onOpenEvent }) => {
-  const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [events, setEvents] = useState(() => {
+    if (!chatId) return [];
+    try {
+      const cached = localStorage.getItem(`group_events_${chatId}`);
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [loading, setLoading] = useState(() => {
+    if (!chatId) return false;
+    try {
+      const cached = localStorage.getItem(`group_events_${chatId}`);
+      return !cached || JSON.parse(cached).length === 0;
+    } catch (e) {
+      return true;
+    }
+  });
   const [selectedFilter, setSelectedFilter] = useState('upcoming'); // 'all', 'upcoming', 'today'
   const userId = localStorage.getItem('userid');
 
   const fetchGroupEvents = async () => {
     if (!chatId) return;
     try {
-      setLoading(true);
+      if (events.length === 0) setLoading(true);
       const res = await fetch(`${API}/user/event/group/${chatId}`, {
         headers: {
           'User-Id': userId,
@@ -33,6 +50,9 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onO
       if (res.ok) {
         const data = await res.json();
         setEvents(data || []);
+        try {
+          localStorage.setItem(`group_events_${chatId}`, JSON.stringify(data || []));
+        } catch (e) {}
       }
     } catch (err) {
       console.error('Failed to fetch group events:', err);
@@ -42,6 +62,15 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onO
   };
 
   useEffect(() => {
+    if (chatId) {
+      try {
+        const cached = localStorage.getItem(`group_events_${chatId}`);
+        if (cached) {
+          setEvents(JSON.parse(cached));
+          setLoading(false);
+        }
+      } catch (e) {}
+    }
     fetchGroupEvents();
 
     const handleSync = (e) => {
@@ -133,12 +162,58 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onO
   };
 
   const handleAddForMe = async (event) => {
+    // 1. Optimistic UI update in Group Calendar
+    setEvents((prev) => {
+      const updated = prev.map((ev) => {
+        if (ev.groupEventId === event.groupEventId || (ev.eventId && ev.eventId === event.eventId)) {
+          return { ...ev, isAdded: true, isSync: true, rsvpStatus: 'going' };
+        }
+        return ev;
+      });
+      try {
+        localStorage.setItem(`group_events_${chatId}`, JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+
+    // 2. Optimistic persist to personal calendar (IndexedDB)
+    try {
+      const startDate = parseEventDate(event.startTime);
+      const endDate = parseEventDate(event.endTime);
+      const evet = {
+        id: event.eventId || event.groupEventId,
+        title: event.eventTitle,
+        date: startDate ? startDate.toISOString() : event.startTime,
+        startTime: startDate ? startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : '',
+        endTime: endDate ? endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : '',
+        description: event.eventDetails || '',
+        color: event.eventColor || '#3b82f6',
+        msgref: event.msgId || '',
+        chatid: chatId || event.chatId || '',
+        action: 'scheduled',
+        isAdded: true,
+        isSync: true,
+        meetingType: event.meetingType,
+        meetingLink: event.meetingLink,
+        location: event.location,
+        groupEventId: event.groupEventId,
+        creatorId: event.creatorId,
+        creatorName: event.creatorName
+      };
+      await saveEventToDB(evet);
+      window.dispatchEvent(new CustomEvent('letschat_refresh_events'));
+    } catch (e) {
+      console.warn('Failed to optimistically save to local DB:', e);
+    }
+
+    // 3. Network call in parallel
     try {
       const res = await fetch(`${API}/user/event/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'User-Id': userId
+          'User-Id': userId,
+          'ngrok-skip-browser-warning': 'true'
         },
         body: JSON.stringify({
           groupEventId: event.groupEventId,

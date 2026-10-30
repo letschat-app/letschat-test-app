@@ -294,6 +294,11 @@ export const saveEventToDB = async (event) => {
   await db.put('events', event);
 };
 
+export const deleteEventFromDB = async (id) => {
+  const db = await initDB();
+  await db.delete('events', id);
+};
+
 export const getEventsFromDB = async () => {
   const db = await initDB();
   return db.getAll('events');
