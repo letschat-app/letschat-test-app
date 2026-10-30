@@ -9,8 +9,9 @@ export const EventStorage = ({ children }) => {
   const [events, setEvents] = useState({});
   const userId = localStorage.getItem("userid");
   const formatDateKey = (dat) => {
-    const date=new Date(dat)
-    if (!date) return '';
+    if (!dat) return '';
+    const date = dat instanceof Date ? dat : new Date(dat);
+    if (isNaN(date.getTime())) return '';
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -45,29 +46,45 @@ export const EventStorage = ({ children }) => {
         const localMap = new Map((localEvents || []).map(e => [String(e.id), e]));
 
         const res = await fetch(
-          `${API}/user/getevents/${userId}`
+          `${API}/user/getevents/${userId}`, { headers: { 'ngrok-skip-browser-warning': 'true' } }
         );
         const data = await res.json();
         const newGrouped = {};
         let hasEventChanges = false;
         const changedIds = [];
 
+        const parseDateVal = (val) => {
+          if (!val) return null;
+          if (typeof val === 'number') {
+            return new Date(val < 1e11 ? val * 1000 : val);
+          }
+          if (typeof val === 'string' && /^\d+(\.\d+)?$/.test(val.trim())) {
+            const num = parseFloat(val.trim());
+            return new Date(num < 1e11 ? num * 1000 : num);
+          }
+          const d = new Date(val);
+          return isNaN(d.getTime()) ? null : d;
+        };
+
         for (const evt of data) {
-          const tim=new Date(evt.startTime*1000).toISOString();
-          const datekey=formatDateKey(tim.toLocaleString());
-          const evet={
+          const startDate = parseDateVal(evt.startTime);
+          if (!startDate) continue;
+          const tim = startDate.toISOString();
+          const datekey = formatDateKey(startDate);
+          const endDate = parseDateVal(evt.endTime);
+          const evet = {
             id: evt.eventId,
             title: evt.eventTitle,
-            date:tim,
-            startTime: new Date((new Date(evt.startTime*1000).toISOString())).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit',hour12:false }),
-            endTime: evt.endTime? new Date((new Date(evt.endTime*1000).toISOString())).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit',hour12:false }) : '',
+            date: tim,
+            startTime: startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
+            endTime: endDate ? endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : '',
             description: evt.eventDetails || '',
             color: evt.eventColor || '#3b82f6',
-            msgref:evt.msgId || '',
-            chatid:evt.chatId || '',
-            action:evt.action,
-            isAdded:evt.isAdded,
-            isSync:evt.isSync,
+            msgref: evt.msgId || '',
+            chatid: evt.chatId || '',
+            action: evt.action,
+            isAdded: evt.isAdded,
+            isSync: evt.isSync,
             meetingType: evt.meetingType,
             meetingLink: evt.meetingLink,
             location: evt.location,

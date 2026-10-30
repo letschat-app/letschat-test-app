@@ -405,13 +405,25 @@ const SmoothCalendar = () => {
             .then(data => {
               const matching = (data || []).find(e => String(e.eventId) === String(deepEventId));
               if (matching) {
-                const tim = new Date(matching.startTime * 1000).toISOString();
+                const parseDateVal = (val) => {
+                  if (!val) return null;
+                  if (typeof val === 'number') return new Date(val < 1e11 ? val * 1000 : val);
+                  if (typeof val === 'string' && /^\d+(\.\d+)?$/.test(val.trim())) {
+                    const num = parseFloat(val.trim());
+                    return new Date(num < 1e11 ? num * 1000 : num);
+                  }
+                  const d = new Date(val);
+                  return isNaN(d.getTime()) ? null : d;
+                };
+                const sDate = parseDateVal(matching.startTime);
+                const eDate = parseDateVal(matching.endTime);
+                const tim = sDate ? sDate.toISOString() : new Date().toISOString();
                 const evet = {
                   id: matching.eventId,
                   title: matching.eventTitle,
                   date: tim,
-                  startTime: new Date(tim).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
-                  endTime: matching.endTime ? new Date(matching.endTime * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : '',
+                  startTime: sDate ? sDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : '',
+                  endTime: eDate ? eDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : '',
                   description: matching.eventDetails || '',
                   color: matching.eventColor || 'var(--accent-text)',
                   msgref: matching.msgId || '',
@@ -1847,4 +1859,4 @@ const SmoothCalendar = () => {
   );
 };
 
-export default SmoothCalendar;
+export default SmoothCalendar;

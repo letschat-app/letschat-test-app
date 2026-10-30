@@ -16,6 +16,7 @@ import { SIMULATION_ID } from "../service/SimulationScript";
 import simulationService from "../service/SimulationService";
 import { usePWA } from "../context/PWAContext";
 import { useEventMediator } from "../service/EventStorage";
+import { parseEventDate } from "../components/chat/GroupCalendarPanel";
 import spaceStore from "../service/SpaceStore";
 
 export const getchat = (chatid, spaceId = 0, timestampOverride = null, type = null) => {
@@ -449,7 +450,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
       try {
         const userId = localStorage.getItem('userid');
         const res = await fetch(`${API}/user/event/group/${currentChatId}`, {
-          headers: { 'User-Id': userId }
+          headers: { 'User-Id': userId, 'ngrok-skip-browser-warning': 'true' }
         });
         if (res.ok) {
           const data = await res.json();
@@ -2108,20 +2109,25 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
             {/* Upcoming Events Section */}
             {(() => {
               const chatEvents = [];
-              const now = new Date();
+              const now = Date.now();
               const currentChatId = String(selectedChatForSpaces.chatId);
 
               // 1. From group events endpoint (visible to all members!)
               if (Array.isArray(spaceGroupEvents)) {
                 spaceGroupEvents.forEach(ev => {
-                  const sTime = ev.startTime ? new Date(ev.startTime) : null;
-                  if (sTime && sTime >= now && ev.action !== 'cancelled') {
+                  const dStart = parseEventDate(ev.startTime);
+                  const startMs = dStart && !isNaN(dStart.getTime()) ? dStart.getTime() : 0;
+                  const dEnd = parseEventDate(ev.endTime);
+                  const endMs = dEnd && !isNaN(dEnd.getTime()) ? dEnd.getTime() : (startMs + 60 * 60 * 1000);
+
+                  // Keep event visible if ongoing or upcoming, and not cancelled
+                  if (endMs >= now && ev.action !== 'cancelled') {
                     chatEvents.push({
                       id: ev.eventId || ev.groupEventId,
                       chatid: currentChatId,
                       title: ev.eventTitle,
                       date: ev.startTime,
-                      startTime: new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true }).format(sTime),
+                      startTime: dStart ? new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true }).format(dStart) : '',
                       color: ev.eventColor || 'var(--accent-color)'
                     });
                   }
@@ -2130,10 +2136,15 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
 
               // 2. From personal calendar mediator
               Object.values(allEvents).forEach(dateGroup => {
+                if (!Array.isArray(dateGroup)) return;
                 dateGroup.forEach(evt => {
                   if (String(evt.chatid) === currentChatId) {
-                    const evtDate = new Date(evt.date);
-                    if (evtDate >= now && !chatEvents.some(e => e.id === evt.id || (e.title === evt.title && Math.abs(new Date(e.date) - evtDate) < 60000))) {
+                    const dStart = parseEventDate(evt.date || evt.startTime);
+                    const startMs = dStart && !isNaN(dStart.getTime()) ? dStart.getTime() : 0;
+                    const dEnd = parseEventDate(evt.endTime);
+                    const endMs = dEnd && !isNaN(dEnd.getTime()) ? dEnd.getTime() : (startMs + 60 * 60 * 1000);
+
+                    if (endMs >= now && evt.action !== 'cancelled' && !chatEvents.some(e => e.id === evt.id || (e.title === evt.title && Math.abs((parseEventDate(e.date || e.startTime)?.getTime() || 0) - startMs) < 60000))) {
                       chatEvents.push(evt);
                     }
                   }
@@ -2141,6 +2152,12 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
               });
 
               if (chatEvents.length === 0) return null;
+
+              chatEvents.sort((a, b) => {
+                const ta = parseEventDate(a.date || a.startTime)?.getTime() || 0;
+                const tb = parseEventDate(b.date || b.startTime)?.getTime() || 0;
+                return ta - tb;
+              });
 
               return (
                 <div style={{ marginTop: '24px', padding: '0 16px' }}>

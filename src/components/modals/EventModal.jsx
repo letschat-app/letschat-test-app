@@ -56,18 +56,75 @@ const EventModal = ({
   // Compute default end time (1 hr default duration)
   const computeDefaultEndTime = (startTime) => {
     if (!startTime) return '11:00';
-    const [h, m] = startTime.split(':').map(Number);
+    const parts = startTime.split(':').map(Number);
+    const h = parts[0];
+    const m = parts[1];
+    if (isNaN(h)) return '11:00';
     const endH = (h + 1) % 24;
     return `${String(endH).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`;
   };
 
-  const initialStart = event?.startTime || '10:00';
-  const initialEnd = event?.endTime || computeDefaultEndTime(initialStart);
+  const parseInitialTime = (timeVal, defaultVal) => {
+    if (!timeVal) return defaultVal;
+    if (typeof timeVal === 'string' && timeVal.includes('T')) {
+      const d = new Date(timeVal);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+      }
+    }
+    return timeVal;
+  };
+
+  const parseInitialDate = (ev) => {
+    if (ev?.date) {
+      const d = new Date(ev.date);
+      if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+    }
+    const rawTime = ev?.startTime;
+    if (rawTime) {
+      if (typeof rawTime === 'number') {
+        const d = new Date(rawTime < 1e11 ? rawTime * 1000 : rawTime);
+        if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+      }
+      if (typeof rawTime === 'string' && rawTime.includes('T')) {
+        const d = new Date(rawTime);
+        if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+      }
+    }
+    return new Date().toISOString().split('T')[0];
+  };
+
+  const initialStart = parseInitialTime(event?.startTime, '10:00');
+  const initialEnd = parseInitialTime(event?.endTime, computeDefaultEndTime(initialStart));
+  const initialDate = parseInitialDate(event);
+  const toSafeIso = (dVal, tVal, fallbackH = 10) => {
+    try {
+      const dStr = typeof dVal === 'string' ? dVal.split('T')[0] : new Date(dVal).toISOString().split('T')[0];
+      if (!tVal) return new Date(`${dStr}T${String(fallbackH).padStart(2, '0')}:00:00`).toISOString();
+      if (typeof tVal === 'string' && tVal.includes('T')) {
+        const d = new Date(tVal);
+        if (!isNaN(d.getTime())) return d.toISOString();
+      }
+      const cleanTime = String(tVal).trim();
+      const parts = cleanTime.split(':');
+      if (parts.length >= 2) {
+        const h = String(parseInt(parts[0], 10) || 0).padStart(2, '0');
+        const m = String(parseInt(parts[1], 10) || 0).padStart(2, '0');
+        return new Date(`${dStr}T${h}:${m}:00`).toISOString();
+      }
+      const d = new Date(`${dStr} ${cleanTime}`);
+      if (!isNaN(d.getTime())) return d.toISOString();
+      return new Date(`${dStr}T${String(fallbackH).padStart(2, '0')}:00:00`).toISOString();
+    } catch (e) {
+      return new Date().toISOString();
+    }
+  };
+
 
   const [formData, setFormData] = useState({
     title: event?.title || event?.eventTitle || '',
     description: event?.description || event?.eventDetails || '',
-    date: event?.date ? (new Date(event.date).toISOString().split('T')[0]) : new Date().toISOString().split('T')[0],
+    date: initialDate,
     startTime: initialStart,
     endTime: initialEnd,
     action: event?.action || 'scheduled',
@@ -108,8 +165,9 @@ const EventModal = ({
     const checkScheduleConflict = async () => {
       if (!currentUserId || !formData.date || !formData.startTime || !formData.endTime) return;
       try {
-        const startIso = new Date(`${formData.date}T${formData.startTime}:00`).toISOString();
-        const endIso = new Date(`${formData.date}T${formData.endTime}:00`).toISOString();
+        const cleanDate = typeof formData.date === "string" ? formData.date.split("T")[0] : new Date(formData.date).toISOString().split("T")[0];
+      const startIso = new Date(`${cleanDate}T${formData.startTime}:00`).toISOString();
+        const endIso = new Date(`${cleanDate}T${formData.endTime}:00`).toISOString();
 
         const res = await fetch(
           `${API}/user/event/check-conflict?userId=${currentUserId}&startTime=${encodeURIComponent(startIso)}&endTime=${encodeURIComponent(endIso)}`
@@ -165,9 +223,8 @@ const EventModal = ({
 
     setIsSubmitting(true);
     try {
-      const dateStr = typeof formData.date === 'string' ? formData.date : new Date(formData.date).toISOString().split('T')[0];
-      const startIso = new Date(`${dateStr}T${formData.startTime}:00`).toISOString();
-      const endIso = new Date(`${dateStr}T${formData.endTime}:00`).toISOString();
+      const startIso = toSafeIso(formData.date, formData.startTime, 10);
+      const endIso = toSafeIso(formData.date, formData.endTime, 11);
       const targetChatId = formData.chatid || event?.chatid || event?.chatId;
 
       const payload = {
@@ -220,8 +277,8 @@ const EventModal = ({
 
   const handleAddToggle = async () => {
     const newIsAdded = !formData.isAdded;
-    const startIso = new Date(`${formData.date}T${formData.startTime}:00`).toISOString();
-    const endIso = new Date(`${formData.date}T${formData.endTime}:00`).toISOString();
+    const startIso = toSafeIso(formData.date, formData.startTime, 10);
+    const endIso = toSafeIso(formData.date, formData.endTime, 11);
 
     const payload = {
       ...formData,
