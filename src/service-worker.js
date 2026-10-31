@@ -1,3 +1,4 @@
+import { formatPushNotification, resolveNotificationPath } from './sw/notificationFormat.js';
 import { precacheAndRoute, createHandlerBoundToURL } from 'workbox-precaching';
 import { registerRoute, NavigationRoute } from 'workbox-routing';
 
@@ -26,14 +27,29 @@ firebase.initializeApp({
 });
 
 const messaging = firebase.messaging();
+const lastAlertTsMap = new Map();
+
 const API = "https://letschat-backend-69jf.onrender.com/api"; 
 const DB_VERSION = 16;
 const APP_VERSION = '2.0.4';
 
-// ─── Service Worker Lifecycle & Auto-Activation ─────────────────────────────
+// ─── Service Worker Lifecycle & User-Controlled Activation ───────────────────
 self.addEventListener('install', (event) => {
-  console.log('[SW] New Service Worker installing — calling skipWaiting()');
-  self.skipWaiting();
+  console.log('[SW] New Service Worker installing — waiting for user update or notification click');
+  // If an active controller exists, this is an update — show system push notification
+  if (self.registration.active) {
+    event.waitUntil(
+      self.registration.showNotification('New version of LetsChat available', {
+        body: 'A new version of LetsChat is available. Tap to update.',
+        icon: '/icon-192.png',
+        
+        tag: 'app-update-available',
+        renotify: true,
+        requireInteraction: true,
+        data: { type: 'APP_UPDATE' }
+      }).catch(err => console.warn('[SW] Could not show update notification on install:', err))
+    );
+  }
 });
 
 self.addEventListener('message', (event) => {
@@ -108,10 +124,60 @@ self.addEventListener('fetch', (event) => {
 });
 
 // ─── FCM: Background Message Handler ─────────────────────────────────────────
-messaging.onBackgroundMessage((payload) => {
+messaging.onBackgroundMessage(async (payload) => {
   console.log('[SW] FCM background message received:', payload);
 
   const data = payload.data || {};
+
+  // ─── Protocol v2 Handler ───
+  if (data.v === '2') {
+    const formatted = formatPushNotification(data);
+    const isSilent = data.silent === 'true';
+
+    let shouldAlert = true;
+    if (isSilent) {
+      shouldAlert = false;
+    } else if (data.alertKind === 'mention' || data.alertKind === 'reply') {
+      shouldAlert = true; // Mentions and replies always alert
+    } else if (data.type === 'CHAT') {
+      if (data.chatKind === 'dm') {
+        shouldAlert = true;
+      } else {
+        const now = Date.now();
+        const lastAlert = lastAlertTsMap.get(data.chatId) || 0;
+        if (now - lastAlert < 30000) {
+          shouldAlert = false; // Silent update within 30s cooldown
+        } else {
+          lastAlertTsMap.set(data.chatId, now);
+          shouldAlert = true;
+        }
+      }
+    }
+
+    return self.registration.showNotification(formatted.title, {
+      body: formatted.body,
+      icon: '/icon-192.png',
+      tag: formatted.tag,
+      data: formatted.data,
+      renotify: shouldAlert,
+      silent: !shouldAlert,
+      vibrate: shouldAlert ? [200, 100, 200] : [],
+    });
+  }
+
+  // ─── Firebase Console Campaign / Direct Notification Block Fallback ───
+  if (payload.notification) {
+    const notifTitle = payload.notification.title || 'LetsChat';
+    const notifBody = payload.notification.body || '';
+    return self.registration.showNotification(notifTitle, {
+      body: notifBody,
+      icon: '/icon-192.png',
+      tag: payload.notification.tag || ('firebase-campaign-' + Date.now()),
+      data: payload.data || {},
+      renotify: true,
+      vibrate: [200, 100, 200],
+    });
+  }
   const { type, chatId, title, unread, msgs, chatType, repliedTo } = data;
 
   if (type === 'EVENT') {
@@ -121,8 +187,7 @@ messaging.onBackgroundMessage((payload) => {
     }
     return self.registration.showNotification(title || 'Upcoming Event', {
       body: bodyText,
-      icon: 'icon.png',
-      badge: 'icon.png',
+      icon: '/icon-192.png',
       tag: data.eventId || 'event',
       data: { type: 'EVENT', chatId: data.chatId, eventId: data.eventId }
     });
@@ -132,8 +197,7 @@ messaging.onBackgroundMessage((payload) => {
     const summary = data.changeSummary || 'Event details were updated';
     return self.registration.showNotification(title || 'Event Details Changed', {
       body: summary,
-      icon: 'icon.png',
-      badge: 'icon.png',
+      icon: '/icon-192.png',
       tag: `event-${data.eventId || Date.now()}`,
       data: { type: 'EVENT_CHANGED', eventId: data.eventId, changeSummary: summary }
     });
@@ -158,8 +222,7 @@ messaging.onBackgroundMessage((payload) => {
 
     return self.registration.showNotification('Today Events', {
       body: eventCount > 0 ? `You have ${eventCount} events scheduled for today.` : 'Check your schedule for today.',
-      icon: 'icon.png',
-      badge: 'icon.png',
+      icon: '/icon-192.png',
       tag: 'daily-summary',
       data: { type: 'DAILY' }
     });
@@ -261,8 +324,8 @@ messaging.onBackgroundMessage((payload) => {
 
         return self.registration.showNotification('Pending Assignments', {
           body: notificationBody,
-          icon: 'icon.png',
-          badge: 'icon.png',
+          icon: '/icon-192.png',
+          
           tag: 'assignments-missing',
           data: { type: 'ASSIGNMENT_MISSING' }
         });
@@ -270,8 +333,8 @@ messaging.onBackgroundMessage((payload) => {
         console.error('[SW] Assignment resolution failed:', err);
         return self.registration.showNotification('Pending Assignments', {
           body: 'You have pending assignments due.',
-          icon: 'icon.png',
-          badge: 'icon.png',
+          icon: '/icon-192.png',
+          
           tag: 'assignments-missing',
           data: { type: 'ASSIGNMENT_MISSING' }
         });
@@ -455,8 +518,7 @@ messaging.onBackgroundMessage((payload) => {
   function showNotification(finalTitle, finalBody) {
     self.registration.showNotification(finalTitle, {
       body: finalBody,
-      icon: 'icon.png',
-      badge: 'icon.png',
+      icon: '/icon-192.png',
       tag: isRoom ? `room-${chatId}` : chatId,
       renotify: true,
       data: { chatId, type: chatType || 'CHAT' },
@@ -472,18 +534,39 @@ self.addEventListener('notificationclick', (event) => {
   const tag = event.notification.tag;
   const baseUrl = self.registration.scope;
 
-  let relativePath = '#/chats';
-  if (data.type === 'EVENT_CHANGED' || (data.type === 'EVENT' && data.eventId)) {
-    relativePath = `#/calendar?eventId=${data.eventId}&viewInfo=true`;
-  } else if (tag === 'daily-summary' || data.type === 'DAILY' || data.type === 'EVENT') {
-    relativePath = '#/calendar';
-  } else if (tag === 'assignments-missing' || data.type === 'ASSIGNMENT_MISSING') {
-    relativePath = '#/communities';
-  } else if (data.chatId) {
-    relativePath = `#/chats?showSpacesForChat=${data.chatId}`;
+  // ── Handle App Update Notification Click ─────────────────────────────────────
+  if (data.type === 'APP_UPDATE' || tag === 'app-update-available') {
+    console.log('[SW] Update notification clicked — activating new version and updating client');
+    self.skipWaiting();
+
+    event.waitUntil(
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (windowClients) => {
+        for (const client of windowClients) {
+          try {
+            const clientOrigin = new URL(client.url).origin;
+            if (clientOrigin === location.origin) {
+              if ('focus' in client) {
+                await client.focus();
+              }
+              client.postMessage({ type: 'APPLY_UPDATE' });
+              if ('navigate' in client) {
+                await client.navigate(client.url);
+              }
+              return;
+            }
+          } catch (e) {
+            console.error('[SW] Error focusing/navigating client on update:', e);
+          }
+        }
+        if (self.clients.openWindow) {
+          return self.clients.openWindow(baseUrl);
+        }
+      })
+    );
+    return;
   }
 
-  const urlToOpen = new URL(relativePath, baseUrl).href;
+  const targetPath = resolveNotificationPath(data);
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (windowClients) => {
@@ -494,9 +577,7 @@ self.addEventListener('notificationclick', (event) => {
             if ('focus' in client) {
               await client.focus();
             }
-            if ('navigate' in client) {
-              await client.navigate(urlToOpen);
-            }
+            client.postMessage({ type: 'NOTIFICATION_CLICK', path: targetPath });
             return;
           }
         } catch (e) {
@@ -504,6 +585,7 @@ self.addEventListener('notificationclick', (event) => {
         }
       }
       if (self.clients.openWindow) {
+        const urlToOpen = new URL('#' + targetPath, baseUrl).href;
         return self.clients.openWindow(urlToOpen);
       }
     })

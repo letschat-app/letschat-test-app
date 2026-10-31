@@ -263,6 +263,11 @@ export const useNotifications = () => {
 
       const handleSWMessage = async (event) => {
         console.log('[useNotifications] Message received from Service Worker:', event.data);
+        if (event.data?.type === 'NOTIFICATION_CLICK' && event.data?.path) {
+          console.log('[useNotifications] Navigating to clicked notification path:', event.data.path);
+          navigate(event.data.path);
+          return;
+        }
         if (event.data && event.data.type === 'SW_ACTIVATED') {
           console.log(`[useNotifications] New SW Version ${event.data.version} activated. Triggering token sync...`);
           localStorage.setItem('sw_just_updated', 'true');
@@ -332,5 +337,29 @@ export const useNotifications = () => {
     }
   }, [userId]);
 
-  return { fcmToken, permissionStatus, requestPermissionAndGetToken, disableNotifications };
+  return { fcmToken, permissionStatus, requestPermissionAndGetToken, disableNotifications, clearChatNotifications };
+};
+
+export const clearChatNotifications = async (chatId) => {
+  if (!chatId || !('serviceWorker' in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const notifs = await reg.getNotifications();
+    for (const notif of notifs) {
+      const data = notif.data || {};
+      const tag = notif.tag || '';
+      if (
+        data.chatId === chatId ||
+        tag === `chat-${chatId}` ||
+        tag === `room-${chatId}` ||
+        tag === String(chatId) ||
+        tag.startsWith(`mention-${chatId}-`) ||
+        tag.startsWith(`reply-${chatId}-`)
+      ) {
+        notif.close();
+      }
+    }
+  } catch (err) {
+    console.warn('[clearChatNotifications] Error clearing notifications:', err);
+  }
 };

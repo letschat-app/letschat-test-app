@@ -45,6 +45,24 @@ export const PWAProvider = ({ children }) => {
     waitingWorkerRef.current = waiting;
     setUpdateAvailable(true);
     console.log('[PWA] Update available — showing toast.');
+
+    // ── Generate System Push Notification for Update ───────────────────────────
+    if ('Notification' in window && Notification.permission === 'granted') {
+      try {
+        const iconUrl = `${import.meta.env.BASE_URL}icon.png`.replace(/\/+/g, '/');
+        registration.showNotification('New version of LetsChat available', {
+          body: 'A new version of LetsChat is available. Tap to update.',
+          icon: iconUrl,
+          badge: iconUrl,
+          tag: 'app-update-available',
+          renotify: true,
+          requireInteraction: true,
+          data: { type: 'APP_UPDATE' }
+        });
+      } catch (err) {
+        console.warn('[PWA] Failed to show update notification:', err);
+      }
+    }
   };
 
   // ─── Helper: Track version from SW message ────────────────────────────────
@@ -62,10 +80,26 @@ export const PWAProvider = ({ children }) => {
       // Hide toast if it was showing (update completed)
       setUpdateAvailable(false);
     }
+
+    if (event.data?.type === 'APPLY_UPDATE') {
+      console.log('[PWA] Received APPLY_UPDATE from notification click.');
+      applyUpdate();
+    }
   };
 
   // ─── Apply Update: User-Controlled Activation ─────────────────────────────
   const applyUpdate = () => {
+    // Dismiss any existing update notification
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistration().then(reg => {
+        if (reg && reg.getNotifications) {
+          reg.getNotifications({ tag: 'app-update-available' }).then(notifs => {
+            notifs.forEach(n => n.close());
+          }).catch(() => {});
+        }
+      }).catch(() => {});
+    }
+
     // Anti-spam + null guard
     if (!waitingWorkerRef.current || refreshingRef.current) {
       console.warn('[PWA] applyUpdate called but no waiting worker or already refreshing.');
