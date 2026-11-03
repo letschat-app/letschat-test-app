@@ -1,3 +1,4 @@
+import useBackClose from '../../hooks/useBackClose';
 import React, { useEffect, useRef } from 'react';
 import { X, Loader2 } from 'lucide-react';
 
@@ -11,6 +12,7 @@ import { X, Loader2 } from 'lucide-react';
 const ProfileSheet = ({
   isOpen = false,
   onClose,
+
   title,
   subtitle,
   children,

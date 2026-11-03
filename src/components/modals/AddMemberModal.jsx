@@ -1,8 +1,10 @@
+import useBackClose from '../../hooks/useBackClose';
 import React, { useState, useEffect } from 'react';
 import { X, Search, UserPlus, CheckCircle2 } from 'lucide-react';
 import Avatar from '../chat/Avatar';
 
 const AddMemberModal = ({ chat, API, myDisplayName, onClose, onSuccess, isPanel = false }) => {
+  useBackClose(true, onClose);
   const [searchTerm, setSearchTerm] = useState('');
   const [users, setUsers] = useState([]);
   const [selectedUsers, setSelectedUsers] = useState([]);
@@ -95,7 +97,7 @@ const AddMemberModal = ({ chat, API, myDisplayName, onClose, onSuccess, isPanel 
       width: '100%', 
       maxWidth: isPanel ? 'none' : '440px',
       height: isPanel ? '100%' : 'auto',
-      maxHeight: isPanel ? 'none' : '80vh', 
+      maxHeight: isPanel ? 'none' : 'calc(100dvh - 32px)', 
       borderRadius: isPanel ? '0' : '24px',
       display: 'flex', flexDirection: 'column',
       border: isPanel ? 'none' : '1px solid var(--border-color)',

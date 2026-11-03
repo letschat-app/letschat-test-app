@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { getsocket } from '../service/Websocket';
 import { MessageSquare, Users, Search, Calendar, LogOut, User, Star, FlaskConical } from 'lucide-react';
 import { removeFCMToken } from '../service/UserAuth';
+import { cleanupFCMOnLogout } from '../hooks/useNotifications';
 import { useBadges } from '../service/BadgeStore';
 import LogoutConfirmModal from './modals/LogoutConfirmModal';
 
@@ -41,13 +42,10 @@ const DesktopSidebar = () => {
             if (socket) socket.close();
         } catch (e) { }
 
-        const deviceId = localStorage.getItem('deviceId');
-        if (deviceId) {
-            try {
-                await removeFCMToken(deviceId);
-            } catch (err) {
-                console.error('Failed to remove FCM token on logout:', err);
-            }
+        try {
+            await cleanupFCMOnLogout();
+        } catch (err) {
+            console.warn('Logout FCM cleanup failed:', err);
         }
 
         localStorage.clear();

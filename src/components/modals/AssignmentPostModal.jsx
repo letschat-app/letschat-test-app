@@ -1,8 +1,10 @@
+import useBackClose from '../../hooks/useBackClose';
 import { X, FileText, Calendar, Clock, AlertCircle, CheckCircle2, ChevronDown, Paperclip, Loader2, Upload } from 'lucide-react';
 import { uploadMedia, STAGE_LABELS } from '../../service/MediaUploader';
 import { API } from '../../service/UserAuth';
 import { useState, useRef, useEffect } from 'react';
 const AssignmentPostModal = ({ chatid, onClose, sendApi, isPanel = false }) => {
+  useBackClose(true, onClose);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -139,7 +141,7 @@ const AssignmentPostModal = ({ chatid, onClose, sendApi, isPanel = false }) => {
       backgroundColor: isPanel ? 'transparent' : 'rgba(15, 23, 42, 0.98)',
       width: '100%',
       maxWidth: isPanel ? 'none' : '500px',
-      maxHeight: isPanel ? 'none' : '90vh',
+      maxHeight: isPanel ? 'none' : 'calc(100dvh - 32px)',
       borderRadius: isPanel ? '0' : '24px',
       display: 'flex', flexDirection: 'column',
       border: isPanel ? 'none' : '1px solid var(--border-color)',

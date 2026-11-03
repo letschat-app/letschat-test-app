@@ -1,3 +1,4 @@
+import useBackClose from '../../hooks/useBackClose';
 /**
  * CameraCaptureModal.jsx
  * A real-time camera interface for both mobile and desktop.
@@ -7,6 +8,8 @@ import React, { useRef, useState, useEffect } from 'react';
 import { X, Camera, RefreshCw } from 'lucide-react';
 
 export default function CameraCaptureModal({ onCapture, onClose }) {
+  useBackClose(true, onClose);
+
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [stream, setStream] = useState(null);
@@ -256,7 +259,7 @@ export default function CameraCaptureModal({ onCapture, onClose }) {
             <button 
               onClick={toggleFacingMode}
               style={{ 
-                position: 'absolute', top: '20px', right: '20px',
+                position: 'absolute', top: 'calc(20px + env(safe-area-inset-top, 0px))', right: 'calc(20px + env(safe-area-inset-right, 0px))',
                 background: 'rgba(0,0,0,0.3)', border: 'none', borderRadius: '50%', 
                 width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: '#fff', cursor: 'pointer', zIndex: 20

@@ -1,3 +1,4 @@
+import useBackClose from '../../hooks/useBackClose';
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Plus } from 'lucide-react';
@@ -78,6 +79,7 @@ const getMinDateTimeString = () => {
 };
 
 const CreatePollModal = ({ isOpen, onClose, chatId, currentUserId, onPollCreated, triggerRef }) => {
+  useBackClose(isOpen, onClose);
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState(['', '']);
   const [allowMultiple, setAllowMultiple] = useState(false);

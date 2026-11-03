@@ -1,3 +1,4 @@
+import useBackClose from '../../hooks/useBackClose';
 import React, { useState } from 'react';
 import { X, FileText, Download, Mail, CheckCircle2, Loader2, Share2 } from 'lucide-react';
 import { API } from '../../service/UserAuth';
@@ -11,6 +12,7 @@ import { API } from '../../service/UserAuth';
  *   Option 2: Email Matrix Report (Endpoint D: POST /api/classroom/{roomId}/email-report?email=...&format=...)
  */
 const ClassroomReportModal = ({ roomId, classroomName = '', isOpen, onClose }) => {
+  useBackClose(isOpen, onClose);
   const [format, setFormat] = useState('pdf'); // 'pdf' | 'excel' | 'csv'
   const [deliveryMode, setDeliveryMode] = useState('download'); // 'download' | 'email'
   const [email, setEmail] = useState(() => localStorage.getItem('email') || localStorage.getItem('userid') || '');

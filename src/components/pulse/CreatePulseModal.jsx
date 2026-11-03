@@ -1,3 +1,5 @@
+import { useToast } from '../common/ToastProvider';
+import useBackClose from '../../hooks/useBackClose';
 import React, { useState, useRef } from 'react';
 import { X, Type, Image as ImageIcon, Video, Mic, Music, Lock, Globe, Upload, Loader2, Sparkles, Check } from 'lucide-react';
 import { fetchPutUrls, uploadMediaToR2, savePulseMediaKeys, createPulse } from '../../service/PulseService';
@@ -19,6 +21,8 @@ const FONT_STYLES = [
 ];
 
 const CreatePulseModal = ({ isOpen, onClose, onSuccess }) => {
+  useBackClose(isOpen, onClose);
+  const toast = useToast();
   if (!isOpen) return null;
 
   const [type, setType] = useState('text'); // text, image, video, audio, image_audio
@@ -91,7 +95,7 @@ const CreatePulseModal = ({ isOpen, onClose, onSuccess }) => {
       setMediaRecorder(recorder);
       setIsRecording(true);
     } catch (err) {
-      alert("Microphone permission denied or unsupported.");
+      toast.error("Microphone permission denied or unsupported.");
     }
   };
 
@@ -105,19 +109,19 @@ const CreatePulseModal = ({ isOpen, onClose, onSuccess }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (type === 'text' && !content.trim()) {
-      alert("Please enter text content for your pulse.");
+      toast.error("Please enter text content for your pulse.");
       return;
     }
     if ((type === 'image' || type === 'image_audio') && !imageFile) {
-      alert("Please select an image file.");
+      toast.error("Please select an image file.");
       return;
     }
     if ((type === 'audio' || type === 'image_audio') && !audioFile) {
-      alert("Please select or record an audio file.");
+      toast.error("Please select or record an audio file.");
       return;
     }
     if (type === 'video' && !videoFile) {
-      alert("Please select a video file.");
+      toast.error("Please select a video file.");
       return;
     }
 
@@ -208,7 +212,7 @@ const CreatePulseModal = ({ isOpen, onClose, onSuccess }) => {
       }, 600);
     } catch (err) {
       console.error('[CreatePulseModal]', err);
-      alert('Failed to publish pulse: ' + err.message);
+      toast.error('Failed to publish pulse: ' + err.message);
       setIsPublishing(false);
     }
   };
@@ -226,7 +230,7 @@ const CreatePulseModal = ({ isOpen, onClose, onSuccess }) => {
       <div style={{
         backgroundColor: 'var(--bg-card)',
         width: '100%', maxWidth: '520px',
-        maxHeight: '90vh',
+        
         borderRadius: '24px',
         border: '1px solid var(--border-color)',
         display: 'flex', flexDirection: 'column',

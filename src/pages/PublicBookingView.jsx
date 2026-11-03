@@ -1,3 +1,4 @@
+import { useToast } from '../components/common/ToastProvider';
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
@@ -8,6 +9,7 @@ import {
 import { API } from '../service/UserAuth';
 
 const PublicBookingView = () => {
+  const toast = useToast();
   const { tokenOrId } = useParams();
   const navigate = useNavigate();
 
@@ -116,11 +118,11 @@ const PublicBookingView = () => {
         await fetchBooking();
         setTimeout(() => setActionSuccess(''), 4000);
       } else {
-        alert(data.message || 'Failed to update booking.');
+        toast.error(data.message || 'Failed to update booking.');
       }
     } catch (err) {
       console.error('Action error:', err);
-      alert('Network error while updating booking.');
+      toast.error('Network error while updating booking.');
     } finally {
       setActionLoading(false);
     }

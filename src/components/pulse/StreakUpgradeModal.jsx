@@ -1,3 +1,4 @@
+import useBackClose from '../../hooks/useBackClose';
 import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, Flame, RotateCcw, Check, AlertTriangle, X } from 'lucide-react';
 import SquircleFireAvatar, { SQUIRCLE_TIERS, getTierIndexFromStreak } from './SquircleFireAvatar';

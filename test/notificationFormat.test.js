@@ -338,11 +338,12 @@ runCase(
 // Test resolveNotificationPath
 console.log('\nTesting resolveNotificationPath...');
 assert.strictEqual(resolveNotificationPath({ type: 'CHAT', chatId: 'c1' }), '/chat/c1');
-assert.strictEqual(resolveNotificationPath({ type: 'CHAT', chatId: 'c1', spaceId: '2', msgId: 'm123' }), '/chat/c1?spaceId=2&msgId=m123');
+assert.strictEqual(resolveNotificationPath({ type: 'CHAT', chatId: 'c1', spaceId: '2', msgId: 'm123' }), '/chat/c1?space=2&msgId=m123');
 assert.strictEqual(resolveNotificationPath({ type: 'EVENT', eventId: 'e1' }), '/calendar?eventId=e1&viewInfo=true');
 assert.strictEqual(resolveNotificationPath({ type: 'EVENT_CHANGED', action: 'cancelled', eventId: 'e1' }), '/calendar');
 assert.strictEqual(resolveNotificationPath({ type: 'DAILY' }), '/calendar');
-assert.strictEqual(resolveNotificationPath({ type: 'ASSIGNMENT_MISSING' }), '/communities');
+assert.strictEqual(resolveNotificationPath({ type: 'ASSIGNMENT_MISSING' }), '/chats');
+assert.strictEqual(resolveNotificationPath({ type: 'ASSIGNMENT_MISSING', chatId: 'c10', assignmentId: '5' }), '/chat/c10?space=1&assignmentId=5');
 console.log('✓ resolveNotificationPath passed all test cases');
 
 // Test silent mode

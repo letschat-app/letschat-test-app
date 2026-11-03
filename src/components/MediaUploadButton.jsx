@@ -1,3 +1,4 @@
+import { useToast } from './common/ToastProvider';
 /**
  * MediaUploadButton.jsx
  * WhatsApp-style upward popup menu.
@@ -5,7 +6,7 @@
  */
 import React, { useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { uploadMedia, formatFileSize, getFileCategory, STAGE_LABELS } from '../service/MediaUploader';
+import { uploadMedia, formatFileSize, STAGE_LABELS } from '../service/MediaUploader';
 import MediaPreviewModal from './chat/MediaPreviewModal';
 
 const MENU_OPTIONS = [
@@ -73,7 +74,8 @@ function UploadProgressToast({ file, progress, stage, onCancel }) {
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
-export default function MediaUploadButton({ 
+export default function MediaUploadButton({
+ 
   onUploadComplete, 
   onError, 
   onCameraClick,
@@ -85,6 +87,7 @@ export default function MediaUploadButton({
   style = {}, 
   children 
 }) {
+  const toast = useToast();
   const inputRefs = useRef({});
   const abortRef = useRef(false);
   const triggerRef = useRef(null);
@@ -138,7 +141,7 @@ export default function MediaUploadButton({
     if (!file) return;
     
     if (file.size > 50 * 1024 * 1024) {
-      alert("This file exceeds the 50MB size limit and cannot be attached.");
+      toast.error("This file exceeds the 50MB size limit and cannot be attached.");
       // Clear inputs to allow re-selection
       Object.values(inputRefs.current).forEach(r => { if (r) r.value = ''; });
       return;
@@ -263,7 +266,7 @@ export default function MediaUploadButton({
         ref={triggerRef}
         onClick={openMenu}
         style={{
-          cursor: disabled || uploading ? 'default' : 'pointer',
+          minWidth: '44px', minHeight: '44px', cursor: disabled || uploading ? 'default' : 'pointer',
           opacity: disabled ? 0.4 : 1,
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
           color: menuOpen ? 'var(--accent-color)' : 'var(--text-secondary)',

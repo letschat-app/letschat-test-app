@@ -1,3 +1,4 @@
+import useBackClose from '../../hooks/useBackClose';
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Volume2, VolumeX, Play, Pause, Eye, Tag, Send, ChevronLeft, ChevronRight } from 'lucide-react';
 import Avatar from '../chat/Avatar';
@@ -18,6 +19,7 @@ const PulseStoryViewer = ({
   onPulseViewed,
   isDesktop = false
 }) => {
+  useBackClose(Boolean(contactsFeed && contactsFeed.length > 0), onClose);
   if (!contactsFeed || contactsFeed.length === 0) return null;
 
   const [userIndex, setUserIndex] = useState(initialUserIndex);
@@ -384,7 +386,10 @@ const PulseStoryViewer = ({
         <div className="story-viewer-top-bar" style={{
           position: 'absolute', top: 0, left: 0, right: 0,
           zIndex: 20,
-          padding: '12px 16px 24px',
+          paddingTop: 'calc(12px + env(safe-area-inset-top, 0px))',
+          paddingBottom: '24px',
+          paddingLeft: 'max(16px, env(safe-area-inset-left, 0px))',
+          paddingRight: 'max(16px, env(safe-area-inset-right, 0px))',
           background: 'linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)'
         }}>
           {/* Progress Bars */}
@@ -455,7 +460,7 @@ const PulseStoryViewer = ({
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }}
-                  style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', borderRadius: '50%', padding: '6px', cursor: 'pointer' }}
+                  style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', borderRadius: '50%', minWidth: '44px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '6px', cursor: 'pointer' }}
                 >
                   {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
                 </button>

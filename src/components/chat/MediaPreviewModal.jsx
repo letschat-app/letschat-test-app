@@ -1,3 +1,4 @@
+import useBackClose from '../../hooks/useBackClose';
 import React, { useState, useEffect } from 'react';
 import { X, Send, FileText, Music, Trash2, Pencil, Download } from 'lucide-react';
 import { formatFileSize, getFileCategory, getPdfThumbnail, getVideoThumbnail } from '../../service/MediaUploader';
@@ -5,6 +6,7 @@ import { formatFileSize, getFileCategory, getPdfThumbnail, getVideoThumbnail } f
 const ImageEditor = React.lazy(() => import('../../editor/ImageEditor'));
 
 export default function MediaPreviewModal({ file, onSend, onCancel, isUploading = false, uploadProgress = 0, onFileChange }) {
+  useBackClose(Boolean(file), onCancel);
   const [currentFile, setCurrentFile] = useState(file);
   const [isEditing, setIsEditing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);

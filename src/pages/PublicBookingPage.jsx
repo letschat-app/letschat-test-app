@@ -1,9 +1,11 @@
+import { useToast } from '../components/common/ToastProvider';
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Calendar, Clock, Video, MapPin, User, Mail, CheckCircle, AlertTriangle, Shield, ArrowLeft } from 'lucide-react';
 import { API } from '../service/UserAuth';
 
 const PublicBookingPage = () => {
+  const toast = useToast();
   const { userIdentifier } = useParams();
   const navigate = useNavigate();
   const [hostInfo, setHostInfo] = useState({ name: userIdentifier || 'Host', isBookingEnabled: true });
@@ -116,7 +118,7 @@ const PublicBookingPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!agenda.trim() || !bookerName.trim() || !bookerEmail.trim()) {
-      alert('Please provide your name, email, and meeting agenda.');
+      toast.error('Please provide your name, email, and meeting agenda.');
       return;
     }
 

@@ -1,9 +1,13 @@
+import { useConfirm } from '../common/ConfirmProvider';
+import useBackClose from '../../hooks/useBackClose';
 import React from 'react';
 import { X, MessageSquare, ShieldCheck, Award, UserMinus, ChevronRight, User } from 'lucide-react';
 import { syncChatsMapToDB } from '../../service/db';
 import Avatar from '../chat/Avatar';
 
 const MemberActionsPopup = ({ member, chat, currentUserId, myDisplayName, API, onClose, onSuccess, getchat, navigate }) => {
+  useBackClose(true, onClose);
+  const confirm = useConfirm();
   if (!member) return null;
 
   const isSelectedMemberAdmin = member.role === 'admin';
@@ -86,7 +90,8 @@ const MemberActionsPopup = ({ member, chat, currentUserId, myDisplayName, API, o
   };
 
   const handleRemoveMember = async () => {
-    if (window.confirm(`Are you sure you want to remove ${member.userName}?`)) {
+    const confirmed = await confirm({ title: 'Remove Member', message: `Are you sure you want to remove ${member.userName}?`, danger: true, confirmText: 'Remove' });
+    if (confirmed) {
       try {
         const res = await fetch(`${API}/group/remove/${chat.id}/${member.userId}`, {
           method: "POST",

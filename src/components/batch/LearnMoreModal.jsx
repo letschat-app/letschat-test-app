@@ -1,7 +1,9 @@
+import useBackClose from '../../hooks/useBackClose';
 import React from 'react';
 import { X, Layers, ShieldCheck, MessageSquare, CheckCircle2 } from 'lucide-react';
 
 export default function LearnMoreModal({ isOpen, onClose }) {
+  useBackClose(isOpen, onClose);
   if (!isOpen) return null;
 
   return (
@@ -27,17 +29,18 @@ export default function LearnMoreModal({ isOpen, onClose }) {
           borderRadius: '20px',
           width: '100%',
           maxWidth: '520px',
-          maxHeight: '90vh',
+          
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
           boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
           animation: 'muFadeIn 0.2s ease-out'
         }}
+        className="responsive-modal-container"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{
+        <div className="responsive-modal-header" style={{
           padding: '18px 24px',
           borderBottom: '1px solid var(--border-color)',
           display: 'flex',

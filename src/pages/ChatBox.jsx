@@ -1,3 +1,7 @@
+import useIsDesktop from '../hooks/useIsDesktop';
+import { useToast } from '../components/common/ToastProvider';
+import { usePrompt } from '../components/common/PromptProvider';
+import useVisualViewport from '../hooks/useVisualViewport';
 import { clearChatNotifications } from '../hooks/useNotifications';
 import React, { useEffect, useState, useRef, useMemo, useLayoutEffect, useCallback } from "react";
 
@@ -159,7 +163,7 @@ import QuickAccessWheel from '../components/chat/QuickAccessWheel';
 
 import { uploadMedia, formatFileSize, getFileCategory, getVideoThumbnail, getPdfThumbnail } from '../service/MediaUploader';
 
-import { saveBlobToCache, getMediaInfo, renameCacheKey } from '../service/MediaCache';
+import { saveBlobToCache, getMediaInfo, getMediaBlob, renameCacheKey, memoryThumbCache } from '../service/MediaCache';
 
 import spaceStore from "../service/SpaceStore";
 
@@ -322,6 +326,46 @@ const PulseQuoteCard = ({ repliedtoStr, isReceived }) => {
 };
 
 
+
+
+const CachedMediaImage = ({ mediaId, optimisticUrl = null, alt = "", style = {} }) => {
+  const [src, setSrc] = useState(() => {
+    if (optimisticUrl) return optimisticUrl;
+    if (mediaId && memoryThumbCache.has(`${mediaId}_thumb`)) {
+      return memoryThumbCache.get(`${mediaId}_thumb`);
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    if (optimisticUrl) {
+      setSrc(optimisticUrl);
+      return;
+    }
+    if (!mediaId) return;
+
+    getMediaInfo(mediaId).then((info) => {
+      if (!isMounted) return;
+      const fetchUrl = (info && (info.thumbnailKey || info.fileKey)) ? (info.thumbnailKey || info.fileKey) : `${API}/files/media/serve/${mediaId}`;
+      const cacheKey = (info && info.thumbnailKey) ? `${mediaId}_thumb` : `${mediaId}_full`;
+      const storeName = (info && info.thumbnailKey) ? 'thumbCache' : 'mainCache';
+      return getMediaBlob(cacheKey, fetchUrl, storeName);
+    }).then((blobUrl) => {
+      if (isMounted && blobUrl) {
+        setSrc(blobUrl);
+      }
+    }).catch((err) => {
+      console.warn("CachedMediaImage failed to load blob:", err);
+      if (isMounted) setSrc(`${API}/files/media/serve/${mediaId}`);
+    });
+
+    return () => { isMounted = false; };
+  }, [mediaId, optimisticUrl]);
+
+  if (!src) return <div style={{ width: '100%', height: '100%', background: 'var(--border-color)', ...style }} />;
+  return <img src={src} alt={alt} style={style} />;
+};
 
 const isEmojiReaction = (str) => {
 
@@ -960,9 +1004,9 @@ const ChatBox = () => {
 
   const [activeSpace, setActiveSpace] = useState(() => {
 
-    const params = new URLSearchParams(window.location.search);
+    const params = new URLSearchParams(window.location.search || (window.location.hash && window.location.hash.includes('?') ? '?' + window.location.hash.split('?')[1] : ''));
 
-    return parseInt(params.get('space')) || 0;
+    return parseInt(params.get('space') || params.get('spaceId')) || 0;
 
   });
 
@@ -1596,11 +1640,16 @@ const ChatBox = () => {
 
   useEffect(() => {
 
-    const params = new URLSearchParams(location.search);
+    const params = new URLSearchParams(location.search || (location.hash && location.hash.includes('?') ? '?' + location.hash.split('?')[1] : ''));
 
-    const sId = parseInt(params.get('space')) || 0;
+    const sId = parseInt(params.get('space') || params.get('spaceId')) || 0;
 
     setActiveSpace(sId);
+    const assignId = params.get('assignmentId');
+    if (assignId) {
+      setSelectedAssignmentId(assignId);
+      setShowAssignmentDetail(true);
+    }
 
 
 
@@ -2022,7 +2071,7 @@ const ChatBox = () => {
 
     if (selectedMediaMsgs.length === 0) {
 
-      alert("No shareable media (images, videos, or files) selected.");
+      toast.info("No shareable media (images, videos, or files) selected.");
 
       return;
 
@@ -2032,7 +2081,7 @@ const ChatBox = () => {
 
     if (!navigator.share) {
 
-      alert("Native sharing is not supported on this browser.");
+      toast.info("Native sharing is not supported on this browser.");
 
       return;
 
@@ -2184,13 +2233,13 @@ const ChatBox = () => {
 
         } else {
 
-          alert("Platform does not support sharing this file type.");
+          toast.info("Platform does not support sharing this file type.");
 
         }
 
       } else {
 
-        alert("Platform does not support sharing this file type.");
+        toast.info("Platform does not support sharing this file type.");
 
       }
 
@@ -2200,7 +2249,7 @@ const ChatBox = () => {
 
         console.error("Sharing failed:", err);
 
-        alert("Sharing failed. Please try again.");
+        toast.error("Sharing failed. Please try again.");
 
       }
 
@@ -2308,7 +2357,7 @@ const ChatBox = () => {
 
 
 
-      // Background Member Sync
+      // Background Member Sync (SWR Hydration + Fresh Revalidation)
 
       const chatsMap = JSON.parse(localStorage.getItem("chatsMap") || "{}");
 
@@ -2316,7 +2365,17 @@ const ChatBox = () => {
 
       if (chatEnv && (chatEnv.type === 'group' || chatEnv.type === 'classroom')) {
 
-        fetch(`${API}/group/getmembers/${chatEnv.chatId || chatEnv.chatid}`, {
+        const targetChatId = chatEnv.chatId || chatEnv.chatid;
+
+        // 1. Immediate cache hydration from IndexedDB
+        getGroupMembersFromDB(targetChatId).then(cached => {
+          if (cached && cached.length) {
+            setChatMembers(cached);
+          }
+        }).catch(e => console.error("Cached members read failed:", e));
+
+        // 2. Background fresh revalidation
+        fetch(`${API}/group/getmembers/${targetChatId}`, {
 
           headers: { "Content-Type": "application/json", "User-Id": localStorage.getItem("userid") }
 
@@ -2332,7 +2391,7 @@ const ChatBox = () => {
 
               saveUsersBatchToDB(data);
 
-              saveGroupMembersToDB(chatEnv.chatId, data);
+              saveGroupMembersToDB(targetChatId, data);
 
             }
 
@@ -2390,7 +2449,7 @@ const ChatBox = () => {
 
       fetchScheduledMessages();
 
-    } catch (err) { alert(err.message); }
+    } catch (err) { toast.error(err.message); }
 
   };
 
@@ -2408,7 +2467,7 @@ const ChatBox = () => {
 
       if (scheduledMessages.length <= 1) setShowScheduledList(false);
 
-    } catch (err) { alert(err.message); }
+    } catch (err) { toast.error(err.message); }
 
   };
 
@@ -2420,7 +2479,7 @@ const ChatBox = () => {
 
     const checkMobile = () => {
 
-      setIsMobile(window.innerWidth < 768);
+      setIsMobile(window.innerWidth < 1024);
 
     };
 
@@ -2622,7 +2681,7 @@ const ChatBox = () => {
 
     const currentName = spaceStore.getSpaceName(chatid, activeSpace);
 
-    const newName = prompt("Enter new name for this space:", currentName);
+    const newName = await prompt({ title: "Rename Space", message: "Enter new name for this space:", defaultValue: currentName });
 
     if (newName && newName.trim() && newName !== currentName) {
 
@@ -4184,7 +4243,7 @@ const ChatBox = () => {
 
     if (file.size > 50 * 1024 * 1024) {
 
-      alert(`The captured file exceeds the 50MB size limit and cannot be sent.`);
+      toast.error(`The captured file exceeds the 50MB size limit and cannot be sent.`);
 
       return;
 
@@ -4416,7 +4475,7 @@ const ChatBox = () => {
 
       console.error("Microphone access denied or error:", err);
 
-      alert("Microphone permission was denied. Please allow microphone access in your browser settings to record voice messages.");
+      toast.error("Microphone permission was denied. Please allow microphone access in your browser settings to record voice messages.");
 
     }
 
@@ -4442,7 +4501,7 @@ const ChatBox = () => {
 
       console.error("Camera access denied or error:", err);
 
-      alert("Camera permission was denied. Please allow camera access in your browser settings to use the camera.");
+      toast.error("Camera permission was denied. Please allow camera access in your browser settings to use the camera.");
 
     }
 
@@ -4914,7 +4973,7 @@ const ChatBox = () => {
 
               display: 'flex', alignItems: 'center', justifyContent: 'center',
 
-              width: isMobile ? '32px' : '36px', height: isMobile ? '32px' : '36px', borderRadius: '50%',
+              minWidth: '44px', minHeight: '44px', width: isMobile ? '36px' : '40px', height: isMobile ? '36px' : '40px', borderRadius: '50%',
 
               color: showEmojiPicker ? 'var(--accent-color)' : 'var(--text-secondary)',
 
@@ -4942,7 +5001,7 @@ const ChatBox = () => {
 
             onFileSelect={setPendingMediaFile}
 
-            onError={err => alert('Upload failed: ' + err.message)}
+            onError={err => toast.error('Upload failed: ' + err.message)}
 
             onCameraClick={handleCameraClick}
 
@@ -5108,7 +5167,7 @@ const ChatBox = () => {
 
               flex: 1, background: 'transparent', border: 'none', outline: 'none',
 
-              fontSize: isMobile ? '14.5px' : '15.5px', color: 'var(--text-primary)',
+              fontSize: '16px', color: 'var(--text-primary)',
 
               padding: isMobile ? '8px 8px 8px 4px' : '10px 10px 10px 6px', minWidth: 0,
 
@@ -8516,7 +8575,7 @@ const ChatBox = () => {
 
   return (
 
-    <div className="chat-layout-wrapper" style={{ display: 'flex', width: '100%', height: '100%', overflow: 'hidden', backgroundColor: 'var(--bg-primary)' }}>
+    <div className="chat-layout-wrapper" style={{ display: 'flex', width: '100%', height: isIOS && isInputFocused ? 'var(--vvh, 100dvh)' : '100%', overflow: 'hidden', backgroundColor: 'var(--bg-primary)' }}>
 
       {showClearModal && (
 
@@ -13498,7 +13557,7 @@ const ChatBox = () => {
 
                           {repliedto.type == 'image' &&
 
-                            <img src={`${API}/files/media/serve/${repliedto.content}`} style={{ width: '100%', height: '100%', }} />
+                            <CachedMediaImage mediaId={repliedto.content} optimisticUrl={repliedto.optimisticThumbUrl || repliedto.optimisticUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
 
                           }
 
@@ -15358,9 +15417,11 @@ const ChatBox = () => {
 
                     {/* Image - Center */}
 
-                    <img
+                    <CachedMediaImage
 
-                      src={`${API}/files/media/serve/${showmedia.content}`}
+                      mediaId={showmedia.content}
+
+                      optimisticUrl={showmedia.optimisticThumbUrl || showmedia.optimisticUrl}
 
                       alt="preview"
 

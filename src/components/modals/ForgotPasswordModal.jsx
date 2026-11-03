@@ -1,3 +1,4 @@
+import useBackClose from '../../hooks/useBackClose';
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { KeyRound, Mail, Lock, ArrowRight, Loader2, CheckCircle2, AlertCircle, Eye, EyeOff, ShieldCheck, RotateCcw } from 'lucide-react';
@@ -112,6 +113,8 @@ const WeightlifterAvatar = ({ score }) => {
 };
 
 export default function ForgotPasswordModal({ isOpen, onClose, onResetComplete, initialIdentifier = '' }) {
+  useBackClose(isOpen, onClose);
+
   const [step, setStep] = useState(1); // 1 = Request OTP, 2 = Verify OTP, 3 = Set New Password
   const [identifier, setIdentifier] = useState(initialIdentifier);
   const [otp, setOtp] = useState('');

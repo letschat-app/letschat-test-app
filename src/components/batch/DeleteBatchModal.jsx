@@ -1,7 +1,9 @@
+import useBackClose from '../../hooks/useBackClose';
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 
 export default function DeleteBatchModal({ isOpen, batch, onConfirm, onCancel }) {
+  useBackClose(isOpen, onCancel);
   if (!isOpen || !batch) return null;
 
   return (

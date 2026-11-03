@@ -1,3 +1,6 @@
+import { useToast } from '../common/ToastProvider';
+import { useConfirm } from '../common/ConfirmProvider';
+import useBackClose from '../../hooks/useBackClose';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { X, Edit2, Users, UserPlus, LogOut, Shield, Award, MessageCircle, UserMinus, Info, Camera, Loader2, Bell, BellOff, Zap } from 'lucide-react';
 import MemberActionsPopup from './MemberActionsPopup';
@@ -12,6 +15,9 @@ import { DisplayNamePolicyModal } from '../common/DisplayNamePolicyModal';
 import { validateChatNickname } from '../../service/nameSimilarity';
 
 const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) => {
+  useBackClose(true, onClose);
+  const toast = useToast();
+  const confirm = useConfirm();
   const currentUserId = localStorage.getItem('userid');
   const currentUsername = (localStorage.getItem('username') || currentUserId || '').toLowerCase();
   const isSleepMode = localStorage.getItem('sleepMode') === 'true';
@@ -317,14 +323,14 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
   const handleSaveMyInfo = async () => {
     const cleanName = myDisplayName.trim();
     if (!cleanName) {
-      alert("Name cannot be empty.");
+      toast.error("Name cannot be empty.");
       return;
     }
 
     const peers = members.filter(m => String(m.userId) !== String(currentUserId));
     const validation = validateChatNickname(currentUsername, cleanName, peers);
     if (!validation.isValid) {
-      alert(validation.message);
+      toast.error(validation.message);
       return;
     }
 
@@ -355,11 +361,11 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
         }
       } else {
         const errText = await res.text();
-        alert(errText || "Failed to update chat info");
+        toast.error(errText || "Failed to update chat info");
       }
     } catch (ex) {
       console.error("Failed to update info:", ex);
-      alert("Network error updating chat info.");
+      toast.error("Network error updating chat info.");
     }
   };
 
@@ -404,7 +410,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
       }
     } catch (ex) {
       console.error(`Failed to update ${endpoint}:`, ex);
-      alert(`Failed to update ${endpoint}: ` + ex.message);
+      toast.error(`Failed to update ${endpoint}: ` + ex.message);
     } finally {
       setUploading(false);
     }
@@ -424,7 +430,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
       setTempGroupProfile(result.mediaId);
     } catch (err) {
       console.error('[InfoModal] Group profile upload fail:', err);
-      alert('Upload failed: ' + err.message);
+      toast.error('Upload failed: ' + err.message);
     } finally {
       setUploading(false);
     }
@@ -468,7 +474,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
       setMyProfile(result.mediaId);
     } catch (err) {
       console.error('[InfoModal] Upload fail:', err);
-      alert('Upload failed: ' + err.message);
+      toast.error('Upload failed: ' + err.message);
     } finally {
       setUploading(false);
     }
@@ -483,11 +489,12 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
     const isCurrentUserAdmin = members.find(m => m.userId === currentUserId)?.role === roleType;
 
     if (isCurrentUserAdmin && admins.length === 1 && members.length > 1) {
-      alert(`You are the only ${roleType}. Please promote someone else before leaving.`);
+      toast.error(`You are the only ${roleType}. Please promote someone else before leaving.`);
       return;
     }
 
-    if (window.confirm(`Are you sure you want to leave this ${isClassroom ? 'classroom' : 'group'}?`)) {
+    const confirmed = await confirm({ title: 'Leave', message: `Are you sure you want to leave this ${isClassroom ? 'classroom' : 'group'}?`, danger: true, confirmText: 'Leave' });
+    if (confirmed) {
       try {
         const res = await fetch(`${API}/group/leave/${chat.chatId}`, {
           method: "POST",
@@ -553,7 +560,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
       backgroundColor: isPanel ? 'transparent' : 'rgba(15, 23, 42, 0.95)',
       width: '100%', 
       maxWidth: isPanel ? 'none' : '480px',
-      maxHeight: isPanel ? 'none' : '85vh', 
+      maxHeight: isPanel ? 'none' : 'calc(100dvh - 32px)', 
       overflowY: 'auto',
       borderRadius: isPanel ? '0' : '24px', 
       position: 'relative',
@@ -581,7 +588,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
             <button 
               onClick={() => {
                 if (isSleepMode) {
-                  alert("cannot edit in sleep mode or offline");
+                  toast.info("cannot edit in sleep mode or offline");
                   return;
                 }
                 setGroupEditMode(true);
@@ -768,7 +775,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
             {!editMode && (
               <button onClick={() => {
                 if (isSleepMode) {
-                  alert("cannot edit in sleep mode or offline");
+                  toast.info("cannot edit in sleep mode or offline");
                   return;
                 }
                 setEditMode(true);

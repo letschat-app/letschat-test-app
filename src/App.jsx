@@ -1,3 +1,7 @@
+import useIsDesktop from './hooks/useIsDesktop';
+import { ToastProvider } from './components/common/ToastProvider';
+import { ConfirmProvider } from './components/common/ConfirmProvider';
+import { PromptProvider } from './components/common/PromptProvider';
 import React, { Suspense, lazy , useEffect , useState} from "react";
 import { Routes, Route, Navigate,useLocation, useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
@@ -172,19 +176,19 @@ function App() {
     };
   }, [location.pathname]);
   
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const isDesktop = useIsDesktop();
+  const isMobile = !isDesktop;
 
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  
 
 
   return (
     
     <>
     <PWAProvider>
+      <ToastProvider>
+        <ConfirmProvider>
+          <PromptProvider>
     {isOffline && (
       <div style={{
         position: 'fixed',
@@ -263,6 +267,8 @@ function App() {
             <Route path="/feed" element={<MediaFeed/>}/>
             <Route path="/calendar" element={<SmoothCalendar/>}/>
             <Route path="/share-target" element={<ShareTargetPage />} />
+            {/* Catch-all route for unknown paths */}
+            <Route path="*" element={<Navigate to={localStorage.getItem("userid") ? "/chats" : "/welcome"} replace />} />
           </Routes>
         </SwipeWrapper>
       </ErrorBoundary>
@@ -270,6 +276,9 @@ function App() {
     </div>
     </EventPanel>
     </EventStorage>
+              </PromptProvider>
+        </ConfirmProvider>
+      </ToastProvider>
     </PWAProvider>
     </>
   );

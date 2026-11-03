@@ -1,3 +1,4 @@
+import useBackClose from '../../hooks/useBackClose';
 import React, { useState, useMemo } from 'react';
 import { X, Search, Check, Layers } from 'lucide-react';
 import Avatar from '../chat/Avatar';
@@ -5,6 +6,7 @@ import { isVerifiedChat, VerifiedBadge } from '../../pages/ChatNames';
 import { createBatch } from '../../service/BatchMessageService';
 
 export default function CreateBatchModal({ isOpen, onClose, onBatchCreated, chats = [], userId }) {
+  useBackClose(isOpen, onClose);
   const [batchName, setBatchName] = useState('');
   const [selectedChatIds, setSelectedChatIds] = useState(new Set());
   const [searchQuery, setSearchQuery] = useState('');

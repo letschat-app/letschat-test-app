@@ -197,6 +197,7 @@ body {
   margin: 0;
   padding: 0;
   width: 100vw;
+  height: 100vh;
   height: 100dvh;
   overflow: hidden;
   background-color: var(--bg-primary);
@@ -456,3 +457,55 @@ button:focus-visible {
 }
 
 
+
+/* 2.2 Global input font size >= 16px on touch devices to prevent iOS auto-zoom */
+@media (pointer: coarse) {
+  input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=color]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* Batch 4: Responsive Modal Container & Height handling on small viewports */
+.responsive-modal-container {
+  display: flex !important;
+  flex-direction: column !important;
+  max-height: calc(100vh - 32px) !important;
+  max-height: calc(100dvh - 32px) !important;
+}
+
+@media (max-height: 500px) {
+  .responsive-modal-container {
+    max-height: 100vh !important;
+    max-height: 100dvh !important;
+    height: 100% !important;
+    border-radius: 0 !important;
+  }
+}
+
+.responsive-modal-header {
+  flex: none !important;
+}
+
+.responsive-modal-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+.responsive-modal-footer {
+  flex: none !important;
+}
+
+/* Batch 5: Touch Targets for Close Buttons and Primary Icon Controls */
+.modal-close-btn,
+button[aria-label="Close"],
+button[aria-label="close"] {
+  min-width: 44px !important;
+  min-height: 44px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}

@@ -1,3 +1,5 @@
+import { useToast } from '../common/ToastProvider';
+import useBackClose from '../../hooks/useBackClose';
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, KeyRound, Lock, User, Mail, Loader2, CheckCircle2, AlertCircle, RotateCcw, X, Eye, EyeOff } from 'lucide-react';
@@ -114,7 +116,9 @@ const WeightlifterAvatar = ({ score }) => {
 };
 
 export default function PendingOtpModal() {
+  const toast = useToast();
   const [session, setSession] = useState(() => getPendingOtpSession());
+  useBackClose(Boolean(session), () => { clearPendingOtpSession(); setSession(null); });
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -344,7 +348,7 @@ export default function PendingOtpModal() {
           if (data?.status === 'SUCCESS' || res.status === 200) {
             clearPendingOtpSession();
             setSession(null);
-            alert('Password updated successfully!');
+            toast.success('Password updated successfully!');
           } else {
             setErrorMsg(data?.message || 'Invalid verification code. Password not updated.');
           }
@@ -363,7 +367,7 @@ export default function PendingOtpModal() {
             setSession(null);
             localStorage.setItem('is2FAEnabled', String(nextEnable));
             window.dispatchEvent(new CustomEvent('2fa_status_changed', { detail: { is2FAEnabled: nextEnable } }));
-            alert(data?.message || `Two-factor authentication successfully ${nextEnable ? 'enabled' : 'disabled'}!`);
+            toast.success(data?.message || `Two-factor authentication successfully ${nextEnable ? 'enabled' : 'disabled'}!`);
           } else {
             setErrorMsg(data?.message || 'Invalid verification code. 2FA setting not updated.');
           }

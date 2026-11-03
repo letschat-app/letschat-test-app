@@ -1,3 +1,4 @@
+import useIsDesktop from '../hooks/useIsDesktop';
 import React, { useState, useEffect } from 'react';
 import { Plus, ChevronDown, ChevronUp, Eye, Sparkles, Clock, Flame, X, Loader2 } from 'lucide-react';
 import { getPulseFeed, getMyPulses, getPulseFeedOffline, getMinePulsesOffline, parsePulseDate, formatPulseTime } from '../service/PulseService';
@@ -32,18 +33,15 @@ const PulsesTab = () => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [selectedUserIdx, setSelectedUserIdx] = useState(0);
 
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const isDesktop = useIsDesktop();
+  const isMobile = !isDesktop;
 
   const userId = localStorage.getItem('userid');
   const userName = localStorage.getItem('username') || userId;
   const userProfile = localStorage.getItem('profile');
   const userStreak = parseInt(localStorage.getItem('streak') || '0', 10);
 
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  
 
   const fetchData = async () => {
     // 1. Instant rendering from IndexedDB cache

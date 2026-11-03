@@ -1,8 +1,10 @@
+import useBackClose from '../../hooks/useBackClose';
 import React from 'react';
 import { X, Download, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
 import { downloadFile } from '../../service/MediaUploader';
 
 export default function MediaViewer({ media, onClose, onEdit }) {
+  useBackClose(Boolean(media), onClose);
   if (!media) return null;
 
   const { fileUrl, fileName, fileType } = media;
@@ -40,7 +42,10 @@ export default function MediaViewer({ media, onClose, onEdit }) {
     >
       {/* Header bar */}
       <div style={{
-        height: '64px',
+        height: 'calc(64px + env(safe-area-inset-top, 0px))',
+        paddingTop: 'env(safe-area-inset-top, 0px)',
+        paddingLeft: 'max(16px, env(safe-area-inset-left, 0px))',
+        paddingRight: 'max(16px, env(safe-area-inset-right, 0px))',
         padding: '0 20px',
         display: 'flex',
         alignItems: 'center',
@@ -53,7 +58,7 @@ export default function MediaViewer({ media, onClose, onEdit }) {
             onClick={onClose}
             style={{ 
               background: 'transparent', border: 'none', color: 'white', 
-              cursor: 'pointer', padding: '8px', borderRadius: '50%'
+              cursor: 'pointer', minWidth: '44px', minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px', borderRadius: '50%'
             }}
           >
             <span style={{ fontSize: '28px', fontWeight: '700' }}>X</span>

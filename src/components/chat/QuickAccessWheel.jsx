@@ -1,3 +1,5 @@
+import useIsDesktop from '../../hooks/useIsDesktop';
+import useBackClose from '../../hooks/useBackClose';
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MessageCircle, X, Zap, Sparkles } from 'lucide-react';
@@ -6,8 +8,10 @@ import messageStore from '../../pages/MessageStore';
 
 const QuickAccessWheel = ({ currentChatId }) => {
   const navigate = useNavigate();
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const isDesktop = useIsDesktop();
+  const isMobile = !isDesktop;
   const [isOpen, setIsOpen] = useState(false);
+  useBackClose(isOpen, () => setIsOpen(false));
   const [wheelItems, setWheelItems] = useState([]);
   const [unreadChatsCount, setUnreadChatsCount] = useState(0);
 
@@ -23,7 +27,7 @@ const QuickAccessWheel = ({ currentChatId }) => {
   // Handle window resize to enforce strict mobile visibility
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
+      
       // Clamp posY on resize
       setPosY(prev => Math.min(Math.max(80, prev), window.innerHeight - 100));
     };

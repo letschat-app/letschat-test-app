@@ -1,3 +1,4 @@
+import { useToast } from '../components/common/ToastProvider';
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSharedData, clearSharedData } from '../service/db';
@@ -5,6 +6,7 @@ import { uploadMedia, getFileCategory } from '../service/MediaUploader';
 import { sendSafe } from '../service/Websocket';
 import messageStore from './MessageStore';
 import { API } from '../service/UserAuth';
+import Avatar from '../components/chat/Avatar';
 import { v4 as uuidv4 } from 'uuid';
 import { Check, Send, X, FileText, Loader2, User } from 'lucide-react';
 
@@ -56,7 +58,7 @@ const ShareTargetPage = () => {
 
     const handleSend = async () => {
         if (selectedChats.size === 0) {
-            alert('Please select at least one chat.');
+            toast.error('Please select at least one chat.');
             return;
         }
 
@@ -295,22 +297,7 @@ const ShareTargetPage = () => {
                                     transition: 'all 0.15s ease'
                                 }}
                             >
-                                <div style={{
-                                    width: '48px',
-                                    height: '48px',
-                                    borderRadius: '14px',
-                                    background: 'var(--border-color)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    overflow: 'hidden'
-                                }}>
-                                    {chat.profile ? (
-                                        <img src={`${API}/files/media/serve/${chat.profile}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
-                                    ) : (
-                                        <User size={24} color="var(--text-secondary)" />
-                                    )}
-                                </div>
+                                <Avatar chat={chat} size={48} />
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{ fontWeight: '600', fontSize: '15px', color: 'white' }}>{chat.chatName}</div>
                                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Last active {new Date(lastMessages[chat.chatId]?.timestamp || 0).toLocaleDateString()}</div>

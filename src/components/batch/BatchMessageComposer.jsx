@@ -1,3 +1,5 @@
+import useIsDesktop from '../../hooks/useIsDesktop';
+import { useToast } from '../common/ToastProvider';
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import EmojiPicker from 'emoji-picker-react';
@@ -14,9 +16,11 @@ export default function BatchMessageComposer({
   disabled = false,
   placeholder = "Type a message to send to all selected..."
 }) {
+  const toast = useToast();
   const { theme } = useTheme();
   const [input, setInput] = useState('');
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const isDesktop = useIsDesktop();
+  const isMobile = !isDesktop;
 
   // Modals state
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -36,11 +40,7 @@ export default function BatchMessageComposer({
   const audioChunksRef = useRef([]);
   const timerIntervalRef = useRef(null);
 
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  
 
   // Close emoji picker when clicking outside
   useEffect(() => {
@@ -81,7 +81,7 @@ export default function BatchMessageComposer({
       setCameraOpen(true);
     } catch (err) {
       console.error("Camera access denied or error:", err);
-      alert("Camera permission was denied. Please allow camera access in your browser settings to use the camera.");
+      toast.error("Camera permission was denied. Please allow camera access in your browser settings to use the camera.");
     }
   };
 
@@ -114,7 +114,7 @@ export default function BatchMessageComposer({
       }, 1000);
     } catch (err) {
       console.error("Microphone access denied or error:", err);
-      alert("Microphone permission was denied. Please allow microphone access in your browser settings to record voice messages.");
+      toast.error("Microphone permission was denied. Please allow microphone access in your browser settings to record voice messages.");
     }
   };
 
@@ -322,7 +322,7 @@ export default function BatchMessageComposer({
                   }
                 }}
                 onFileSelect={setPendingMediaFile}
-                onError={err => alert('Upload failed: ' + err.message)}
+                onError={err => toast.error('Upload failed: ' + err.message)}
                 onCameraClick={handleCameraClick}
                 disabled={disabled}
                 style={{

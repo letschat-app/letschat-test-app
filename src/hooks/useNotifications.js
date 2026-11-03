@@ -45,13 +45,13 @@ export const useNotifications = () => {
   const navigate = useNavigate();
   const isRefreshingRef = useRef(false);
 
-  const requestPermissionAndGetToken = async (forceRefresh = false) => {
+  const requestPermissionAndGetToken = async (forceRefresh = false, forceSync = false) => {
     if (isRefreshingRef.current) {
       console.log('[useNotifications] Token request already in progress, skipping duplicate call.');
       return null;
     }
     isRefreshingRef.current = true;
-    console.log('[useNotifications] requestPermissionAndGetToken called with forceRefresh =', forceRefresh);
+    console.log('[useNotifications] requestPermissionAndGetToken called with forceRefresh =', forceRefresh, 'forceSync =', forceSync);
     try {
       if (!('Notification' in window) || !messaging) {
         console.warn('[useNotifications] Notifications or Firebase messaging not supported in this browser.');
@@ -131,7 +131,7 @@ export const useNotifications = () => {
             const currentUserId = localStorage.getItem('userid') || userId;
             if (currentUserId) {
               console.log('[useNotifications] Syncing token with backend for user:', currentUserId);
-              await syncTokenWithBackend(token);
+              await syncTokenWithBackend(token, forceSync);
             } else {
               console.warn('[useNotifications] Token retrieved but no userId found. Skipping sync.');
             }
@@ -195,7 +195,7 @@ export const useNotifications = () => {
     }
   };
 
-  const syncTokenWithBackend = async (token) => {
+  const syncTokenWithBackend = async (token, force = false) => {
     try {
       const currentUserId = localStorage.getItem('userid') || userId;
       const deviceId = getOrCreateDeviceId();
@@ -204,10 +204,20 @@ export const useNotifications = () => {
           console.warn('[useNotifications] Cannot sync token: No userId found in localStorage');
           return;
         }
+        const lastSyncedToken = localStorage.getItem('lastSyncedToken');
+        const lastSyncedAt = parseInt(localStorage.getItem('lastSyncedAt') || '0', 10);
+        const isExpired = Date.now() - lastSyncedAt > 24 * 60 * 60 * 1000;
+        if (!force && token === lastSyncedToken && !isExpired) {
+          return; // Already synced with backend
+        }
         await registerFCMToken({ userId: currentUserId, deviceId, token });
+        localStorage.setItem('lastSyncedToken', token);
+        localStorage.setItem('lastSyncedAt', String(Date.now()));
         console.log('[useNotifications] FCM Token registered for user:', currentUserId, 'device:', deviceId);
       } else {
         await removeFCMToken(deviceId);
+        localStorage.removeItem('lastSyncedToken');
+        localStorage.removeItem('lastSyncedAt');
         console.log('FCM Token removed from backend for device:', deviceId);
       }
     } catch (err) {
@@ -215,75 +225,47 @@ export const useNotifications = () => {
     }
   };
 
-  useEffect(() => {
+    useEffect(() => {
     const hasNotificationSupport = typeof window !== 'undefined' && 'Notification' in window;
     const isManuallyDisabled = localStorage.getItem('notificationsDisabled') === 'true';
-    const justUpdated = localStorage.getItem('sw_just_updated') === 'true';
     const currentUserId = localStorage.getItem('userid') || userId;
 
-    // Automatic version update check:
-    // If the app bundle updated (VITE_BUILD_TIME changed) or SW just updated,
-    // force a clean token teardown and re-generation
-    const currentBuildTime = import.meta.env.VITE_BUILD_TIME;
-    const storedBuildTime = localStorage.getItem('app_build_version');
-    const isNewBuild = Boolean(currentBuildTime && storedBuildTime && storedBuildTime !== currentBuildTime);
-
-    if (currentBuildTime) {
-      localStorage.setItem('app_build_version', currentBuildTime);
-    }
-
-    const needsForceRefresh = justUpdated || isNewBuild;
-
-    // 1. Initial Sync on App Launch / Mount
+    // 1. Initial Sync on App Launch / Mount (without tearing down token, forced backend sync)
     if (hasNotificationSupport && Notification.permission === 'granted' && currentUserId && !isManuallyDisabled && messaging) {
-      if (needsForceRefresh) {
-        console.log('[useNotifications] Forced refresh detected after SW update or new build.');
-        localStorage.removeItem('sw_just_updated');
-        requestPermissionAndGetToken(true);
-      } else {
-        // If an existing token is in localStorage, proactively ensure backend is in sync
-        const existingToken = localStorage.getItem('fcmToken');
-        if (existingToken) {
-          syncTokenWithBackend(existingToken);
-        }
-        // Verify with Firebase / active Service Worker
-        requestPermissionAndGetToken(false);
-      }
+      requestPermissionAndGetToken(false, true);
     }
 
     // 2. Monitor Service Worker changes
     if ('serviceWorker' in navigator) {
       const handleControllerChange = async () => {
-        console.log('[useNotifications] Service Worker controller changed (version update). Refreshing token...');
-        localStorage.setItem('sw_just_updated', 'true');
+        console.log('[useNotifications] Service Worker controller changed. Verifying token...');
         if (hasNotificationSupport && Notification.permission === 'granted' && !isManuallyDisabled) {
-          await requestPermissionAndGetToken(true);
+          await requestPermissionAndGetToken(false, true);
         }
       };
 
       const handleSWMessage = async (event) => {
-        console.log('[useNotifications] Message received from Service Worker:', event.data);
         if (event.data?.type === 'NOTIFICATION_CLICK' && event.data?.path) {
           console.log('[useNotifications] Navigating to clicked notification path:', event.data.path);
           navigate(event.data.path);
           return;
         }
         if (event.data && event.data.type === 'SW_ACTIVATED') {
-          console.log(`[useNotifications] New SW Version ${event.data.version} activated. Triggering token sync...`);
-          localStorage.setItem('sw_just_updated', 'true');
+          console.log(`[useNotifications] SW Version ${event.data.version} activated. Verifying token...`);
           if (hasNotificationSupport && Notification.permission === 'granted' && !isManuallyDisabled) {
-            await requestPermissionAndGetToken(true);
+            await requestPermissionAndGetToken(false, true);
           }
         }
       };
 
+      let hiddenTimestamp = 0;
       const handleVisibilityChange = () => {
-        if (document.visibilityState === 'visible') {
-          const needsRefresh = localStorage.getItem('sw_just_updated') === 'true';
-          if (needsRefresh && hasNotificationSupport && Notification.permission === 'granted' && !isManuallyDisabled) {
-            console.log('[useNotifications] App visible and SW update pending — refreshing FCM token...');
-            localStorage.removeItem('sw_just_updated');
-            requestPermissionAndGetToken(true);
+        if (document.visibilityState === 'hidden') {
+          hiddenTimestamp = Date.now();
+        } else if (document.visibilityState === 'visible') {
+          if (hasNotificationSupport && Notification.permission === 'granted' && !isManuallyDisabled) {
+            const wasLongHidden = hiddenTimestamp > 0 && (Date.now() - hiddenTimestamp > 15 * 60 * 1000);
+            requestPermissionAndGetToken(false, wasLongHidden);
           }
         }
       };
@@ -302,7 +284,7 @@ export const useNotifications = () => {
             const data = payload.data || {};
             const { unread, msgs, chatId, type } = data;
 
-            // 1. Broadast to Store for InAppToast and UI updates
+            // 1. Broadcast to Store for InAppToast and UI updates
             if (type === 'CHAT' || type === 'EVENT' || type === 'DAILY' || type === 'ASSIGNMENT_MISSING') {
               messageStore.notifyListeners({ ...data, fromFCM: true });
             }
@@ -337,7 +319,7 @@ export const useNotifications = () => {
     }
   }, [userId]);
 
-  return { fcmToken, permissionStatus, requestPermissionAndGetToken, disableNotifications, clearChatNotifications };
+    return { fcmToken, permissionStatus, requestPermissionAndGetToken, disableNotifications, clearChatNotifications };
 };
 
 export const clearChatNotifications = async (chatId) => {
@@ -362,4 +344,29 @@ export const clearChatNotifications = async (chatId) => {
   } catch (err) {
     console.warn('[clearChatNotifications] Error clearing notifications:', err);
   }
+};
+
+// Safe unified logout cleanup (Item A4)
+export const cleanupFCMOnLogout = async () => {
+  const deviceId = localStorage.getItem('deviceId');
+  if (deviceId) {
+    try {
+      await removeFCMToken(deviceId);
+    } catch (err) {
+      console.warn('[cleanupFCMOnLogout] Failed to remove FCM token from backend:', err);
+    }
+  }
+  try {
+    if (messaging) {
+      await deleteToken(messaging);
+    }
+  } catch (err) {
+    console.warn('[cleanupFCMOnLogout] deleteToken(messaging) failed:', err);
+  }
+  try {
+    localStorage.removeItem('fcmToken');
+    localStorage.removeItem('lastSyncedToken');
+    localStorage.removeItem('lastSyncedAt');
+    await clearFirebaseTokenDB();
+  } catch (e) {}
 };

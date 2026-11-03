@@ -1,7 +1,9 @@
+import useBackClose from '../../hooks/useBackClose';
 import React from 'react';
 import { X, Clock, Edit2, Trash2 } from 'lucide-react';
 
 const ScheduledListModal = ({ isOpen, onClose, scheduledMessages, onEdit, onDelete }) => {
+  useBackClose(isOpen, onClose);
   if (!isOpen) return null;
 
   const handleWrapperClick = (e) => {
@@ -20,8 +22,8 @@ const ScheduledListModal = ({ isOpen, onClose, scheduledMessages, onEdit, onDele
         display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999999
       }}
     >
-      <div style={{
-        background: 'var(--bg-card)', borderRadius: '16px', width: '90%', maxWidth: '400px', maxHeight: '80vh',
+      <div className="responsive-modal-container" style={{
+        background: 'var(--bg-card)', borderRadius: '16px', width: '90%', maxWidth: '400px', 
         border: '1px solid #333', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
         display: 'flex', flexDirection: 'column', overflow: 'hidden'
       }}>

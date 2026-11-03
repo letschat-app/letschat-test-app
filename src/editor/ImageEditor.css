@@ -14,8 +14,11 @@
 
 /* Header */
 .image-editor-header {
-  height: 54px;
-  padding: 0 16px;
+  height: calc(54px + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-bottom: 0;
   background: rgba(18, 27, 34, 0.95);
   backdrop-filter: blur(8px);
   display: flex;
@@ -196,12 +199,15 @@
 
 /* Bottom Toolbar */
 .image-editor-toolbar {
-  height: 64px;
+  height: calc(64px + env(safe-area-inset-bottom, 0px));
   background: #111b21;
   display: flex;
   align-items: center;
   justify-content: space-around;
-  padding: 0 8px;
+  padding-top: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: max(8px, env(safe-area-inset-left, 0px));
+  padding-right: max(8px, env(safe-area-inset-right, 0px));
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
   overflow-x: auto;

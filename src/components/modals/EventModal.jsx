@@ -1,3 +1,5 @@
+import { useToast } from '../common/ToastProvider';
+import useBackClose from '../../hooks/useBackClose';
 import React, { useState, useEffect } from 'react';
 import {
   X, Calendar, Clock, Check, AlertTriangle, Trash2, ArrowRight, Plus,
@@ -218,7 +220,7 @@ const EventModal = ({
 
   const handleCreateEvent = async () => {
     if (!formData.title || !formData.title.trim()) {
-      alert("Please enter an event title");
+      toast.error("Please enter an event title");
       return;
     }
 
@@ -266,11 +268,11 @@ const EventModal = ({
       } else {
         const errorText = await res.text();
         console.error("Failed to create event:", res.status, errorText);
-        alert("Failed to create event. Please try again.");
+        toast.error("Failed to create event. Please try again.");
       }
     } catch (err) {
       console.error("Network error creating group event:", err);
-      alert("Network error creating group event.");
+      toast.error("Network error creating group event.");
     } finally {
       setIsSubmitting(false);
     }
@@ -435,7 +437,7 @@ const EventModal = ({
         padding: '24px',
         width: '100%',
         maxWidth: isPanel ? 'none' : '500px',
-        maxHeight: isPanel ? 'none' : '90vh',
+        maxHeight: isPanel ? 'none' : 'calc(100dvh - 32px)',
         overflowY: 'auto',
         position: 'relative',
         border: isPanel ? 'none' : '1px solid var(--border-color)',

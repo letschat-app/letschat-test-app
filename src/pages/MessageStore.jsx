@@ -382,6 +382,16 @@ const messageStore = {
       return;
     }
 
+    // Auto-clear active indicator for this user when a message arrives from them
+    const senderUid = userid || msg.senderid;
+    if (senderUid && this.transientIndicators) {
+      const cid = String(chatid);
+      const uid = String(senderUid);
+      if (this.transientIndicators[cid]?.[uid] || this.transientIndicators[chatid]?.[uid]) {
+        this.setIndicator(cid, uid, sendername, 'stop');
+      }
+    }
+
     const actualRepliedTo = repliedTo || msg.repliedto;
     const actualMsgType = msgtype || type;
 
@@ -993,26 +1003,28 @@ const messageStore = {
 
   setIndicator(chatid, userid, sendername, content) {
     if (!chatid || !userid) return;
+    const cid = String(chatid);
+    const uid = String(userid);
     
     // 1. Initialize structures
-    if (!this.transientIndicators[chatid]) this.transientIndicators[chatid] = {};
-    if (!this.indicatorTimeouts[chatid]) this.indicatorTimeouts[chatid] = {};
+    if (!this.transientIndicators[cid]) this.transientIndicators[cid] = {};
+    if (!this.indicatorTimeouts[cid]) this.indicatorTimeouts[cid] = {};
 
     if (content === 'stop') {
-      if (this.transientIndicators[chatid] && this.transientIndicators[chatid][userid]) {
-        clearTimeout(this.indicatorTimeouts[chatid][userid]);
-        delete this.transientIndicators[chatid][userid];
-        this.notifyListeners({ type: 'indicator', chatid, userid, content: 'stop' });
+      if (this.transientIndicators[cid] && this.transientIndicators[cid][uid]) {
+        clearTimeout(this.indicatorTimeouts[cid][uid]);
+        delete this.transientIndicators[cid][uid];
+        this.notifyListeners({ type: 'indicator', chatid: cid, userid: uid, content: 'stop' });
       }
       return;
     }
 
     // 2. Override Logic: typing/recording hide in-chat
     if (content === 'typing' || content === 'recording') {
-      const existing = this.transientIndicators[chatid][userid];
+      const existing = this.transientIndicators[cid][uid];
       if (existing && existing.content === 'in-chat') {
-        clearTimeout(this.indicatorTimeouts[chatid][userid]);
-        delete this.transientIndicators[chatid][userid];
+        clearTimeout(this.indicatorTimeouts[cid][uid]);
+        delete this.transientIndicators[cid][uid];
       }
     }
 
@@ -1020,35 +1032,38 @@ const messageStore = {
     const ttl = 4500; // Updated to 4.5 secs for better stability
     
     // Clear previous timeout for this specific user in this specific chat
-    if (this.indicatorTimeouts[chatid][userid]) {
-      clearTimeout(this.indicatorTimeouts[chatid][userid]);
+    if (this.indicatorTimeouts[cid][uid]) {
+      clearTimeout(this.indicatorTimeouts[cid][uid]);
     }
 
-    this.transientIndicators[chatid][userid] = {
+    this.transientIndicators[cid][uid] = {
       content,
       sendername,
       expiry: Date.now() + ttl
     };
 
     // 4. Set Cleanup Timeout
-    this.indicatorTimeouts[chatid][userid] = setTimeout(() => {
-      if (this.transientIndicators[chatid] && this.transientIndicators[chatid][userid]) {
-        delete this.transientIndicators[chatid][userid];
-        this.notifyListeners({ type: 'indicator', chatid, userid });
+    this.indicatorTimeouts[cid][uid] = setTimeout(() => {
+      if (this.transientIndicators[cid] && this.transientIndicators[cid][uid]) {
+        delete this.transientIndicators[cid][uid];
+        this.notifyListeners({ type: 'indicator', chatid: cid, userid: uid });
       }
     }, ttl);
 
     // 5. Notify UI
-    this.notifyListeners({ type: 'indicator', chatid, userid, content });
+    this.notifyListeners({ type: 'indicator', chatid: cid, userid: uid, content });
   },
 
   getIndicators(chatid) {
-    if (!this.transientIndicators[chatid]) return [];
+    if (!chatid) return [];
+    const cid = String(chatid);
+    const map = this.transientIndicators[cid] || this.transientIndicators[chatid];
+    if (!map) return [];
     
     // Filter out any that might have expired but not been cleaned yet
     const now = Date.now();
-    return Object.keys(this.transientIndicators[chatid])
-      .map(userid => ({ userid, ...this.transientIndicators[chatid][userid] }))
+    return Object.keys(map)
+      .map(uid => ({ userid: uid, ...map[uid] }))
       .filter(ind => ind.expiry > now);
   }
 };

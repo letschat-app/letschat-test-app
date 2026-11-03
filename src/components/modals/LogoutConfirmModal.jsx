@@ -1,3 +1,4 @@
+import useBackClose from '../../hooks/useBackClose';
 import React, { useEffect } from 'react';
 import { LogOut, X, Loader2 } from 'lucide-react';
 
@@ -6,6 +7,7 @@ import { LogOut, X, Loader2 } from 'lucide-react';
  * Prevents accidental logouts across desktop and mobile views.
  */
 const LogoutConfirmModal = ({ isOpen, onClose, onConfirm, loading = false }) => {
+  useBackClose(isOpen, onClose);
   useEffect(() => {
     if (!isOpen) return;
 

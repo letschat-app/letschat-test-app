@@ -1,3 +1,4 @@
+import useBackClose from '../../hooks/useBackClose';
 import React, { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShieldCheck, X, UserCheck, ShieldAlert, Sparkles } from "lucide-react";
@@ -11,6 +12,7 @@ import { ShieldCheck, X, UserCheck, ShieldAlert, Sparkles } from "lucide-react";
  * @param {function} onClose - Callback to close the modal
  */
 export const DisplayNamePolicyModal = ({ isOpen, onClose }) => {
+  useBackClose(isOpen, onClose);
   useEffect(() => {
     if (!isOpen) return;
 

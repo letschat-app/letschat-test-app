@@ -43,7 +43,11 @@ const PollWidget = ({ message, currentUserId, members = [] }) => {
           if (data) {
             setFetchedPoll(data);
             if (messageStore.handlePollUpdate) {
-              messageStore.handlePollUpdate(data);
+              messageStore.handlePollUpdate({
+                ...data,
+                msgid: targetMsgId,
+                chatid: message?.chatid
+              });
             }
           }
         })

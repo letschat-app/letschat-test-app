@@ -1,3 +1,4 @@
+import useBackClose from '../../hooks/useBackClose';
 import React, { useState } from 'react';
 import { X, Sparkles, Flame } from 'lucide-react';
 import SquircleFireAvatar from './SquircleFireAvatar';
@@ -8,6 +9,7 @@ import SquircleFireAvatar from './SquircleFireAvatar';
  * across all 5 streak thresholds (>=3, >=7, >=14, >=30, >=50) with their profile photo.
  */
 const StreakTierExplainerModal = ({ isOpen, onClose, onPreviewUpgrade }) => {
+  useBackClose(isOpen, onClose);
   const [selectedIdx, setSelectedIdx] = useState(0); // Default to >=3 tier
 
   if (!isOpen) return null;

@@ -1,6 +1,20 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import useBackClose from '../hooks/useBackClose';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Users, Hash, ArrowLeft, Loader2, Sparkles, Pin, PinOff, RefreshCcw, CheckCircle2, AlertCircle } from 'lucide-react';
+import {
+  Search,
+  Plus,
+  Users,
+  Hash,
+  Loader2,
+  Sparkles,
+  Pin,
+  PinOff,
+  RefreshCcw,
+  CheckCircle2,
+  AlertCircle,
+  X
+} from 'lucide-react';
 import { API } from '../service/UserAuth';
 import messageStore from './MessageStore';
 import { getchat } from './ChatNames';
@@ -44,16 +58,77 @@ const generateShuffledSuggestions = () => {
   });
 };
 
+const safeJsonParse = (key, fallback) => {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (err) {
+    console.error(`Failed to parse localStorage key: ${key}`, err);
+    return fallback;
+  }
+};
+
+// Normalization helpers for backend properties
+const getChatId = (r) => (r ? (r.ChatId || r.chatId || r.roomId || r.Id || r.id || '') : '');
+const getName = (r) => (r ? (r.ChatName || r.chatName || r.roomName || r.name || 'Unnamed room') : 'Unnamed room');
+const getMembers = (r) => (r ? Number(r.noOfMembers || r.NoOfMembers || r.noofmembers || r.membersCount || 0) : 0);
+const getMotto = (r) => (r ? (r.motto || r.Motto || r.status || r.Status || 'Explore topics and connect with others') : 'Explore topics and connect with others');
+
+// User rooms cache key (only caches pinned, created, and joined rooms)
+const USER_ROOMS_CACHE_KEY = 'letschat_user_rooms_cache';
+
+const getCachedUserRooms = () => {
+  try {
+    const raw = localStorage.getItem(USER_ROOMS_CACHE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+};
+
+const saveUserRoomsToCache = (userRoomsList, allRoomsList, pinnedIds = []) => {
+  try {
+    const pinnedSet = new Set((pinnedIds || []).map(String));
+    const targetMap = new Map();
+
+    // 1. User created / joined rooms
+    (Array.isArray(userRoomsList) ? userRoomsList : []).forEach(r => {
+      const id = String(getChatId(r));
+      if (id) targetMap.set(id, r);
+    });
+
+    // 2. User pinned rooms (from allRooms if not already in userRooms)
+    (Array.isArray(allRoomsList) ? allRoomsList : []).forEach(r => {
+      const id = String(getChatId(r));
+      if (id && pinnedSet.has(id)) {
+        targetMap.set(id, r);
+      }
+    });
+
+    const filteredRooms = Array.from(targetMap.values());
+    localStorage.setItem(USER_ROOMS_CACHE_KEY, JSON.stringify(filteredRooms));
+  } catch (e) {
+    console.warn('[Rooms] Failed to update user rooms cache:', e);
+  }
+};
+
 export default function Rooms({ isSidebar = false }) {
   const navigate = useNavigate();
   const userId = localStorage.getItem('userid');
 
+  const [cachedInitial] = useState(() => getCachedUserRooms());
   const [allRooms, setAllRooms] = useState([]);
-  const [userRooms, setUserRooms] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [userRooms, setUserRooms] = useState(cachedInitial);
+  const [isLoading, setIsLoading] = useState(() => cachedInitial.length === 0);
+  const [fetchError, setFetchError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterTab, setFilterTab] = useState('all'); // 'all' | 'joined' | 'pinned'
+  const [joiningRoomId, setJoiningRoomId] = useState(null);
+
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(() => !localStorage.getItem('roomNickname'));
+  useBackClose(showOnboarding, () => setShowOnboarding(false));
+  useBackClose(isCreateModalOpen, () => setIsCreateModalOpen(false));
   const [nickname, setNickname] = useState(() => localStorage.getItem('roomNickname') || '');
 
   const roomNicknameCheck = useUsernameCheck({
@@ -62,21 +137,19 @@ export default function Rooms({ isSidebar = false }) {
     excludeUserId: userId,
     debounceMs: 400
   });
+
   const [suggestedNames, setSuggestedNames] = useState(generateShuffledSuggestions);
   const [showAllSuggestions, setShowAllSuggestions] = useState(false);
   const [isSettingNickname, setIsSettingNickname] = useState(false);
-  const [pinnedRoomIds, setPinnedRoomIds] = useState(() => {
-    const saved = localStorage.getItem('pinnedRoomIds');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [pinnedRoomIds, setPinnedRoomIds] = useState(() => safeJsonParse('pinnedRoomIds', []));
 
-  // New Room Form State
+  // Create Room Form State
   const [newRoom, setNewRoom] = useState({ name: '', motto: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState(null);
+  const [formError, setFormError] = useState(null);
   const [counts, setCounts] = useState(() => messageStore.getRoomCounts() || {});
 
-  // Virtual Room Soft Duplicate Check (Debounced ~300ms)
+  // Abortable Room Name Availability Check
   const [roomNameCheck, setRoomNameCheck] = useState({
     isChecking: false,
     available: null,
@@ -96,16 +169,20 @@ export default function Rooms({ isSidebar = false }) {
       return;
     }
 
+    const controller = new AbortController();
     setRoomNameCheck(prev => ({ ...prev, isChecking: true }));
+
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`${API}/room/check-name?roomName=${encodeURIComponent(trimmed)}`);
+        const res = await fetch(`${API}/room/check-name?roomName=${encodeURIComponent(trimmed)}`, {
+          signal: controller.signal
+        });
         if (res.ok) {
           const data = await res.json();
           setRoomNameCheck({
             isChecking: false,
             available: Boolean(data?.available),
-            message: data?.message || (data?.available ? 'Room name is available' : 'Room name already exists'),
+            message: data?.message || (data?.available ? 'Room name is available' : 'Room name already taken'),
             normalized: data?.normalized || trimmed
           });
         } else {
@@ -117,17 +194,68 @@ export default function Rooms({ isSidebar = false }) {
           });
         }
       } catch (e) {
-        setRoomNameCheck({
-          isChecking: false,
-          available: null,
-          message: '',
-          normalized: trimmed
-        });
+        if (e.name !== 'AbortError') {
+          setRoomNameCheck({
+            isChecking: false,
+            available: null,
+            message: '',
+            normalized: trimmed
+          });
+        }
       }
     }, 300);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [newRoom.name, isCreateModalOpen]);
+
+  // Escape key handler for Create modal
+  useEffect(() => {
+    if (!isCreateModalOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setIsCreateModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isCreateModalOpen]);
+
+  const fetchData = useCallback(async (isSilent = false) => {
+    if (!isSilent) setIsLoading(true);
+    setFetchError(null);
+    try {
+      const [allRes, userRes] = await Promise.all([
+        fetch(`${API}/room/load`, { headers: { 'ngrok-skip-browser-warning': 'true' } }),
+        fetch(`${API}/room/load/${userId}`, { headers: { 'ngrok-skip-browser-warning': 'true' } })
+      ]);
+
+      if (!allRes.ok || !userRes.ok) {
+        throw new Error('Failed to load rooms');
+      }
+
+      const allData = await allRes.json();
+      const userData = await userRes.json();
+
+      const freshAll = Array.isArray(allData) ? allData : [];
+      const freshUser = Array.isArray(userData) ? userData : [];
+
+      setAllRooms(freshAll);
+      setUserRooms(freshUser);
+
+      // Continuously update cache over network: only cache user pinned, created, or joined rooms
+      saveUserRoomsToCache(freshUser, freshAll, pinnedRoomIds);
+    } catch (err) {
+      console.error('Failed to fetch rooms:', err);
+      if (!isSilent) {
+        setFetchError('Could not load rooms. Check your connection and try again.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [userId, pinnedRoomIds]);
 
   useEffect(() => {
     const checkNickname = async () => {
@@ -140,7 +268,6 @@ export default function Rooms({ isSidebar = false }) {
           const localName = localStorage.getItem('roomNickname');
 
           if (serverName) {
-            // Update if different or first time
             if (serverName !== localName) {
               setNickname(serverName);
               localStorage.setItem('roomNickname', serverName);
@@ -148,20 +275,20 @@ export default function Rooms({ isSidebar = false }) {
             localStorage.setItem('roomOnboardingSeen', 'true');
             setShowOnboarding(false);
           } else if (!localName) {
-            // Only show onboarding if we have nothing locally either
             setShowOnboarding(true);
           }
         }
       } catch (err) {
         console.error('Failed to fetch room nickname:', err);
-        // If fetch fails and we have no local name, show onboarding as fallback
         if (!localStorage.getItem('roomNickname')) {
           setShowOnboarding(true);
         }
       }
     };
 
-    fetchData();
+    // If cached rooms exist, fetch silently in background (Stale-While-Revalidate)
+    const hasCache = cachedInitial.length > 0;
+    fetchData(hasCache);
     checkNickname();
 
     const unsubscribe = messageStore.addListener(() => {
@@ -171,196 +298,17 @@ export default function Rooms({ isSidebar = false }) {
     return () => {
       if (typeof unsubscribe === 'function') unsubscribe();
     };
-  }, []);
+  }, [fetchData, userId, cachedInitial.length]);
 
   useEffect(() => {
-    localStorage.setItem('pinnedRoomIds', JSON.stringify(pinnedRoomIds));
-  }, [pinnedRoomIds]);
-
-  const togglePinRoom = (e, roomId) => {
-    e.stopPropagation();
-    setPinnedRoomIds(prev =>
-      prev.includes(roomId)
-        ? prev.filter(id => id !== roomId)
-        : [...prev, roomId]
-    );
-  };
-
-  const handleSetNickname = async (e) => {
-    e.preventDefault();
-    if (!nickname.trim()) return;
-    if (roomNicknameCheck.isBlocked) {
-      setError(roomNicknameCheck.message || 'Please choose an available nickname');
-      return;
-    }
-    if (roomNicknameCheck.isChecking) {
-      setError('Validating nickname availability, please wait...');
-      return;
-    }
-    setIsSettingNickname(true);
     try {
-      const res = await fetch(`${API}/room/set/name`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Id': userId
-        },
-        body: JSON.stringify({ name: nickname.trim() })
-      });
-      if (res.ok) {
-        localStorage.setItem('roomOnboardingSeen', 'true');
-        localStorage.setItem('roomNickname', nickname.trim());
-        setShowOnboarding(false);
-      } else {
-        const err = await res.text();
-        setError(err || 'Failed to set nickname');
-      }
-    } catch (err) {
-      setError('Network error');
-    } finally {
-      setIsSettingNickname(false);
+      localStorage.setItem('pinnedRoomIds', JSON.stringify(pinnedRoomIds));
+      // Keep cache updated when user pins/unpins a room
+      saveUserRoomsToCache(userRooms, allRooms, pinnedRoomIds);
+    } catch (e) {
+      console.error('Failed to persist pinnedRoomIds:', e);
     }
-  };
-
-  const fetchData = async () => {
-    setIsLoading(true);
-    try {
-      const [allRes, userRes] = await Promise.all([
-        fetch(`${API}/room/load`, { headers: { 'ngrok-skip-browser-warning': 'true' } }),
-        fetch(`${API}/room/load/${userId}`, { headers: { 'ngrok-skip-browser-warning': 'true' } })
-      ]);
-
-      if (allRes.ok && userRes.ok) {
-        const allData = await allRes.json();
-        const userData = await userRes.json();
-
-        setAllRooms(Array.isArray(allData) ? allData : []);
-        setUserRooms(Array.isArray(userData) ? userData : []);
-      }
-    } catch (err) {
-      console.error('Failed to fetch rooms:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleCreateRoom = async (e) => {
-    e.preventDefault();
-    const cleanRoomName = (newRoom.name || '').trim();
-    if (!cleanRoomName) return;
-
-    if (roomNameCheck.available === false) {
-      setError(roomNameCheck.message || "Room name is already taken. Please choose another name.");
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError(null);
-
-    try {
-      const res = await fetch(`${API}/room/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          roomName: cleanRoomName,
-          motto: (newRoom.motto || '').trim(),
-          roomId: newRoom.roomId || undefined
-        })
-      });
-
-      if (res.status === 409) {
-        setError("Room name is already taken. Please choose another name.");
-        setRoomNameCheck(prev => ({ ...prev, available: false, message: "Room name already exists" }));
-        return;
-      }
-
-      if (res.ok || res.status === 201) {
-        const createdRoom = await res.json();
-        setIsCreateModalOpen(false);
-        setNewRoom({ name: '', motto: '' });
-        setRoomNameCheck({ isChecking: false, available: null, message: '', normalized: '' });
-        fetchData(); // Refresh list
-        handleJoinRoom(createdRoom);
-      } else {
-        const errText = await res.text();
-        setError(errText || 'Failed to create room');
-      }
-    } catch (err) {
-      setError('Network error. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleJoinRoom = async (room) => {
-    // Determine the roomId using robust property mapping
-    const roomId = room.Id || room.id || room.roomId;
-    if (!roomId) {
-      console.error('No roomId found for room:', room);
-      return;
-    }
-
-    try {
-      // New spec: Join via query param roomId and header User-Id
-      const res = await fetch(`${API}/room/join?roomId=${roomId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Id': userId
-        }
-      });
-
-      if (res.ok) {
-        // The server returns the chatId as a plain string (e.g. "AAA118")
-        const chatId = await res.text();
-
-        if (!chatId) {
-          console.error('Server returned empty chatId');
-          return;
-        }
-
-        if (room) {
-          const finalChatId = room.ChatId || room.chatId || chatId;
-
-          // CRITICAL: Mark as volatile BEFORE loading messages to ensure 30-min TTL
-          messageStore.markAsVolatile(finalChatId);
-
-          const isCreator = (room.creator && room.creator === userId) || room.Role === 'admin';
-          // Creators unmuted by default; room members/viewers muted by default
-          const defaultMuted = !isCreator;
-          const currentMuted = room.isMuted !== undefined && isCreator ? room.isMuted : defaultMuted;
-
-          const chatsMap = JSON.parse(localStorage.getItem("chatsMap") || "{}");
-          chatsMap[finalChatId] = {
-            ...room,
-            chatId: finalChatId,
-            chatName: room.ChatName || room.chatName || room.roomName,
-            id: roomId,
-            type: 'room',
-            status: 'allowed',
-            isMuted: currentMuted
-          };
-          localStorage.setItem("chatsMap", JSON.stringify(chatsMap));
-          syncChatsMapToDB(chatsMap);
-
-          // Full Initialization Sync (load / check-in)
-          const visited = JSON.parse(localStorage.getItem("visited") || "{}");
-          visited[finalChatId] = Date.now();
-          localStorage.setItem("visited", JSON.stringify(visited));
-          localStorage.setItem(finalChatId, JSON.stringify(chatsMap[finalChatId]));
-
-          messageStore.setActivechatbox(finalChatId);
-          getchat(finalChatId);
-          messageStore.setCount(finalChatId);
-        }
-
-        navigate('/chats', { state: { showSpacesForChat: chatId }, replace: true });
-      }
-    } catch (err) {
-      console.error('Failed to join room:', err);
-    }
-  };
+  }, [pinnedRoomIds, userRooms, allRooms]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -370,178 +318,442 @@ export default function Rooms({ isSidebar = false }) {
     }
   }, []);
 
-  const filteredAllRooms = useMemo(() => {
-    const userRoomIds = new Set(userRooms.map(r => r.ChatId || r.chatId));
-    return allRooms
-      .filter(r => !userRoomIds.has(r.ChatId || r.chatId))
-      .filter(r => {
-        const nameMatch = (r.ChatName || r.chatName || '').toLowerCase().includes(searchQuery.toLowerCase());
-        const idMatch = (r.ChatId || r.chatId) === searchQuery;
-        return nameMatch || idMatch;
+  const togglePinRoom = useCallback((e, roomId) => {
+    e.stopPropagation();
+    setPinnedRoomIds(prev =>
+      prev.includes(roomId)
+        ? prev.filter(id => id !== roomId)
+        : [...prev, roomId]
+    );
+  }, []);
+
+  const handleSetNickname = async (e) => {
+    e.preventDefault();
+    const cleanNick = nickname.trim();
+    if (!cleanNick) return;
+
+    if (roomNicknameCheck.isBlocked) {
+      setFormError(roomNicknameCheck.message || 'Choose an available nickname');
+      return;
+    }
+    if (roomNicknameCheck.isChecking) {
+      setFormError('Checking availability, wait a moment...');
+      return;
+    }
+
+    setIsSettingNickname(true);
+    setFormError(null);
+    try {
+      const res = await fetch(`${API}/room/set/name`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Id': userId
+        },
+        body: JSON.stringify({ name: cleanNick })
       });
-  }, [allRooms, userRooms, searchQuery]);
+      if (res.ok) {
+        localStorage.setItem('roomOnboardingSeen', 'true');
+        localStorage.setItem('roomNickname', cleanNick);
+        setShowOnboarding(false);
+      } else {
+        const err = await res.text();
+        setFormError(err || 'Could not set nickname. Try again.');
+      }
+    } catch (err) {
+      setFormError('Network error. Check your connection.');
+    } finally {
+      setIsSettingNickname(false);
+    }
+  };
 
-  const filteredUserRooms = useMemo(() => {
-    return userRooms.filter(r => (r.ChatName || r.chatName || '').toLowerCase().includes(searchQuery.toLowerCase()));
-  }, [userRooms, searchQuery]);
+  const handleCreateRoom = async (e) => {
+    e.preventDefault();
+    const cleanRoomName = (newRoom.name || '').trim();
+    if (!cleanRoomName) return;
 
-  const pinnedRooms = useMemo(() => {
-    const visited = JSON.parse(localStorage.getItem('visited') || '{}');
-    const all = [...userRooms, ...allRooms];
+    if (roomNameCheck.available === false) {
+      setFormError(roomNameCheck.message || 'Room name already taken. Choose another name.');
+      return;
+    }
 
-    // Deduplicate all rooms first
-    const seenIds = new Set();
-    const uniqueAll = all.filter(r => {
-      const id = r.ChatId || r.chatId || r.roomId || r.Id;
-      if (seenIds.has(id)) return false;
-      seenIds.add(id);
-      return true;
+    setIsSubmitting(true);
+    setFormError(null);
+
+    try {
+      const res = await fetch(`${API}/room/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          roomName: cleanRoomName,
+          motto: (newRoom.motto || '').trim()
+        })
+      });
+
+      if (res.status === 409) {
+        setFormError('Room name already taken. Choose another name.');
+        setRoomNameCheck(prev => ({ ...prev, available: false, message: 'Room name already exists' }));
+        return;
+      }
+
+      if (res.ok || res.status === 201) {
+        const createdRoom = await res.json();
+        setIsCreateModalOpen(false);
+        setNewRoom({ name: '', motto: '' });
+        setRoomNameCheck({ isChecking: false, available: null, message: '', normalized: '' });
+        fetchData();
+        handleJoinRoom(createdRoom);
+      } else {
+        const errText = await res.text();
+        setFormError(errText || 'Could not create room. Try again.');
+      }
+    } catch (err) {
+      setFormError('Network error. Check your connection.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleJoinRoom = async (room) => {
+    if (!room) return;
+    const roomId = room.Id || room.id || room.roomId || room.ChatId || room.chatId;
+    if (!roomId) {
+      console.error('No roomId found for room:', room);
+      return;
+    }
+
+    if (joiningRoomId) return;
+    setJoiningRoomId(roomId);
+
+    try {
+      const res = await fetch(`${API}/room/join?roomId=${encodeURIComponent(roomId)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Id': userId
+        }
+      });
+
+      if (res.ok) {
+        const chatId = await res.text();
+        if (!chatId) {
+          console.error('Server returned empty chatId');
+          return;
+        }
+
+        const finalChatId = room.ChatId || room.chatId || chatId;
+
+        // CRITICAL: Mark as volatile BEFORE loading messages to ensure 30-min TTL
+        messageStore.markAsVolatile(finalChatId);
+
+        const isCreator = (room.creator && room.creator === userId) || room.Role === 'admin';
+        const defaultMuted = !isCreator;
+        const currentMuted = room.isMuted !== undefined && isCreator ? room.isMuted : defaultMuted;
+
+        const chatsMap = safeJsonParse('chatsMap', {});
+        chatsMap[finalChatId] = {
+          ...room,
+          chatId: finalChatId,
+          chatName: getName(room),
+          id: roomId,
+          type: 'room',
+          status: 'allowed',
+          isMuted: currentMuted
+        };
+
+        try {
+          localStorage.setItem('chatsMap', JSON.stringify(chatsMap));
+        } catch (e) {
+          console.error('Failed to save chatsMap', e);
+        }
+        syncChatsMapToDB(chatsMap);
+
+        // Full Initialization Sync (load / check-in)
+        const visited = safeJsonParse('visited', {});
+        visited[finalChatId] = Date.now();
+        try {
+          localStorage.setItem('visited', JSON.stringify(visited));
+          localStorage.setItem(finalChatId, JSON.stringify(chatsMap[finalChatId]));
+        } catch (e) {
+          console.error('Failed to save visited or room item', e);
+        }
+
+        messageStore.setActivechatbox(finalChatId);
+        getchat(finalChatId);
+        messageStore.setCount(finalChatId);
+
+        navigate('/chats', { state: { showSpacesForChat: chatId }, replace: true });
+      } else {
+        const errText = await res.text();
+        setFetchError(errText || 'Could not join room. Try again.');
+      }
+    } catch (err) {
+      console.error('Failed to join room:', err);
+      setFetchError('Network error joining room. Check your connection.');
+    } finally {
+      setJoiningRoomId(null);
+    }
+  };
+
+  // Match search filter
+  const matchesSearch = useCallback((room) => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.trim().toLowerCase();
+    const name = getName(room).toLowerCase();
+    const id = getChatId(room).toLowerCase();
+    return name.includes(query) || id.includes(query);
+  }, [searchQuery]);
+
+  // Deduplicate master list of rooms
+  const allUniqueRooms = useMemo(() => {
+    const seen = new Set();
+    const list = [];
+    for (const r of [...userRooms, ...allRooms]) {
+      const id = getChatId(r);
+      if (id && !seen.has(id)) {
+        seen.add(id);
+        list.push(r);
+      }
+    }
+    return list;
+  }, [userRooms, allRooms]);
+
+  // User joined room IDs set
+  const userRoomIdSet = useMemo(() => {
+    return new Set(userRooms.map(r => getChatId(r)).filter(Boolean));
+  }, [userRooms]);
+
+  const pinnedRoomIdSet = useMemo(() => {
+    return new Set(pinnedRoomIds);
+  }, [pinnedRoomIds]);
+
+  // Section 1: Pinned Rooms (All pinned rooms, ordered by last visit)
+  const pinnedSectionRooms = useMemo(() => {
+    const visited = safeJsonParse('visited', {});
+    const list = allUniqueRooms.filter(r => {
+      const id = getChatId(r);
+      return pinnedRoomIdSet.has(id) && matchesSearch(r);
     });
 
-    const pinned = uniqueAll.filter(r => pinnedRoomIds.includes(r.ChatId || r.chatId || r.roomId || r.Id));
-
-    // Sort by last visit time
-    return pinned.sort((a, b) => {
-      const timeA = visited[a.ChatId || a.chatId || a.roomId || a.Id] || 0;
-      const timeB = visited[b.ChatId || b.chatId || b.roomId || b.Id] || 0;
+    return list.sort((a, b) => {
+      const timeA = visited[getChatId(a)] || 0;
+      const timeB = visited[getChatId(b)] || 0;
       return timeB - timeA;
     });
-  }, [userRooms, allRooms, pinnedRoomIds]);
+  }, [allUniqueRooms, pinnedRoomIdSet, matchesSearch]);
 
-  const userCreatedRooms = useMemo(() => {
-    return filteredUserRooms;
-  }, [filteredUserRooms]);
+  // Section 2: Your Rooms (Joined rooms, excluding rooms already displayed in Pinned)
+  const joinedSectionRooms = useMemo(() => {
+    return allUniqueRooms.filter(r => {
+      const id = getChatId(r);
+      return userRoomIdSet.has(id) && !pinnedRoomIdSet.has(id) && matchesSearch(r);
+    });
+  }, [allUniqueRooms, userRoomIdSet, pinnedRoomIdSet, matchesSearch]);
 
-  const discoveryRooms = useMemo(() => {
-    const userIds = new Set(userRooms.map(r => r.ChatId || r.chatId || r.roomId || r.Id));
-    const pinnedIds = new Set(pinnedRoomIds);
-
-    return allRooms
+  // Section 3: Discover Rooms (Unjoined and unpinned rooms, sorted by member count descending)
+  const discoverSectionRooms = useMemo(() => {
+    return allUniqueRooms
       .filter(r => {
-        const id = r.ChatId || r.chatId || r.roomId || r.Id;
-        return !userIds.has(id) && !pinnedIds.has(id) && (r.ChatName || r.chatName || '').toLowerCase().includes(searchQuery.toLowerCase());
+        const id = getChatId(r);
+        return !userRoomIdSet.has(id) && !pinnedRoomIdSet.has(id) && matchesSearch(r);
       })
-      .sort((a, b) => {
-        const countA = a.noOfMembers || a.NoOfMembers || a.noofmembers || 0;
-        const countB = b.noOfMembers || b.NoOfMembers || b.noofmembers || 0;
-        return countB - countA;
-      });
-  }, [allRooms, userRooms, pinnedRoomIds, searchQuery]);
+      .sort((a, b) => getMembers(b) - getMembers(a));
+  }, [allUniqueRooms, userRoomIdSet, pinnedRoomIdSet, matchesSearch]);
 
+  // Compute counts for filter chip tabs
+  const totalPinnedMatching = pinnedSectionRooms.length;
+  const totalJoinedMatching = useMemo(() => {
+    return allUniqueRooms.filter(r => userRoomIdSet.has(getChatId(r)) && matchesSearch(r)).length;
+  }, [allUniqueRooms, userRoomIdSet, matchesSearch]);
 
+  const totalVisibleRooms = useMemo(() => {
+    if (filterTab === 'pinned') return pinnedSectionRooms.length;
+    if (filterTab === 'joined') return totalJoinedMatching;
+    return pinnedSectionRooms.length + joinedSectionRooms.length + discoverSectionRooms.length;
+  }, [filterTab, pinnedSectionRooms.length, joinedSectionRooms.length, discoverSectionRooms.length, totalJoinedMatching]);
+
+  const hasExistingNickname = Boolean(localStorage.getItem('roomNickname'));
 
   return (
-    <div style={{ ...containerStyle, padding: isSidebar ? '0' : containerStyle.padding }}>
+    <div className={`rm-container ${isSidebar ? 'rm-sidebar-mode' : ''}`}>
       {/* Sticky Header */}
       {!isSidebar && (
-        <div className="res-header" style={headerStyle}>
-          <div style={headerTopStyle}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <h1 className="res-title" style={titleStyle}>Rooms</h1>
+        <header className="rm-header">
+          <div className="rm-header-inner">
+            <div className="rm-header-left">
+              <h1 className="rm-title">Rooms</h1>
               {nickname && (
-                <div style={{
-                  fontSize: '12px',
-                  color: 'var(--text-secondary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  paddingLeft: '2px'
-                }}>
-                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--success-color)' }}></span>
-                  Acting as: <span style={{ color: 'var(--accent-text)', fontWeight: '600' }}>{nickname}</span>
+                <div className="rm-nickname-row">
+                  <span className="rm-nickname-dot" aria-hidden="true" />
+                  <span>Acting as:</span>
+                  <strong className="rm-nickname-name">{nickname}</strong>
                   <button
-                    onClick={() => setShowOnboarding(true)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--accent-text)',
-                      cursor: 'pointer',
-                      padding: '2px 4px',
-                      fontSize: '11px',
-                      textDecoration: 'underline'
+                    type="button"
+                    onClick={() => {
+                      setFormError(null);
+                      setShowOnboarding(true);
                     }}
-                    title="Change room nickname"
+                    className="rm-link-btn"
+                    title="Change nickname"
                   >
                     Change
                   </button>
                 </div>
               )}
             </div>
-            <div className="res-header-actions" style={headerActionsStyle}>
-              <div className="res-search" style={searchContainerStyle}>
-                <Search size={18} color="var(--text-secondary)" />
+
+            <div className="rm-header-right">
+              <div className="rm-search-box">
+                <Search size={16} className="rm-search-icon" aria-hidden="true" />
                 <input
                   type="text"
-                  placeholder="Search topics..."
-                  style={searchInputStyle}
+                  placeholder="Search by name or room ID..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  className="rm-search-input"
+                  aria-label="Search rooms by name or ID"
                 />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="rm-search-clear"
+                    aria-label="Clear search"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
               </div>
-              <button className="create-btn" onClick={() => setIsCreateModalOpen(true)} style={createButtonStyle}>
-                <Plus size={36} strokeWidth={3} />
+
+              <button
+                type="button"
+                className="rm-create-btn"
+                onClick={() => {
+                  setFormError(null);
+                  setIsCreateModalOpen(true);
+                }}
+                aria-label="Create a new room"
+              >
+                <Plus size={18} />
+                <span className="rm-btn-text">New room</span>
               </button>
             </div>
           </div>
-        </div>
+
+          {/* Filter Chips */}
+          <div className="rm-filter-bar" role="tablist" aria-label="Room filter options">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={filterTab === 'all'}
+              className={`rm-chip ${filterTab === 'all' ? 'rm-chip-active' : ''}`}
+              onClick={() => setFilterTab('all')}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={filterTab === 'joined'}
+              className={`rm-chip ${filterTab === 'joined' ? 'rm-chip-active' : ''}`}
+              onClick={() => setFilterTab('joined')}
+            >
+              Joined
+              {totalJoinedMatching > 0 && <span className="rm-chip-count">{totalJoinedMatching}</span>}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={filterTab === 'pinned'}
+              className={`rm-chip ${filterTab === 'pinned' ? 'rm-chip-active' : ''}`}
+              onClick={() => setFilterTab('pinned')}
+            >
+              Pinned
+              {totalPinnedMatching > 0 && <span className="rm-chip-count">{totalPinnedMatching}</span>}
+            </button>
+          </div>
+        </header>
       )}
 
-      <div className="res-content" style={{ ...contentStyle, padding: isSidebar ? '12px' : contentStyle.padding }}>
+      {/* Main Content Area */}
+      <main className="rm-content">
         {isLoading ? (
-          <div style={{ padding: '80px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
-            <Loader2 className="animate-spin" size={48} color="var(--accent-color)" />
-            <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>Loading spaces...</p>
+          <div className="rm-grid" aria-busy="true" aria-label="Loading rooms">
+            {Array.from({ length: 6 }).map((_, idx) => (
+              <div key={idx} className="rm-skeleton-card">
+                <div className="rm-skeleton-header">
+                  <div className="rm-skeleton-avatar" />
+                  <div className="rm-skeleton-pill" />
+                </div>
+                <div className="rm-skeleton-line rm-skeleton-title" />
+                <div className="rm-skeleton-line rm-skeleton-text" />
+                <div className="rm-skeleton-line rm-skeleton-text-short" />
+                <div className="rm-skeleton-footer">
+                  <div className="rm-skeleton-members" />
+                  <div className="rm-skeleton-btn" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : fetchError ? (
+          <div className="rm-error-state" role="alert">
+            <AlertCircle size={36} color="var(--danger-color)" aria-hidden="true" />
+            <p className="rm-error-text">{fetchError}</p>
+            <button type="button" onClick={fetchData} className="rm-retry-btn">
+              <RefreshCcw size={15} aria-hidden="true" />
+              <span>Try again</span>
+            </button>
+          </div>
+        ) : totalVisibleRooms === 0 ? (
+          <div className="rm-empty-state">
+            <Hash size={44} className="rm-empty-icon" aria-hidden="true" />
+            <h3 className="rm-empty-title">
+              {searchQuery ? 'No matching rooms' : filterTab === 'pinned' ? 'No pinned rooms yet' : filterTab === 'joined' ? 'You have not joined any rooms yet' : 'No rooms found'}
+            </h3>
+            <p className="rm-empty-desc">
+              {searchQuery
+                ? `No room matches "${searchQuery}". Clear your search or start a new room.`
+                : filterTab === 'pinned'
+                ? 'Pin rooms you visit often for quick access.'
+                : 'Be the first to create a public space and start a discussion.'}
+            </p>
+            {!isSidebar && (
+              <button
+                type="button"
+                className="rm-empty-action"
+                onClick={() => {
+                  if (searchQuery) setSearchQuery('');
+                  else setIsCreateModalOpen(true);
+                }}
+              >
+                {searchQuery ? 'Clear search' : 'Create room'}
+              </button>
+            )}
           </div>
         ) : (
           <>
-            {/* User Created Rooms Section */}
-            {userCreatedRooms.length > 0 && (
-              <section className="res-section" style={sectionStyle}>
-                <div style={sectionHeaderStyle}>
-                  <Sparkles size={18} color="var(--warning-color)" />
-                  <h2 style={sectionTitleStyle}>Your Rooms</h2>
+            {/* Pinned Section */}
+            {(filterTab === 'all' || filterTab === 'pinned') && pinnedSectionRooms.length > 0 && (
+              <section className="rm-section" aria-labelledby="rm-pinned-heading">
+                <div className="rm-section-header">
+                  <Pin size={17} color="var(--danger-color)" aria-hidden="true" />
+                  <h2 id="rm-pinned-heading" className="rm-section-title">Pinned</h2>
+                  <span className="rm-section-count">({pinnedSectionRooms.length})</span>
                 </div>
-                <div className="res-grid" style={{ ...gridStyle, gridTemplateColumns: isSidebar ? '1fr' : gridStyle.gridTemplateColumns }}>
-                  {userCreatedRooms.map(room => {
-                    const id = room.ChatId || room.chatId || room.roomId || room.Id;
-                    return (
-                      <RoomCard
-                        key={id}
-                        room={room}
-                        isPinned={pinnedRoomIds.includes(id)}
-                        onTogglePin={(e) => togglePinRoom(e, id)}
-                        badgeText="Joined"
-                        badgeColor="var(--success-color)"
-                        chatCount={counts[room.ChatId || room.chatId]}
-                        onClick={() => handleJoinRoom(room)}
-                      />
-                    );
-                  })}
-                </div>
-              </section>
-            )}
-
-            {/* Pinned Rooms Section */}
-            {pinnedRooms.length > 0 && (
-              <section className="res-section" style={sectionStyle}>
-                <div style={sectionHeaderStyle}>
-                  <Pin size={18} color="var(--danger-color)" />
-                  <h2 style={sectionTitleStyle}>Pinned Rooms</h2>
-                </div>
-                <div className="res-grid" style={gridStyle}>
-                  {pinnedRooms.map(room => {
-                    const id = room.ChatId || room.chatId || room.roomId || room.Id;
-                    // Check if already shown in User Created section to avoid visible duplicates if logic changes
+                <div className="rm-grid">
+                  {pinnedSectionRooms.map(room => {
+                    const id = getChatId(room);
                     return (
                       <RoomCard
                         key={id}
                         room={room}
                         isPinned={true}
-                        onTogglePin={(e) => togglePinRoom(e, id)}
-                        badgeText="Pinned"
-                        badgeColor="var(--danger-color)"
-                        chatCount={counts[room.ChatId || room.chatId]}
+                        isJoined={userRoomIdSet.has(id)}
+                        onTogglePin={togglePinRoom}
+                        chatCount={counts[id] || 0}
                         onClick={() => handleJoinRoom(room)}
+                        isJoining={joiningRoomId === id}
                       />
                     );
                   })}
@@ -549,123 +761,172 @@ export default function Rooms({ isSidebar = false }) {
               </section>
             )}
 
-            {/* Global Rooms Section */}
-            <section className="res-section" style={sectionStyle}>
-              <div style={sectionHeaderStyle}>
-                <Users size={18} color="var(--accent-text)" />
-                <h2 style={sectionTitleStyle}>Global Discovery</h2>
-              </div>
-              {discoveryRooms.length > 0 ? (
-                <div className="res-grid" style={{ ...gridStyle, gridTemplateColumns: isSidebar ? '1fr' : gridStyle.gridTemplateColumns }}>
-                  {discoveryRooms.map(room => {
-                    const roomId = room.ChatId || room.chatId || room.roomId || room.Id;
-                    const isPinned = pinnedRoomIds.includes(roomId);
+            {/* Your Rooms Section (Joined Rooms) */}
+            {filterTab === 'all' && joinedSectionRooms.length > 0 && (
+              <section className="rm-section" aria-labelledby="rm-your-rooms-heading">
+                <div className="rm-section-header">
+                  <Sparkles size={17} color="var(--warning-color)" aria-hidden="true" />
+                  <h2 id="rm-your-rooms-heading" className="rm-section-title">Your rooms</h2>
+                  <span className="rm-section-count">({joinedSectionRooms.length})</span>
+                </div>
+                <div className="rm-grid">
+                  {joinedSectionRooms.map(room => {
+                    const id = getChatId(room);
                     return (
                       <RoomCard
-                        key={roomId}
+                        key={id}
                         room={room}
-                        isPinned={isPinned}
-                        onTogglePin={(e) => togglePinRoom(e, roomId)}
-                        badgeText="Discovery"
-                        badgeColor="var(--accent-text)"
-                        chatCount={counts[room.ChatId || room.chatId]}
+                        isPinned={false}
+                        isJoined={true}
+                        onTogglePin={togglePinRoom}
+                        chatCount={counts[id] || 0}
                         onClick={() => handleJoinRoom(room)}
+                        isJoining={joiningRoomId === id}
                       />
                     );
                   })}
                 </div>
-              ) : (
-                <div style={emptyStateStyle}>
-                  <Hash size={48} color="var(--border-color)" />
-                  <p>No other rooms found. Be the first to start a conversation!</p>
+              </section>
+            )}
+
+            {/* When "Joined" tab is selected, show both joined-pinned and unpinned in Your Rooms */}
+            {filterTab === 'joined' && (
+              <section className="rm-section" aria-labelledby="rm-joined-heading">
+                <div className="rm-section-header">
+                  <Sparkles size={17} color="var(--success-color)" aria-hidden="true" />
+                  <h2 id="rm-joined-heading" className="rm-section-title">Joined rooms</h2>
+                  <span className="rm-section-count">({totalJoinedMatching})</span>
                 </div>
-              )}
-            </section>
+                <div className="rm-grid">
+                  {allUniqueRooms
+                    .filter(r => userRoomIdSet.has(getChatId(r)) && matchesSearch(r))
+                    .map(room => {
+                      const id = getChatId(room);
+                      return (
+                        <RoomCard
+                          key={id}
+                          room={room}
+                          isPinned={pinnedRoomIdSet.has(id)}
+                          isJoined={true}
+                          onTogglePin={togglePinRoom}
+                          chatCount={counts[id] || 0}
+                          onClick={() => handleJoinRoom(room)}
+                          isJoining={joiningRoomId === id}
+                        />
+                      );
+                    })}
+                </div>
+              </section>
+            )}
+
+            {/* Discover Section */}
+            {filterTab === 'all' && discoverSectionRooms.length > 0 && (
+              <section className="rm-section" aria-labelledby="rm-discover-heading">
+                <div className="rm-section-header">
+                  <Users size={17} color="var(--accent-text)" aria-hidden="true" />
+                  <h2 id="rm-discover-heading" className="rm-section-title">Discover</h2>
+                  <span className="rm-section-count">({discoverSectionRooms.length})</span>
+                </div>
+                <div className="rm-grid">
+                  {discoverSectionRooms.map(room => {
+                    const id = getChatId(room);
+                    return (
+                      <RoomCard
+                        key={id}
+                        room={room}
+                        isPinned={false}
+                        isJoined={false}
+                        onTogglePin={togglePinRoom}
+                        chatCount={counts[id] || 0}
+                        onClick={() => handleJoinRoom(room)}
+                        isJoining={joiningRoomId === id}
+                      />
+                    );
+                  })}
+                </div>
+              </section>
+            )}
           </>
         )}
-      </div>
+      </main>
 
-      {/* Onboarding Overlay */}
+      {/* Nickname Onboarding / Edit Modal */}
       {showOnboarding && !isSidebar && (
-        <div className="res-modal-overlay" style={{ ...modalOverlayStyle, zIndex: 1000, backdropFilter: 'blur(16px)' }}>
-          <div className="res-modal" style={{
-            ...modalContentStyle,
-            maxWidth: '460px',
-            textAlign: 'center',
-            padding: '36px 28px',
-            border: '1px solid var(--border-color)',
-            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6)'
-          }}>
-            <div style={{
-              width: '56px',
-              height: '56px',
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, var(--accent-tint) 0%, rgba(167, 139, 250, 0.2) 100%)',
-              border: '1px solid var(--accent-tint-border)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 16px auto'
-            }}>
-              <Sparkles size={28} color="var(--accent-text)" />
+        <div
+          className="rm-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="rm-onboarding-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && hasExistingNickname) {
+              setShowOnboarding(false);
+            }
+          }}
+        >
+          <div className="rm-modal">
+            {hasExistingNickname && (
+              <button
+                type="button"
+                className="rm-modal-close"
+                onClick={() => setShowOnboarding(false)}
+                aria-label="Close nickname settings"
+              >
+                <X size={20} />
+              </button>
+            )}
+
+            <div className="rm-modal-icon">
+              <Sparkles size={24} color="var(--accent-text)" />
             </div>
 
-            <h2 style={{
-              fontSize: '22px',
-              fontWeight: '800',
-              marginBottom: '8px',
-              background: 'var(--accent-gradient)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent'
-            }}>
-              Welcome to Public Rooms
+            <h2 id="rm-onboarding-title" className="rm-modal-title">
+              {hasExistingNickname ? 'Change your nickname' : 'Welcome to Rooms'}
             </h2>
 
-            <p style={{ color: 'var(--text-secondary)', lineHeight: '1.5', marginBottom: '22px', fontSize: '14px' }}>
-              Public rooms are completely anonymous — nicknames are recommended to protect your privacy.
+            <p className="rm-modal-desc">
+              Public rooms are anonymous. Nicknames keep conversations friendly while protecting your privacy.
             </p>
 
-            <form onSubmit={handleSetNickname} style={formStyle}>
-              <div style={{ ...inputGroupStyle, marginBottom: '6px', position: 'relative' }}>
+            <form onSubmit={handleSetNickname} className="rm-form">
+              <div className="rm-input-wrap">
                 <input
                   autoFocus
                   type="text"
-                  placeholder="Enter your nickname..."
+                  placeholder="Enter a nickname..."
                   required
-                  className="premium-input"
                   value={nickname}
-                  onChange={e => {
+                  onChange={(e) => {
                     setNickname(e.target.value);
-                    setError(null);
+                    setFormError(null);
                   }}
+                  className="rm-input"
                   style={{
                     textAlign: 'center',
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    letterSpacing: '0.3px',
-                    paddingRight: '36px',
-                    borderColor: roomNicknameCheck.status === 'block' ? 'var(--danger-color)' : roomNicknameCheck.status === 'warn' ? 'var(--warning-color)' : roomNicknameCheck.status === 'allow' ? 'var(--success-color)' : undefined
+                    fontWeight: 600,
+                    borderColor:
+                      roomNicknameCheck.status === 'block'
+                        ? 'var(--danger-color)'
+                        : roomNicknameCheck.status === 'warn'
+                        ? 'var(--warning-color)'
+                        : roomNicknameCheck.status === 'allow'
+                        ? 'var(--success-color)'
+                        : undefined
                   }}
                 />
-                <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center' }}>
+                <div className="rm-input-status-icon">
                   <UsernameStatusIndicator checkResult={roomNicknameCheck} showInlineIcon={true} />
                 </div>
               </div>
 
-              <UsernameStatusIndicator checkResult={roomNicknameCheck} containerStyle={{ justifyContent: 'center', marginBottom: '14px' }} />
+              <UsernameStatusIndicator
+                checkResult={roomNicknameCheck}
+                containerStyle={{ justifyContent: 'center' }}
+              />
 
-              {/* Random Nickname Suggestions */}
-              <div style={{ marginBottom: '22px' }}>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: '10px',
-                  padding: '0 4px'
-                }}>
-                  <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Suggested Handles
-                  </span>
+              {/* Suggestions */}
+              <div className="rm-chip-group">
+                <div className="rm-chip-group-header">
+                  <span className="rm-chip-group-title">Suggested handles</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -676,66 +937,22 @@ export default function Rooms({ isSidebar = false }) {
                         setShowAllSuggestions(false);
                       }
                     }}
-                    style={{
-                      background: 'var(--accent-tint)',
-                      border: '1px solid var(--accent-tint-border)',
-                      color: 'var(--accent-text)',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      padding: '3px 10px',
-                      borderRadius: '12px',
-                      transition: 'all 0.2s ease'
-                    }}
-                    title={showAllSuggestions ? "Show fewer suggestions" : "Show all suggested handles"}
+                    className="rm-chip-group-toggle"
                   >
-                    {showAllSuggestions ? "Show Less" : "+ More"}
+                    {showAllSuggestions ? 'Show less' : '+ More'}
                   </button>
                 </div>
 
-                <div style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: '8px',
-                  justifyContent: 'center',
-                  maxHeight: showAllSuggestions ? '180px' : 'none',
-                  overflowY: showAllSuggestions ? 'auto' : 'visible',
-                  padding: '2px'
-                }} className="hide-scrollbar">
+                <div className={`rm-suggestions-grid ${showAllSuggestions ? 'rm-suggestions-expanded' : ''}`}>
                   {(showAllSuggestions ? suggestedNames : suggestedNames.slice(0, 4)).map((item, idx) => (
                     <button
                       key={idx}
                       type="button"
                       onClick={() => {
                         setNickname(item);
-                        setError(null);
+                        setFormError(null);
                       }}
-                      style={{
-                        padding: '6px 12px',
-                        borderRadius: '20px',
-                        background: nickname === item ? 'var(--accent-tint)' : 'var(--bg-hover)',
-                        border: nickname === item ? '1px solid var(--accent-tint-border)' : '1px solid var(--border-color)',
-                        color: nickname === item ? 'var(--accent-text)' : '#d1d5db',
-                        fontSize: '13px',
-                        fontWeight: '500',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease'
-                      }}
-                      onMouseEnter={(e) => {
-                        if (nickname !== item) {
-                          e.currentTarget.style.background = 'var(--border-color)';
-                          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (nickname !== item) {
-                          e.currentTarget.style.background = 'var(--bg-hover)';
-                          e.currentTarget.style.borderColor = 'var(--border-color)';
-                        }
-                      }}
+                      className={`rm-suggestion-chip ${nickname === item ? 'rm-suggestion-chip-active' : ''}`}
                     >
                       {item}
                     </button>
@@ -743,21 +960,14 @@ export default function Rooms({ isSidebar = false }) {
                 </div>
               </div>
 
-              {error && <p style={{ ...errorStyle, marginBottom: '12px' }}>{error}</p>}
+              {formError && <p className="rm-status-text rm-status-text-danger">{formError}</p>}
 
               <button
                 type="submit"
-                disabled={isSettingNickname || roomNicknameCheck.isBlocked || roomNicknameCheck.isChecking}
-                className="submit-btn"
-                style={{
-                  ...submitButtonStyle,
-                  width: '100%',
-                  marginTop: '4px',
-                  opacity: (isSettingNickname || roomNicknameCheck.isBlocked || roomNicknameCheck.isChecking) ? 0.6 : 1,
-                  cursor: (isSettingNickname || roomNicknameCheck.isBlocked || roomNicknameCheck.isChecking) ? 'not-allowed' : 'pointer'
-                }}
+                disabled={isSettingNickname || roomNicknameCheck.isBlocked || roomNicknameCheck.isChecking || !nickname.trim()}
+                className="rm-submit-btn"
               >
-                {isSettingNickname ? 'Saving...' : roomNicknameCheck.isChecking ? 'Checking...' : 'Start Exploring'}
+                {isSettingNickname ? 'Saving...' : roomNicknameCheck.isChecking ? 'Checking...' : hasExistingNickname ? 'Save nickname' : 'Start exploring'}
               </button>
             </form>
           </div>
@@ -766,478 +976,1135 @@ export default function Rooms({ isSidebar = false }) {
 
       {/* Create Room Modal */}
       {isCreateModalOpen && (
-        <div className="res-modal-overlay" style={modalOverlayStyle}>
-          <div className="res-modal" style={modalContentStyle}>
-            <div className="res-modal-header" style={modalHeaderStyle}>
-              <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '800', background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Create a Room</h2>
-              <button className="close-btn" onClick={() => setIsCreateModalOpen(false)} style={closeButtonStyle}>×</button>
+        <div
+          className="rm-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="rm-create-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setIsCreateModalOpen(false);
+            }
+          }}
+        >
+          <div className="rm-modal">
+            <div className="rm-modal-header">
+              <h2 id="rm-create-title" className="rm-modal-title">Create a room</h2>
+              <button
+                type="button"
+                className="rm-modal-close"
+                onClick={() => setIsCreateModalOpen(false)}
+                aria-label="Close dialog"
+              >
+                <X size={20} />
+              </button>
             </div>
-            <form onSubmit={handleCreateRoom} style={formStyle}>
-              <div style={inputGroupStyle}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Room Name</label>
+
+            <form onSubmit={handleCreateRoom} className="rm-form">
+              <div className="rm-form-group">
+                <div className="rm-label-row">
+                  <label htmlFor="rm-input-name" className="rm-label">Room name</label>
                   {roomNameCheck.isChecking && (
-                    <span style={{ fontSize: '11px', color: 'var(--accent-text)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Loader2 size={12} className="animate-spin" /> Checking...
+                    <span className="rm-check-status">
+                      <Loader2 size={12} className="rm-spin" /> Checking...
                     </span>
                   )}
                 </div>
-                <div style={{ position: 'relative' }}>
+                <div className="rm-input-wrap">
                   <input
+                    id="rm-input-name"
                     autoFocus
                     type="text"
                     placeholder="e.g. JavaScript Enthusiasts"
                     required
-                    className="premium-input"
-                    style={{
-                      borderColor: roomNameCheck.available === false ? 'var(--danger-color)' : roomNameCheck.available === true ? 'var(--success-color)' : undefined,
-                      paddingRight: '36px'
-                    }}
                     value={newRoom.name}
-                    onChange={e => {
+                    onChange={(e) => {
                       setNewRoom({ ...newRoom, name: e.target.value });
-                      setError(null);
+                      setFormError(null);
+                    }}
+                    className="rm-input"
+                    style={{
+                      borderColor:
+                        roomNameCheck.available === false
+                          ? 'var(--danger-color)'
+                          : roomNameCheck.available === true
+                          ? 'var(--success-color)'
+                          : undefined
                     }}
                   />
-                  <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center' }}>
+                  <div className="rm-input-status-icon">
                     {roomNameCheck.available === true && !roomNameCheck.isChecking && (
-                      <CheckCircle2 size={18} color="var(--success-color)" />
+                      <CheckCircle2 size={17} color="var(--success-color)" />
                     )}
                     {roomNameCheck.available === false && !roomNameCheck.isChecking && (
-                      <AlertCircle size={18} color="var(--danger-color)" />
+                      <AlertCircle size={17} color="var(--danger-color)" />
                     )}
                   </div>
                 </div>
                 {roomNameCheck.message && !roomNameCheck.isChecking && (
-                  <span style={{
-                    fontSize: '12px',
-                    color: roomNameCheck.available ? 'var(--success-color)' : 'var(--danger-color)',
-                    marginTop: '2px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}>
+                  <p
+                    className={`rm-status-text ${
+                      roomNameCheck.available ? 'rm-status-text-success' : 'rm-status-text-danger'
+                    }`}
+                  >
                     {roomNameCheck.message}
-                  </span>
+                  </p>
                 )}
               </div>
-              <div style={inputGroupStyle}>
-                <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Motto / Topic</label>
+
+              <div className="rm-form-group">
+                <label htmlFor="rm-input-motto" className="rm-label">Motto or topic</label>
                 <input
+                  id="rm-input-motto"
                   type="text"
-                  placeholder="e.g. Discussing the future of web dev"
-                  className="premium-input"
+                  placeholder="e.g. Discussing web dev and modern tooling"
                   value={newRoom.motto}
-                  onChange={e => setNewRoom({ ...newRoom, motto: e.target.value })}
+                  onChange={(e) => setNewRoom({ ...newRoom, motto: e.target.value })}
+                  className="rm-input"
                 />
               </div>
-              {error && <p style={errorStyle}>{error}</p>}
+
+              {formError && <p className="rm-status-text rm-status-text-danger">{formError}</p>}
+
               <button
                 type="submit"
-                disabled={isSubmitting || roomNameCheck.available === false || roomNameCheck.isChecking || !newRoom.name.trim()}
-                className="submit-btn"
-                style={{
-                  ...submitButtonStyle,
-                  opacity: (isSubmitting || roomNameCheck.available === false || roomNameCheck.isChecking || !newRoom.name.trim()) ? 0.6 : 1,
-                  cursor: (isSubmitting || roomNameCheck.available === false || roomNameCheck.isChecking || !newRoom.name.trim()) ? 'not-allowed' : 'pointer'
-                }}
+                disabled={
+                  isSubmitting ||
+                  roomNameCheck.available === false ||
+                  roomNameCheck.isChecking ||
+                  !newRoom.name.trim()
+                }
+                className="rm-submit-btn"
               >
-                {isSubmitting ? 'Creating...' : roomNameCheck.isChecking ? 'Checking availability...' : 'Launch Room'}
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={16} className="rm-spin" />
+                    <span>Creating...</span>
+                  </>
+                ) : (
+                  'Launch room'
+                )}
               </button>
             </form>
           </div>
         </div>
       )}
 
-      {/* Styles */}
+      {/* Scoped CSS Block */}
       <style>{`
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-        .room-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        .room-card:hover { transform: translateY(-4px); background: #252525 !important; border-color: var(--border-color) !important; }
-        .animate-spin { animation: spin 1s linear infinite; }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        
-        .create-btn:hover { background-color: var(--accent-tint) !important; transform: scale(1.05); }
-        .create-btn:active { transform: scale(0.95); }
-        
-        .close-btn { transition: all 0.3s ease; }
-        .close-btn:hover { color: white !important; transform: rotate(90deg); }
-        
-        .premium-input {
+        .rm-container {
+          flex: 1;
+          background-color: var(--bg-primary);
+          color: var(--text-primary);
+          display: flex;
+          flex-direction: column;
+          height: 100%;
+          overflow-y: auto;
+          position: relative;
+          padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+        }
+
+        .rm-sidebar-mode {
+          padding: 0;
+          background-color: transparent;
+        }
+
+        .rm-header {
+          position: sticky;
+          top: 0;
+          z-index: 20;
+          background: color-mix(in srgb, var(--bg-primary) 85%, transparent);
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          border-bottom: 1px solid var(--border-color);
+          padding: 20px 24px 12px 24px;
+          display: flex;
+          flex-direction: column;
+          gap: 14px;
+        }
+
+        .rm-header-inner {
+          max-width: 1200px;
           width: 100%;
-          background: rgba(0, 0, 0, 0.2) !important;
-          border: 1px solid var(--border-color) !important;
+          margin: 0 auto;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 16px;
+        }
+
+        .rm-header-left {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          min-width: 160px;
+        }
+
+        .rm-title {
+          margin: 0;
+          font-size: 26px;
+          font-weight: 700;
+          color: var(--text-primary);
+          letter-spacing: -0.5px;
+          line-height: 1.2;
+        }
+
+        .rm-nickname-row {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 12px;
+          color: var(--text-secondary);
+        }
+
+        .rm-nickname-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background-color: var(--success-color);
+          display: inline-block;
+        }
+
+        .rm-nickname-name {
+          color: var(--accent-text);
+          font-weight: 600;
+        }
+
+        .rm-link-btn {
+          background: none;
+          border: none;
+          color: var(--accent-text);
+          cursor: pointer;
+          padding: 0 4px;
+          font-size: 11px;
+          text-decoration: underline;
+          line-height: 1;
+        }
+
+        .rm-link-btn:hover {
+          color: var(--text-primary);
+        }
+
+        .rm-header-right {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex: 1;
+          justify-content: flex-end;
+        }
+
+        .rm-search-box {
+          position: relative;
+          display: flex;
+          align-items: center;
+          background-color: var(--bg-card);
+          border: 1px solid var(--border-color);
           border-radius: 12px;
-          padding: 16px 20px;
-          color: white;
-          font-size: 15px;
-          transition: all 0.2s ease;
+          height: 40px;
+          padding: 0 12px;
+          max-width: 360px;
+          width: 100%;
+          transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .rm-search-box:focus-within {
+          border-color: var(--accent-solid);
+          box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-solid) 20%, transparent);
+        }
+
+        .rm-search-icon {
+          color: var(--text-muted);
+          flex-shrink: 0;
+          margin-right: 8px;
+        }
+
+        .rm-search-input {
+          background: transparent;
+          border: none;
+          outline: none;
+          color: var(--text-primary);
+          font-size: 13px;
+          width: 100%;
+          padding: 0;
+        }
+
+        .rm-search-input::placeholder {
+          color: var(--text-muted);
+        }
+
+        .rm-search-clear {
+          background: transparent;
+          border: none;
+          color: var(--text-muted);
+          cursor: pointer;
+          padding: 4px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          margin-left: 4px;
+        }
+
+        .rm-search-clear:hover {
+          color: var(--text-primary);
+          background-color: var(--bg-hover);
+        }
+
+        .rm-create-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background-color: var(--accent-solid);
+          color: var(--text-on-accent);
+          border: 1px solid var(--accent-solid);
+          border-radius: 10px;
+          height: 40px;
+          padding: 0 14px;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          white-space: nowrap;
+          flex-shrink: 0;
+          transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .rm-create-btn:hover {
+          background-color: var(--accent-color);
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px color-mix(in srgb, var(--accent-solid) 35%, transparent);
+        }
+
+        .rm-create-btn:active {
+          transform: translateY(0);
+        }
+
+        .rm-filter-bar {
+          max-width: 1200px;
+          width: 100%;
+          margin: 0 auto;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .rm-chip {
+          background-color: var(--bg-card);
+          color: var(--text-secondary);
+          border: 1px solid var(--border-color);
+          border-radius: 8px;
+          padding: 6px 12px;
+          font-size: 12px;
+          font-weight: 500;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          transition: all 0.15s ease;
+        }
+
+        .rm-chip:hover {
+          background-color: var(--bg-hover);
+          color: var(--text-primary);
+        }
+
+        .rm-chip-active {
+          background-color: var(--accent-tint);
+          color: var(--accent-text);
+          border-color: var(--accent-tint-border);
+          font-weight: 600;
+        }
+
+        .rm-chip-count {
+          font-size: 11px;
+          padding: 1px 6px;
+          border-radius: 9999px;
+          background-color: color-mix(in srgb, var(--border-color) 60%, transparent);
+          color: inherit;
+        }
+
+        .rm-content {
+          max-width: 1200px;
+          width: 100%;
+          margin: 0 auto;
+          padding: 24px;
           box-sizing: border-box;
+          flex: 1;
+        }
+
+        .rm-sidebar-mode .rm-content {
+          padding: 12px;
+        }
+
+        .rm-section {
+          margin-bottom: 32px;
+        }
+
+        .rm-section:last-child {
+          margin-bottom: 12px;
+        }
+
+        .rm-section-header {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 14px;
+        }
+
+        .rm-section-title {
+          margin: 0;
+          font-size: 14px;
+          font-weight: 700;
+          color: var(--text-secondary);
+          text-transform: uppercase;
+          letter-spacing: 0.6px;
+        }
+
+        .rm-section-count {
+          font-size: 12px;
+          color: var(--text-muted);
+          font-weight: 500;
+        }
+
+        .rm-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          gap: 16px;
+        }
+
+        .rm-sidebar-mode .rm-grid {
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+
+        /* Room Card */
+        .rm-card {
+          background-color: var(--bg-card);
+          border: 1px solid var(--border-color);
+          border-radius: 14px;
+          padding: 18px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          cursor: pointer;
+          transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+          position: relative;
           outline: none;
         }
-        .premium-input:focus {
-          border-color: var(--accent-color) !important;
-          background: rgba(0, 0, 0, 0.4) !important;
-          box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-solid) 45%, transparent);
-        }
-        .premium-input::placeholder { color: var(--text-muted); }
-        
-        .submit-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 20px color-mix(in srgb, var(--accent-solid) 45%, transparent) !important; }
-        .submit-btn:active:not(:disabled) { transform: translateY(0); }
 
-        /* Mobile Responsiveness */
+        .rm-card:hover {
+          border-color: color-mix(in srgb, var(--border-color) 60%, var(--accent-solid));
+          transform: translateY(-2px);
+          box-shadow: 0 6px 18px color-mix(in srgb, var(--bg-primary) 50%, black);
+        }
+
+        .rm-card:focus-visible {
+          border-color: var(--accent-solid);
+          box-shadow: 0 0 0 2px var(--accent-solid);
+        }
+
+        .rm-card-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .rm-card-header-left {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .rm-card-header-right {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+
+        .rm-unread-pill {
+          background-color: var(--danger-tint);
+          color: var(--danger-color);
+          border: 1px solid color-mix(in srgb, var(--danger-color) 35%, transparent);
+          font-size: 11px;
+          font-weight: 700;
+          padding: 2px 7px;
+          border-radius: 9999px;
+          line-height: 1.2;
+        }
+
+        .rm-pin-btn {
+          width: 30px;
+          height: 30px;
+          border-radius: 8px;
+          border: 1px solid var(--border-color);
+          background-color: var(--bg-hover);
+          color: var(--text-muted);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+
+        .rm-pin-btn:hover {
+          color: var(--text-primary);
+          background-color: color-mix(in srgb, var(--bg-card) 70%, var(--border-color));
+        }
+
+        .rm-pin-active {
+          color: var(--danger-color);
+          background-color: var(--danger-tint);
+          border-color: color-mix(in srgb, var(--danger-color) 30%, transparent);
+        }
+
+        .rm-card-body {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .rm-card-title {
+          margin: 0;
+          font-size: 15px;
+          font-weight: 600;
+          color: var(--text-primary);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          line-height: 1.3;
+        }
+
+        .rm-card-motto {
+          margin: 0;
+          font-size: 13px;
+          color: var(--text-secondary);
+          line-height: 1.4;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          min-height: 36px;
+        }
+
+        .rm-card-footer {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding-top: 10px;
+          border-top: 1px solid color-mix(in srgb, var(--border-color) 50%, transparent);
+          gap: 12px;
+        }
+
+        .rm-card-members {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          color: var(--text-muted);
+          font-size: 12px;
+          font-weight: 500;
+        }
+
+        .rm-action-btn {
+          padding: 6px 14px;
+          border-radius: 8px;
+          font-size: 12px;
+          font-weight: 600;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          line-height: 1.2;
+          transition: all 0.15s ease;
+        }
+
+        .rm-action-open {
+          background-color: var(--accent-tint);
+          color: var(--accent-text);
+          border: 1px solid var(--accent-tint-border);
+        }
+
+        .rm-action-open:hover {
+          background-color: color-mix(in srgb, var(--accent-solid) 24%, transparent);
+        }
+
+        .rm-action-join {
+          background-color: var(--accent-solid);
+          color: var(--text-on-accent);
+          border: 1px solid var(--accent-solid);
+        }
+
+        .rm-action-join:hover {
+          background-color: var(--accent-color);
+        }
+
+        .rm-action-btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        /* Empty & Error States */
+        .rm-empty-state, .rm-error-state {
+          padding: 56px 20px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          gap: 12px;
+          color: var(--text-secondary);
+          max-width: 440px;
+          margin: 40px auto;
+        }
+
+        .rm-empty-icon {
+          color: var(--border-color);
+        }
+
+        .rm-empty-title {
+          margin: 0;
+          font-size: 17px;
+          font-weight: 600;
+          color: var(--text-primary);
+        }
+
+        .rm-empty-desc, .rm-error-text {
+          margin: 0;
+          font-size: 13px;
+          color: var(--text-secondary);
+          line-height: 1.5;
+        }
+
+        .rm-empty-action, .rm-retry-btn {
+          margin-top: 6px;
+          padding: 8px 18px;
+          border-radius: 10px;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background-color: var(--accent-solid);
+          color: var(--text-on-accent);
+          border: 1px solid var(--accent-solid);
+          transition: all 0.15s ease;
+        }
+
+        .rm-empty-action:hover, .rm-retry-btn:hover {
+          background-color: var(--accent-color);
+        }
+
+        /* Skeleton Cards */
+        .rm-skeleton-card {
+          background-color: var(--bg-card);
+          border: 1px solid var(--border-color);
+          border-radius: 14px;
+          padding: 18px;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          animation: rmPulse 1.6s ease-in-out infinite;
+        }
+
+        .rm-skeleton-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .rm-skeleton-avatar {
+          width: 42px;
+          height: 42px;
+          border-radius: 50%;
+          background-color: var(--bg-hover);
+        }
+
+        .rm-skeleton-pill {
+          width: 28px;
+          height: 28px;
+          border-radius: 8px;
+          background-color: var(--bg-hover);
+        }
+
+        .rm-skeleton-line {
+          border-radius: 6px;
+          background-color: var(--bg-hover);
+        }
+
+        .rm-skeleton-title {
+          height: 16px;
+          width: 70%;
+        }
+
+        .rm-skeleton-text {
+          height: 12px;
+          width: 90%;
+        }
+
+        .rm-skeleton-text-short {
+          height: 12px;
+          width: 55%;
+        }
+
+        .rm-skeleton-footer {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding-top: 10px;
+          border-top: 1px solid color-mix(in srgb, var(--border-color) 40%, transparent);
+        }
+
+        .rm-skeleton-members {
+          height: 12px;
+          width: 80px;
+          border-radius: 6px;
+          background-color: var(--bg-hover);
+        }
+
+        .rm-skeleton-btn {
+          height: 26px;
+          width: 60px;
+          border-radius: 8px;
+          background-color: var(--bg-hover);
+        }
+
+        /* Modal Overlays & Centering */
+        .rm-modal-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 1000;
+          background: color-mix(in srgb, var(--bg-primary) 70%, transparent);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 16px;
+          box-sizing: border-box;
+        }
+
+        .rm-modal {
+          background-color: var(--bg-card);
+          border: 1px solid var(--border-color);
+          border-radius: 20px;
+          width: 100%;
+          max-width: 460px;
+          padding: 28px;
+          box-shadow: 0 20px 40px color-mix(in srgb, var(--bg-primary) 50%, black);
+          display: flex;
+          flex-direction: column;
+          position: relative;
+          box-sizing: border-box;
+          max-height: 90vh;
+          overflow-y: auto;
+        }
+
+        .rm-modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 20px;
+        }
+
+        .rm-modal-icon {
+          width: 48px;
+          height: 48px;
+          border-radius: 12px;
+          background-color: var(--accent-tint);
+          border: 1px solid var(--accent-tint-border);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin: 0 auto 14px auto;
+        }
+
+        .rm-modal-title {
+          margin: 0;
+          font-size: 20px;
+          font-weight: 700;
+          color: var(--text-primary);
+          text-align: center;
+          letter-spacing: -0.3px;
+        }
+
+        .rm-modal-header .rm-modal-title {
+          text-align: left;
+        }
+
+        .rm-modal-desc {
+          margin: 8px 0 20px 0;
+          font-size: 13px;
+          color: var(--text-secondary);
+          text-align: center;
+          line-height: 1.5;
+        }
+
+        .rm-modal-close {
+          position: absolute;
+          top: 18px;
+          right: 18px;
+          background: none;
+          border: none;
+          color: var(--text-muted);
+          cursor: pointer;
+          padding: 4px;
+          border-radius: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .rm-modal-close:hover {
+          color: var(--text-primary);
+          background-color: var(--bg-hover);
+        }
+
+        .rm-form {
+          display: flex;
+          flex-direction: column;
+          gap: 18px;
+        }
+
+        .rm-form-group {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        .rm-label-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .rm-label {
+          font-size: 12px;
+          font-weight: 600;
+          color: var(--text-secondary);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        .rm-check-status {
+          font-size: 11px;
+          color: var(--accent-text);
+          display: flex;
+          align-items: center;
+          gap: 4px;
+        }
+
+        .rm-input-wrap {
+          position: relative;
+          display: flex;
+          align-items: center;
+          width: 100%;
+        }
+
+        .rm-input {
+          width: 100%;
+          background-color: color-mix(in srgb, var(--bg-primary) 70%, transparent);
+          border: 1px solid var(--border-color);
+          border-radius: 10px;
+          padding: 12px 14px;
+          padding-right: 38px;
+          color: var(--text-primary);
+          font-size: 14px;
+          outline: none;
+          box-sizing: border-box;
+          transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .rm-input:focus {
+          border-color: var(--accent-solid);
+          box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-solid) 20%, transparent);
+        }
+
+        .rm-input::placeholder {
+          color: var(--text-muted);
+        }
+
+        .rm-input-status-icon {
+          position: absolute;
+          right: 12px;
+          display: flex;
+          align-items: center;
+          pointer-events: none;
+        }
+
+        .rm-status-text {
+          margin: 4px 0 0 0;
+          font-size: 12px;
+          line-height: 1.4;
+        }
+
+        .rm-status-text-success {
+          color: var(--success-color);
+        }
+
+        .rm-status-text-danger {
+          color: var(--danger-color);
+        }
+
+        /* Suggestions in Onboarding */
+        .rm-chip-group {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .rm-chip-group-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .rm-chip-group-title {
+          font-size: 11px;
+          font-weight: 600;
+          color: var(--text-muted);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        .rm-chip-group-toggle {
+          background: none;
+          border: 1px solid var(--accent-tint-border);
+          background-color: var(--accent-tint);
+          color: var(--accent-text);
+          font-size: 11px;
+          font-weight: 600;
+          cursor: pointer;
+          padding: 2px 8px;
+          border-radius: 12px;
+        }
+
+        .rm-chip-group-toggle:hover {
+          color: var(--text-primary);
+        }
+
+        .rm-suggestions-grid {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 6px;
+          justify-content: center;
+          max-height: 100px;
+          overflow-y: auto;
+          padding: 2px;
+        }
+
+        .rm-suggestions-expanded {
+          max-height: 180px;
+        }
+
+        .rm-suggestion-chip {
+          padding: 5px 12px;
+          border-radius: 16px;
+          background-color: var(--bg-hover);
+          border: 1px solid var(--border-color);
+          color: var(--text-secondary);
+          font-size: 12px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+
+        .rm-suggestion-chip:hover {
+          background-color: color-mix(in srgb, var(--border-color) 60%, transparent);
+          color: var(--text-primary);
+        }
+
+        .rm-suggestion-chip-active {
+          background-color: var(--accent-tint);
+          color: var(--accent-text);
+          border-color: var(--accent-tint-border);
+          font-weight: 600;
+        }
+
+        .rm-submit-btn {
+          width: 100%;
+          background-color: var(--accent-solid);
+          color: var(--text-on-accent);
+          border: 1px solid var(--accent-solid);
+          padding: 12px;
+          border-radius: 10px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          transition: all 0.15s ease;
+          margin-top: 4px;
+        }
+
+        .rm-submit-btn:hover:not(:disabled) {
+          background-color: var(--accent-color);
+          box-shadow: 0 4px 14px color-mix(in srgb, var(--accent-solid) 35%, transparent);
+        }
+
+        .rm-submit-btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .rm-spin {
+          animation: rmSpin 1s linear infinite;
+        }
+
+        @keyframes rmSpin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+
+        @keyframes rmPulse {
+          0%, 100% { opacity: 0.55; }
+          50% { opacity: 0.9; }
+        }
+
+        /* Mobile Adjustments */
         @media (max-width: 768px) {
-          .res-header { padding: 16px 12px !important; }
-          .res-title { font-size: 24px !important; }
-          .res-content { padding: 0 12px !important; }
-          .res-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
-          .res-modal { padding: 24px !important; width: 90% !important; margin: 0 auto !important; }
-          .res-modal-overlay { padding: 0 !important; }
-          .res-modal-header h2 { font-size: 20px !important; }
-          .res-header-actions { gap: 8px !important; }
-          .create-btn { width: 40px !important; height: 40px !important; }
-          .res-search { max-width: 100% !important; height: 40px !important; padding: 0 12px !important; font-size: 13px !important; }
-          .res-section { margin-top: 24px !important; }
+          .rm-header {
+            padding: 14px 16px 10px 16px;
+            gap: 10px;
+          }
+
+          .rm-title {
+            font-size: 22px;
+          }
+
+          .rm-btn-text {
+            display: none;
+          }
+
+          .rm-create-btn {
+            width: 40px;
+            padding: 0;
+            justify-content: center;
+          }
+
+          .rm-search-box {
+            max-width: 100%;
+          }
+
+          .rm-content {
+            padding: 16px;
+          }
+
+          .rm-grid {
+            grid-template-columns: 1fr;
+            gap: 12px;
+          }
+
+          .rm-modal {
+            padding: 20px;
+            border-radius: 16px;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .rm-card,
+          .rm-create-btn,
+          .rm-submit-btn,
+          .rm-chip,
+          .rm-skeleton-card,
+          .rm-spin {
+            animation: none !important;
+            transition: none !important;
+          }
         }
       `}</style>
     </div>
   );
 }
 
-function RoomCard({ room, badgeText, badgeColor, onClick, isPinned, onTogglePin, chatCount }) {
-  return (
-    <div
-      className="room-card"
-      onClick={onClick}
-      style={{ ...cardStyle, position: 'relative' }}
-    >
-      {chatCount > 0 && (
-        <div style={{
-          position: 'absolute',
-          top: '-8px',
-          right: '-8px',
-          backgroundColor: 'var(--danger-color)',
-          color: 'white',
-          fontSize: '11px',
-          fontWeight: '800',
-          minWidth: '20px',
-          height: '20px',
-          borderRadius: '10px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '0 6px',
-          boxShadow: '0 4px 12px var(--danger-tint)',
-          border: '2px solid var(--bg-secondary)',
-          zIndex: 10,
-          animation: 'scaleIn 0.2s ease-out'
-        }}>
-          {chatCount > 99 ? '99+' : chatCount}
-        </div>
-      )}
-      <button
-        onClick={onTogglePin}
-        style={{
-          position: 'absolute',
-          top: '12px',
-          right: '12px',
-          background: 'rgba(0, 0, 0, 0.4)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '8px',
-          width: '32px',
-          height: '32px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          zIndex: 5,
-          color: isPinned ? 'var(--danger-color)' : 'var(--text-secondary)',
-          transition: 'all 0.2s ease',
-          backdropFilter: 'blur(4px)'
-        }}
-        onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.6)'}
-        onMouseLeave={e => e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.4)'}
-        title={isPinned ? "Unpin Room" : "Pin Room"}
-      >
-        {isPinned ? <PinOff size={16} /> : <Pin size={16} />}
-      </button>
+function RoomCard({
+  room,
+  isPinned,
+  isJoined,
+  onTogglePin,
+  chatCount,
+  onClick,
+  isJoining
+}) {
+  const name = getName(room);
+  const motto = getMotto(room);
+  const members = getMembers(room);
+  const id = getChatId(room);
 
-      <div style={cardHeaderStyle}>
-        <Avatar chat={room} size={48} />
-        <span style={{ ...badgeStyle, backgroundColor: `${badgeColor}20`, color: badgeColor, border: `1px solid ${badgeColor}40` }}>
-          {badgeText}
+  return (
+    <article
+      className="rm-card"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      aria-label={`${name}, ${members} ${members === 1 ? 'member' : 'members'}`}
+    >
+      <div className="rm-card-header">
+        <div className="rm-card-header-left">
+          <Avatar chat={room} size={42} />
+          {chatCount > 0 && (
+            <span className="rm-unread-pill" aria-label={`${chatCount} unread messages`}>
+              {chatCount > 99 ? '99+ new' : `${chatCount} new`}
+            </span>
+          )}
+        </div>
+
+        <div className="rm-card-header-right">
+          <button
+            type="button"
+            className={`rm-pin-btn ${isPinned ? 'rm-pin-active' : ''}`}
+            onClick={(e) => onTogglePin(e, id)}
+            aria-label={isPinned ? `Unpin ${name}` : `Pin ${name}`}
+            aria-pressed={isPinned}
+          >
+            {isPinned ? <PinOff size={15} /> : <Pin size={15} />}
+          </button>
+        </div>
+      </div>
+
+      <div className="rm-card-body">
+        <h3 className="rm-card-title" title={name}>
+          {name}
+        </h3>
+        <p className="rm-card-motto" title={motto}>
+          {motto}
+        </p>
+      </div>
+
+      <div className="rm-card-footer">
+        <span className="rm-card-members">
+          <Users size={14} aria-hidden="true" />
+          <span>{members} {members === 1 ? 'member' : 'members'}</span>
         </span>
+
+        <button
+          type="button"
+          className={`rm-action-btn ${isJoined ? 'rm-action-open' : 'rm-action-join'}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick();
+          }}
+          disabled={isJoining}
+          aria-label={isJoining ? 'Joining room' : isJoined ? `Open ${name}` : `Join ${name}`}
+        >
+          {isJoining ? (
+            <>
+              <Loader2 size={12} className="rm-spin" />
+              <span>Joining</span>
+            </>
+          ) : isJoined ? (
+            'Open'
+          ) : (
+            'Join'
+          )}
+        </button>
       </div>
-      <div style={cardBodyStyle}>
-        <h3 style={cardTitleStyle}>{room.ChatName || room.chatName || "Unnamed Room"}</h3>
-        <p style={cardMottoStyle}>{room.status || "Explore topics and connect with others"}</p>
-      </div>
-      <div style={cardFooterStyle}>
-        <Users size={14} />
-        <span>{room.noOfMembers || 0} active members</span>
-      </div>
-    </div>
+    </article>
   );
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Styled CSS Modules (JS Objects)
-// ─────────────────────────────────────────────────────────────────────────────
-
-const containerStyle = {
-  flex: 1,
-  backgroundColor: 'var(--bg-primary)',
-  display: 'flex',
-  flexDirection: 'column',
-  height: '100%',
-  overflowY: 'auto',
-  position: 'relative',
-  paddingBottom: '24px'
-};
-
-const headerStyle = {
-  position: 'sticky',
-  top: 0,
-  zIndex: 10,
-  backgroundColor: 'rgba(18, 18, 18, 0.8)',
-  backdropFilter: 'blur(20px)',
-  borderBottom: '1px solid var(--bg-hover)',
-  padding: '24px',
-};
-
-const headerTopStyle = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  maxWidth: '1200px',
-  margin: '0 auto',
-  width: '100%',
-  gap: '24px'
-};
-
-const titleStyle = {
-  margin: 0,
-  fontSize: '28px',
-  fontWeight: '800',
-  color: 'white',
-  letterSpacing: '-1px'
-};
-
-const headerActionsStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '12px',
-  flex: 1,
-  justifyContent: 'flex-end'
-};
-
-const searchContainerStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  backgroundColor: 'var(--bg-card)',
-  borderRadius: '12px',
-  padding: '0 16px',
-  maxWidth: '400px',
-  width: '100%',
-  border: '1px solid var(--border-color)',
-  height: '44px'
-};
-
-const searchInputStyle = {
-  backgroundColor: 'transparent',
-  border: 'none',
-  color: 'white',
-  padding: '12px',
-  fontSize: '14px',
-  width: '100%',
-  outline: 'none',
-};
-
-const createButtonStyle = {
-  backgroundColor: 'transparent',
-  color: 'var(--accent-color)',
-  border: 'none',
-  borderRadius: '12px',
-  width: '44px',
-  height: '44px',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  cursor: 'pointer',
-  transition: 'all 0.2s ease',
-};
-
-const contentStyle = {
-  maxWidth: '1200px',
-  width: '100%',
-  margin: '0 auto',
-  padding: '0 24px',
-  boxSizing: 'border-box'
-};
-
-const sectionStyle = {
-  marginTop: '40px',
-  animation: 'fadeIn 0.5s ease-out'
-};
-
-const sectionHeaderStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '10px',
-  marginBottom: '20px'
-};
-
-const sectionTitleStyle = {
-  margin: 0,
-  fontSize: '18px',
-  fontWeight: '700',
-  color: 'var(--text-secondary)',
-  textTransform: 'uppercase',
-  letterSpacing: '1px'
-};
-
-const gridStyle = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-  gap: '20px'
-};
-
-const cardStyle = {
-  backgroundColor: 'var(--bg-secondary)',
-  borderRadius: '20px',
-  padding: '24px',
-  border: '1px solid var(--bg-hover)',
-  cursor: 'pointer',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '16px'
-};
-
-const cardHeaderStyle = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'flex-start'
-};
-
-const badgeStyle = {
-  padding: '4px 10px',
-  borderRadius: '8px',
-  fontSize: '11px',
-  fontWeight: '700',
-  textTransform: 'uppercase',
-};
-
-const cardBodyStyle = {
-  flex: 1
-};
-
-const cardTitleStyle = {
-  margin: '0 0 8px 0',
-  fontSize: '18px',
-  fontWeight: '700',
-  color: 'white'
-};
-
-const cardMottoStyle = {
-  margin: 0,
-  fontSize: '13px',
-  lineHeight: '1.5',
-  color: 'var(--text-secondary)',
-  display: '-webkit-box',
-  WebkitLineClamp: '2',
-  WebkitBoxOrient: 'vertical',
-  overflow: 'hidden'
-};
-
-const cardFooterStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '6px',
-  color: '#4B5563',
-  fontSize: '12px',
-  fontWeight: '500'
-};
-
-const emptyStateStyle = {
-  padding: '60px 0',
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  gap: '16px',
-  color: '#4B5563',
-  textAlign: 'center'
-};
-
-const modalOverlayStyle = {
-  position: 'absolute',
-  inset: 0,
-  backgroundColor: 'rgba(10, 10, 12, 0.65)',
-  backdropFilter: 'blur(16px)',
-  WebkitBackdropFilter: 'blur(16px)',
-  zIndex: 1000,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '20px'
-};
-
-const modalContentStyle = {
-  background: 'linear-gradient(145deg, rgba(30, 30, 34, 0.95) 0%, rgba(20, 20, 24, 0.95) 100%)',
-  borderRadius: '28px',
-  width: '100%',
-  maxWidth: '440px',
-  padding: '40px',
-  boxShadow: '0 30px 60px -12px rgba(0, 0, 0, 0.7), inset 0 1px 0 var(--border-color)',
-  border: '1px solid var(--bg-hover)',
-  animation: 'scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
-};
-
-const modalHeaderStyle = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: '24px'
-};
-
-const closeButtonStyle = {
-  backgroundColor: 'transparent',
-  border: 'none',
-  color: 'var(--text-secondary)',
-  fontSize: '32px',
-  cursor: 'pointer',
-  lineHeight: '1'
-};
-
-const formStyle = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '24px'
-};
-
-const inputGroupStyle = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '10px',
-  position: 'relative'
-};
-
-const errorStyle = {
-  color: 'var(--danger-color)',
-  fontSize: '13px',
-  margin: '0'
-};
-
-const submitButtonStyle = {
-  marginTop: '10px',
-  backgroundColor: 'var(--accent-color)',
-  color: 'white',
-  border: 'none',
-  padding: '14px',
-  borderRadius: '12px',
-  fontWeight: '600',
-  fontSize: '16px',
-  cursor: 'pointer',
-  transition: 'opacity 0.2s',
-  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
-};

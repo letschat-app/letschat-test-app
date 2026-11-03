@@ -1,3 +1,4 @@
+import useBackClose from '../../hooks/useBackClose';
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Tag, Send, Check, Users, Lock, Sparkles, MessageCircle } from 'lucide-react';
 import { sendSafe } from '../../service/Websocket';
@@ -11,6 +12,7 @@ import { API } from '../../service/UserAuth';
  * Protocol: Sets repliedto: "PULSE_TAG:<PULSE_ID>"
  */
 const PulseTagModal = ({ isOpen, onClose, pulse, pulseOwnerUserId }) => {
+  useBackClose(isOpen, onClose);
   if (!isOpen || !pulse) return null;
 
   const currentUserId = localStorage.getItem('userid');
@@ -109,7 +111,7 @@ const PulseTagModal = ({ isOpen, onClose, pulse, pulseOwnerUserId }) => {
         borderRadius: '24px',
         width: '100%',
         maxWidth: '460px',
-        maxHeight: '85vh',
+        
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',

@@ -1,3 +1,4 @@
+import useBackClose from '../../hooks/useBackClose';
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Zap, Check, Lock, Globe, Users, ArrowRight } from 'lucide-react';
 import { getFeedDataFromDB, getMineDataFromDB } from '../../service/PulseMediaCache';
@@ -151,7 +152,7 @@ const AttachPulseModal = ({
         border: '1px solid var(--border-color)',
         borderRadius: '24px',
         width: '100%', maxWidth: '480px',
-        maxHeight: '85vh',
+        
         display: 'flex', flexDirection: 'column',
         overflow: 'hidden',
         boxShadow: '0 25px 60px rgba(0,0,0,0.6)',

@@ -1,3 +1,5 @@
+import { useToast } from '../components/common/ToastProvider';
+import useBackClose from '../hooks/useBackClose';
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   Pencil,
@@ -40,6 +42,8 @@ const PRESET_COLORS = [
 ];
 
 export default function ImageEditor({ src, onDone, onCancel }) {
+  useBackClose(Boolean(src), onCancel);
+  const toast = useToast();
   const canvasRef = useRef(null);
   const overlayRef = useRef(null);
   const historyRef = useRef(new History());
@@ -73,7 +77,7 @@ export default function ImageEditor({ src, onDone, onCancel }) {
       })
       .catch((err) => {
         console.error('[ImageEditor] Failed to load image:', err);
-        alert("Can't edit this image");
+        toast.error("Can't edit this image");
         onCancel();
       });
 
@@ -181,7 +185,7 @@ export default function ImageEditor({ src, onDone, onCancel }) {
       });
     } else if (activeTool === 'text') {
       if (!textInput.trim()) {
-        alert('Type text in the box below first, then tap to place.');
+        toast.info('Type text in the box below first, then tap to place.');
         return;
       }
       placeText(ctx, textInput, x, y, { color: brushColor, size: brushSize });

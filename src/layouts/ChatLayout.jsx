@@ -1,3 +1,4 @@
+import useIsDesktop from '../hooks/useIsDesktop';
 import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import ChatNames from '../pages/ChatNames';
@@ -6,7 +7,8 @@ import DesktopSidebar from '../components/DesktopSidebar';
 import Navbar from '../Navbar';
 
 export default function ChatLayout() {
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const isDesktop = useIsDesktop();
+  const isMobile = !isDesktop;
   const location = useLocation();
   const navigate = useNavigate();
   const isChatOpen = location.pathname.includes('/chat/');
@@ -15,11 +17,7 @@ export default function ChatLayout() {
   const userId = localStorage.getItem('userid');
   const username = localStorage.getItem('username') || userId;
 
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  
 
   if (isMobile) {
     // On mobile, always render the routed content via Outlet

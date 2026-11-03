@@ -1,3 +1,4 @@
+import useBackClose from '../../hooks/useBackClose';
 import React, { useState, useEffect } from 'react';
 import { X, FileText, CheckCircle2, XCircle, Search, RefreshCcw, Download, Users, Award, BarChart3, Loader2 } from 'lucide-react';
 import { API } from '../../service/UserAuth';
@@ -11,6 +12,7 @@ import ClassroomReportModal from './ClassroomReportModal';
  * Provides role-based control and triggers the Report Export Modal
  */
 const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student', isOpen, onClose }) => {
+  useBackClose(isOpen, onClose);
   const [studentStats, setStudentStats] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [matrixData, setMatrixData] = useState({}); // { [userId]: { [assignmentId]: { status: 'SUBMITTED' | 'MISSING', ... } } }
@@ -119,7 +121,7 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
             maxWidth: '400px',
             color: 'var(--text-primary)',
           }}
-          onClick={(e) => e.stopPropagation()}
+          className="responsive-modal-container" onClick={(e) => e.stopPropagation()}
         >
           <XCircle size={48} color="var(--danger-color)" style={{ margin: '0 auto 12px' }} />
           <h3 style={{ margin: '0 0 8px', fontSize: '18px', fontWeight: '700' }}>Access Restricted</h3>
@@ -193,7 +195,7 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
             borderRadius: '20px',
             width: '100%',
             maxWidth: '1100px',
-            maxHeight: '90vh',
+            
             display: 'flex',
             flexDirection: 'column',
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
@@ -203,7 +205,7 @@ const ClassroomMatrixModal = ({ roomId, classroomName = '', userRole = 'student'
           onClick={(e) => e.stopPropagation()}
         >
           {/* Top Bar Header */}
-          <div
+          <div className="responsive-modal-header"
             style={{
               padding: '18px 24px',
               borderBottom: '1px solid var(--border-color)',

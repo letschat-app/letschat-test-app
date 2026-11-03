@@ -1,21 +1,18 @@
+import useIsDesktop from './hooks/useIsDesktop';
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
 
 const SwipeWrapper = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [[page, direction], setPage] = useState([0, 0]);
-  const [isDesktop, setIsDesktop] = useState(window.innerWidth > 768);
+  const [[, direction], setPage] = useState([0, 0]);
+  const isDesktop = useIsDesktop();
 
-  useEffect(() => {
-    const handleResize = () => setIsDesktop(window.innerWidth > 768);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  
 
   // Define swipeable routes in order
-  const swipeableRoutes = ['/chats', '/group', '/search', '/calendar'];
+  const swipeableRoutes = ['/chats', '/pulses', '/rooms', '/calendar'];
   const currentIndex = swipeableRoutes.indexOf(location.pathname);
   const isSwipeablePath = currentIndex !== -1;
 
@@ -81,7 +78,7 @@ const SwipeWrapper = ({ children }) => {
       overflow: 'hidden'
     }}>
       <AnimatePresence initial={false} custom={direction}>
-        <motion.div
+        <Motion.div
           key={location.pathname}
           custom={direction}
           variants={variants}
@@ -106,7 +103,7 @@ const SwipeWrapper = ({ children }) => {
           }}
         >
           {children}
-        </motion.div>
+        </Motion.div>
       </AnimatePresence>
     </div>
   );

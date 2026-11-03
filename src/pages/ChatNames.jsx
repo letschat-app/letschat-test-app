@@ -1,3 +1,5 @@
+import { useToast } from '../components/common/ToastProvider';
+import { usePrompt } from '../components/common/PromptProvider';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getsocket, isSocketOpen, sendSafe } from "../service/Websocket";
@@ -120,7 +122,7 @@ const ChatRow = React.memo(function ChatRow({
   chat, msg, chatCount, isPinned, isActive,
   isDesktop, isOnline, userId,
   onChatClick, onTogglePin, onAvatarClick,
-  formatTime, hideAvatar, hideMessage
+  formatTime, hideAvatar, hideMessage, indicators
 }) {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -134,6 +136,93 @@ const ChatRow = React.memo(function ChatRow({
     [onTogglePin, chat.chatId]
   );
 
+  // Filter active indicators for this chat (excluding current user and any expired indicators)
+  const validIndicators = useMemo(() => {
+    if (!indicators || !Array.isArray(indicators)) return [];
+    const now = Date.now();
+    return indicators.filter(ind => ind && ind.userid != userId && (!ind.expiry || ind.expiry > now));
+  }, [indicators, userId]);
+
+  // Priority: typing / recording > in-chat (matching ChatBox and messageStore override rules)
+  const activeIndicator = useMemo(() => {
+    if (validIndicators.length === 0) return null;
+    return (
+      validIndicators.find(i => i.content === 'typing') ||
+      validIndicators.find(i => i.content === 'recording') ||
+      validIndicators.find(i => i.content === 'in-chat') ||
+      validIndicators[0]
+    );
+  }, [validIndicators]);
+
+  // Auto-revert timer when indicator expiry elapses
+  const [, setIndicatorTick] = useState(0);
+  useEffect(() => {
+    if (!activeIndicator || !activeIndicator.expiry) return;
+    const remaining = activeIndicator.expiry - Date.now();
+    if (remaining <= 0) return;
+    const timer = setTimeout(() => {
+      setIndicatorTick(t => t + 1);
+    }, remaining + 50);
+    return () => clearTimeout(timer);
+  }, [activeIndicator]);
+
+  const isPrivate = chat.type === 'private';
+
+  const indicatorView = useMemo(() => {
+    if (!activeIndicator) return null;
+    const content = activeIndicator.content;
+
+    if (content === 'typing') {
+      const typingUsers = validIndicators.filter(i => i.content === 'typing');
+      let label = 'is typing';
+      if (isPrivate) {
+        label = 'typing';
+      } else if (typingUsers.length > 1) {
+        const names = typingUsers.map(u => u.sendername).filter(Boolean);
+        label = names.length > 2 ? 'Several people are typing' : `${names.join(', ')} are typing`;
+      } else {
+        label = `${activeIndicator.sendername || 'Someone'} is typing`;
+      }
+
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', color: 'var(--accent-text)', fontWeight: '500' }}>
+          <span>{label}</span>
+          <span className="dot-blink-1">.</span>
+          <span className="dot-blink-2">.</span>
+          <span className="dot-blink-3">.</span>
+        </span>
+      );
+    }
+
+    if (content === 'recording') {
+      const label = isPrivate
+        ? 'recording audio...'
+        : `${activeIndicator.sendername || 'Someone'} is recording audio...`;
+
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--danger-color)', fontWeight: '500' }}>
+          <span>{label}</span>
+          <span className="rec-pulse" style={{ display: 'inline-block', width: '7px', height: '7px', backgroundColor: 'var(--danger-color)', borderRadius: '50%' }} />
+        </span>
+      );
+    }
+
+    if (content === 'in-chat') {
+      const label = isPrivate
+        ? 'in chat'
+        : `${activeIndicator.sendername || 'Someone'} is in chat`;
+
+      return (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--accent-text)', fontWeight: '500' }}>
+          <span style={{ display: 'inline-block', width: '6px', height: '6px', backgroundColor: 'var(--success-color)', borderRadius: '50%', flexShrink: 0 }} />
+          <span>{label}</span>
+        </span>
+      );
+    }
+
+    return null;
+  }, [activeIndicator, validIndicators, isPrivate]);
+
   // Derive message preview text — pure computation, no side effects
   let preview = 'No messages yet';
   if (msg) {
@@ -245,7 +334,25 @@ const ChatRow = React.memo(function ChatRow({
   }, [chatCount, isActive, activeSpaceForChat]);
 
   // -------------------------------------
-  return (
+  // Indicator animations for ChatRow
+      <style>{`
+        @keyframes blink { 0% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 0; } }
+        .dot-blink-1 { animation: blink 1.4s infinite 0s; }
+        .dot-blink-2 { animation: blink 1.4s infinite 0.2s; }
+        .dot-blink-3 { animation: blink 1.4s infinite 0.4s; }
+        @keyframes pulse-red {
+          0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+          70% { transform: scale(1.15); box-shadow: 0 0 0 5px rgba(239, 68, 68, 0); }
+          100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .rec-pulse { animation: pulse-red 1s infinite; }
+        @media (prefers-reduced-motion: reduce) {
+          .dot-blink-1, .dot-blink-2, .dot-blink-3, .rec-pulse {
+            animation: none !important;
+          }
+        }
+      `}</style>
+    return (
     <div
       onClick={handleClick}
       onMouseEnter={() => setIsHovered(true)}
@@ -335,7 +442,7 @@ const ChatRow = React.memo(function ChatRow({
               whiteSpace: 'nowrap',
               opacity: 0.8,
             }}>
-              {preview}
+              {indicatorView || preview}
             </span>
           )}
 
@@ -398,7 +505,18 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
   });
   const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [lastMessages, setLastMessages] = useState({});
+  const [lastMessages, setLastMessages] = useState({});
+  const [chatIndicators, setChatIndicators] = useState(() => {
+    const myId = localStorage.getItem('userid');
+    const initial = {};
+    if (messageStore.transientIndicators) {
+      Object.keys(messageStore.transientIndicators).forEach(cid => {
+        const inds = messageStore.getIndicators(cid).filter(ind => ind && ind.userid != myId);
+        if (inds.length > 0) initial[cid] = inds;
+      });
+    }
+    return initial;
+  });
   const [count, setCount] = useState({});
   // hoveredIdx removed — hover state now lives inside ChatRow
   const [activeTab, setActiveTab] = useState('All');
@@ -725,6 +843,24 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
     const unsubscribe = messageStore.addListener((update) => {
       if (!isMounted.current) return;
 
+      // Handle transient indicator updates (typing, recording, in-chat, stop, expiry)
+      if (update && update.type === 'indicator' && update.chatid) {
+        const myId = userIdRef.current || localStorage.getItem('userid');
+        const cid = String(update.chatid);
+        const activeInds = messageStore.getIndicators(cid).filter(ind => ind && ind.userid != myId);
+        setChatIndicators(prev => {
+          if (activeInds.length === 0) {
+            if (!prev[cid] && !prev[update.chatid]) return prev;
+            const next = { ...prev };
+            delete next[cid];
+            delete next[update.chatid];
+            return next;
+          }
+          return { ...prev, [cid]: activeInds, [update.chatid]: activeInds };
+        });
+        return; // Indicator events must never corrupt persistent lastMessages
+      }
+
       if (update && (update.type === 'username_change' || update.msgtype === 'username_change' || (update.content && typeof update.content === 'string' && update.content.includes('changed display name')))) {
         handleRefreshChatNames();
       }
@@ -737,7 +873,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
         const merged = { ...prev };
 
         // 1. If update is an individual message (incoming/outgoing/reaction)
-        if (update && update.chatid && (update.content !== undefined || update.type)) {
+        if (update && update.chatid && update.type !== 'indicator' && (update.content !== undefined || update.type)) {
           const incomingTs = resolveTimestamp(update);
           const currentTs = merged[update.chatid] ? resolveTimestamp(merged[update.chatid]) : 0;
           if (incomingTs >= currentTs) {
@@ -1585,11 +1721,11 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
             }
           }
         } catch (e) {}
-        alert("Failed to create space");
+        toast.error("Failed to create space");
       }
     } catch (err) {
       console.error(err);
-      alert("Network error");
+      toast.error("Network error");
     } finally {
       isCreatingSpaceRef.current = false;
       setIsAddingSpace(false);
@@ -1616,7 +1752,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
       width: '100%',
       padding: isDesktop ? "0" : "8px 0",
       paddingTop: isDesktop ? "0" : "26px",
-      paddingBottom: isDesktop ? "0" : "80px",
+      paddingBottom: isDesktop ? "0" : "calc(80px + env(safe-area-inset-bottom, 0px))",
       minHeight: isDesktop ? "100%" : "100vh",
       height: isDesktop ? "100%" : "auto",
       fontFamily: "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
@@ -1940,14 +2076,15 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                       onAvatarClick={() => { }}
                       formatTime={formatChatTime}
                       hideAvatar={true}
-                    />
+                    indicators={space.id === 0 ? (chatIndicators[selectedChatForSpaces.chatId] || chatIndicators[String(selectedChatForSpaces.chatId)]) : null}
+                      />
                   </div>
                   {space.id !== 0 && selectedChatForSpaces.type !== 'classroom' && (
                     <button
                       onClick={async (e) => {
                         e.stopPropagation();
                         const currentName = space.name;
-                        const newName = prompt("Enter new name for this space:", currentName);
+                        const newName = await prompt({ title: "Rename Space", message: "Enter new name for this space:", defaultValue: currentName });
                         if (newName && newName.trim() && newName !== currentName) {
                           await spaceStore.setSpaceName(selectedChatForSpaces.chatId, space.id, newName.trim());
                         }
@@ -2257,10 +2394,10 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
         ) : isLoading && sortedAndFilteredChats.length === 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '4px' }}>
             <style>{`
-              @keyframes chatSkeletonPulse {
-                0% { opacity: 0.3; }
-                50% { opacity: 0.8; }
-                100% { opacity: 0.3; }
+              @keyframes chatSkeletonPulse {
+                0% { opacity: 0.3; }
+                50% { opacity: 0.8; }
+                100% { opacity: 0.3; }
               }
             `}</style>
             {[1, 2, 3, 4, 5, 6].map(i => (
@@ -2339,7 +2476,8 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                   onAvatarClick={handleAvatarClick}
                   formatTime={formatChatTime}
                   hideMessage={false}
-                />
+                indicators={chatIndicators[chat.chatId] || chatIndicators[String(chat.chatId)]}
+                  />
               );
             })}
             

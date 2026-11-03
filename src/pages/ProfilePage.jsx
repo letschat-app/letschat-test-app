@@ -1,3 +1,4 @@
+import useIsDesktop from '../hooks/useIsDesktop';
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getsocket, toggleSleepMode } from '../service/Websocket';
@@ -9,6 +10,7 @@ import {
   changePasswordSendOtp,
   removeFCMToken
 } from '../service/UserAuth';
+import { cleanupFCMOnLogout } from '../hooks/useNotifications';
 import { savePendingOtpSession } from '../service/otpSessionManager';
 import { uploadMedia, STAGE_LABELS } from '../service/MediaUploader';
 import { getMediaInfo, getMediaBlob } from '../service/MediaCache';
@@ -27,7 +29,7 @@ import {
 import Avatar from '../components/chat/Avatar';
 import StreakBadge from '../components/pulse/StreakBadge';
 import { useNotifications } from '../hooks/useNotifications';
-import { getGroupMembersFromDB, syncChatsMapToDB } from '../service/db';
+import { getGroupMembersFromDB, syncChatsMapToDB, getUserFromDB, saveUserToDB } from '../service/db';
 import { getchat } from './ChatNames';
 import { useUsernameCheck } from '../hooks/useUsernameCheck';
 import { UsernameStatusIndicator } from '../components/common/UsernameStatusIndicator';
@@ -74,7 +76,7 @@ const ProfilePage = () => {
   const navigate = useNavigate();
   const { targetUserId } = useParams();
   const userId = localStorage.getItem('userid');
-  const isDesktop = useMediaQuery('(min-width: 768px)');
+  const isDesktop = useIsDesktop();
 
   const isTargetUser = Boolean(targetUserId && String(targetUserId) !== String(userId));
   const [targetUserData, setTargetUserData] = useState(null);
@@ -185,18 +187,29 @@ const ProfilePage = () => {
 
   // Fetch Other User or Own Profile Data
   useEffect(() => {
-    if (isTargetUser) {
+    if (isTargetUser && targetUserId) {
+      // 1. SWR Immediate Cache Hydration
+      getUserFromDB(targetUserId).then((cached) => {
+        if (cached) {
+          setTargetUserData(cached);
+        }
+      }).catch(console.error);
+
+      // 2. Background Network Revalidation
       const fetchTargetInfo = async () => {
         try {
           const res = await fetch(`${API}/user/search/${targetUserId}`);
           if (res.ok) {
             const data = await res.json();
             setTargetUserData(data);
+            if (data && data.userId) {
+              saveUserToDB(data).catch(console.error);
+            }
           } else {
-            setTargetUserData({ userId: targetUserId, userName: targetUserId });
+            setTargetUserData((prev) => prev || { userId: targetUserId, userName: targetUserId });
           }
         } catch (e) {
-          setTargetUserData({ userId: targetUserId, userName: targetUserId });
+          setTargetUserData((prev) => prev || { userId: targetUserId, userName: targetUserId });
         }
       };
       fetchTargetInfo();
@@ -664,13 +677,10 @@ const ProfilePage = () => {
       if (socket) socket.close();
     } catch (e) {}
 
-    const deviceId = localStorage.getItem('deviceId');
-    if (deviceId) {
-      try {
-        await removeFCMToken(deviceId);
-      } catch (err) {
-        console.error('Failed to remove FCM token on logout:', err);
-      }
+    try {
+      await cleanupFCMOnLogout();
+    } catch (err) {
+      console.warn('Logout FCM cleanup failed:', err);
     }
 
     localStorage.clear();

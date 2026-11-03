@@ -49,11 +49,12 @@ export const PWAProvider = ({ children }) => {
     // ── Generate System Push Notification for Update ───────────────────────────
     if ('Notification' in window && Notification.permission === 'granted') {
       try {
-        const iconUrl = `${import.meta.env.BASE_URL}icon.png`.replace(/\/+/g, '/');
+        const iconUrl = `${import.meta.env.BASE_URL}icon-notify.png`.replace(/\/+/g, '/');
+        const badgeUrl = `${import.meta.env.BASE_URL}badge-96.png`.replace(/\/+/g, '/');
         registration.showNotification('New version of LetsChat available', {
           body: 'A new version of LetsChat is available. Tap to update.',
           icon: iconUrl,
-          badge: iconUrl,
+          badge: badgeUrl,
           tag: 'app-update-available',
           renotify: true,
           requireInteraction: true,
@@ -135,6 +136,17 @@ export const PWAProvider = ({ children }) => {
       try {
         // Register the worker (Compiled by VitePWA)
         const swPath = `${import.meta.env.BASE_URL}service-worker.js`.replace(/\/+/g, '/');
+        // Clean up any stale legacy registration of firebase-messaging-sw.js (Item D3)
+        try {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          for (const r of regs) {
+            if (r.active?.scriptURL?.includes('firebase-messaging-sw.js')) {
+              console.log('[PWA] Unregistering old duplicate firebase-messaging-sw.js:', r.scope);
+              await r.unregister();
+            }
+          }
+        } catch (e) {}
+
         registration = await navigator.serviceWorker.register(swPath, { scope: import.meta.env.BASE_URL });
         console.log('[PWA] Service Worker registered via Workbox:', registration.scope);
 

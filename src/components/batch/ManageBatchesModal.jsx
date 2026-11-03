@@ -1,3 +1,4 @@
+import useBackClose from '../../hooks/useBackClose';
 import React, { useState } from 'react';
 import { X, Layers, Plus, Edit2, Trash2, ChevronDown, ChevronUp, Users } from 'lucide-react';
 import Avatar from '../chat/Avatar';
@@ -13,6 +14,7 @@ export default function ManageBatchesModal({
   onDeleteBatch,
   onCreateBatch
 }) {
+  useBackClose(isOpen, onClose);
   const [expandedBatchId, setExpandedBatchId] = useState(null);
 
   if (!isOpen) return null;

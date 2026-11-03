@@ -1,3 +1,5 @@
+import { useToast } from '../components/common/ToastProvider';
+import useBackClose from '../hooks/useBackClose';
 import { Eye, Paperclip, Upload, X, FileText, Calendar, Award, Clock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { API } from '../service/UserAuth';
 import { uploadMedia, STAGE_LABELS } from '../service/MediaUploader';
@@ -8,6 +10,8 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
   const [assignment, setAssignment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  useBackClose(showModal, () => setShowModal(false));
+  const toast = useToast();
   const [submissions, setSubmissions] = useState([]);
   const [submissionText, setSubmissionText] = useState('');
   const [uploadedFiles, setUploadedFiles] = useState([]);
@@ -208,7 +212,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
     const files = Array.from(e.target.files);
     const oversized = files.filter(f => f.size > 50 * 1024 * 1024);
     if (oversized.length > 0) {
-      alert(`Some files exceed the 50MB limit: ${oversized.map(f => f.name).join(', ')}`);
+      toast.error(`Some files exceed the 50MB limit: ${oversized.map(f => f.name).join(', ')}`);
       e.target.value = '';
       return;
     }
@@ -222,7 +226,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
 
   const handleSubmit = async () => {
     if (!submissionText.trim() && uploadedFiles.length === 0) {
-      alert('Please add some text or upload a file');
+      toast.error('Please add some text or upload a file');
       return;
     }
 
@@ -246,7 +250,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
           setUploadStates(prev => ({ ...prev, [fileId]: { ...prev[fileId], stage: 'done' } }));
         } catch (err) {
           console.error(`Failed to upload ${file.name}:`, err);
-          alert(`Failed to upload ${file.name}: ${err.message}`);
+          toast.error(`Failed to upload ${file.name}: ${err.message}`);
           setSubmitting(false);
           return;
         }
@@ -276,7 +280,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
       );
 
       if (response.ok) {
-        alert('Assignment submitted successfully!');
+        toast.success('Assignment submitted successfully!');
         setShowSubmissionForm(false);
         setSubmissionText('');
         setUploadedFiles([]);
@@ -284,11 +288,11 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
         if (onClose) onClose();
         else setShowModal(false);
       } else {
-        alert('Failed to submit assignment');
+        toast.error('Failed to submit assignment');
       }
     } catch (err) {
       console.error('Error submitting assignment:', err);
-      alert('Error submitting assignment');
+      toast.error('Error submitting assignment');
     } finally {
       setSubmitting(false);
     }
@@ -746,7 +750,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                 <button
                   onClick={() => {
                     if (isDeadlinePassed()) {
-                      alert('Deadline has passed. Submission is not allowed.');
+                      toast.error('Deadline has passed. Submission is not allowed.');
                       return;
                     }
                     setShowSubmissionForm(true);

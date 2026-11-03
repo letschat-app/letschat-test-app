@@ -1,3 +1,5 @@
+import { useToast } from '../common/ToastProvider';
+import useBackClose from '../../hooks/useBackClose';
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Clock, CalendarDays, Send, Image as ImageIcon, Trash2, Mic, Bird } from 'lucide-react';
 import MediaUploadButton from '../MediaUploadButton';
@@ -5,6 +7,8 @@ import EmojiPicker from 'emoji-picker-react';
 import { uploadMedia } from '../../service/MediaUploader';
 
 const ScheduleMessageModal = ({ isOpen, onClose, onSubmit, initialData }) => {
+  useBackClose(isOpen, onClose);
+  const toast = useToast();
   const [message, setMessage] = useState('');
   const [mediaData, setMediaData] = useState(null);
   const [timeMode, setTimeMode] = useState('datetime');
@@ -128,7 +132,7 @@ const ScheduleMessageModal = ({ isOpen, onClose, onSubmit, initialData }) => {
       }, 1000);
     } catch (err) {
       console.error("Microphone access denied or error:", err);
-      alert("Microphone access is required to record voice notes.");
+      toast.error("Microphone access is required to record voice notes.");
     }
   };
 
@@ -154,7 +158,7 @@ const ScheduleMessageModal = ({ isOpen, onClose, onSubmit, initialData }) => {
              });
           } catch(e) {
              console.error("Audio upload failed", e);
-             alert("Failed to upload audio.");
+             toast.error("Failed to upload audio.");
           } finally {
              setIsUploadingMedia(false);
           }

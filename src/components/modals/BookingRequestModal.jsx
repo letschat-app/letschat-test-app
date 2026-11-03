@@ -1,9 +1,14 @@
+import { useToast } from '../common/ToastProvider';
+import useBackClose from '../../hooks/useBackClose';
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Video, MapPin, User, Mail, Check, X, AlertCircle } from 'lucide-react';
 import { API } from '../../service/UserAuth';
 
 const BookingRequestModal = () => {
+  const toast = useToast();
   const [currentRequest, setCurrentRequest] = useState(null);
+  useBackClose(Boolean(currentRequest), () => setCurrentRequest(null));
+
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState(null);
 
@@ -61,11 +66,11 @@ const BookingRequestModal = () => {
           }
         }, 1500);
       } else {
-        alert(data.message || 'Action failed');
+        toast.error(data.message || 'Action failed');
       }
     } catch (err) {
       console.error('Error handling booking request:', err);
-      alert('Network error while processing request');
+      toast.error('Network error while processing request');
     } finally {
       setLoading(false);
     }

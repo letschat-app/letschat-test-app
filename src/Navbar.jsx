@@ -1,8 +1,11 @@
+import useIsDesktop from './hooks/useIsDesktop';
+import useBackClose from './hooks/useBackClose';
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getsocket } from './service/Websocket';
 import { getchat } from './pages/ChatNames';
 import { API, removeFCMToken } from './service/UserAuth';
+import { cleanupFCMOnLogout } from './hooks/useNotifications';
 import { useTheme } from './context/ThemeContext';
 import Avatar from './components/chat/Avatar';
 import { syncChatsMapToDB, saveUserIdToDB } from './service/db';
@@ -14,6 +17,8 @@ function Navbar() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeSection, setActiveSection] = useState(null);
+  useBackClose(Boolean(activeSection), () => setActiveSection(null));
+  useBackClose(isSidebarOpen, () => setIsSidebarOpen(false));
   const [groupName, setGroupName] = useState('');
   const [groupMotto, setGroupMotto] = useState('');
   const [roomname, setRoomname] = useState('');
@@ -28,7 +33,8 @@ function Navbar() {
 
   const { theme, setTheme, availableThemes } = useTheme();
   const userId = localStorage.getItem('userid');
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const isDesktop = useIsDesktop();
+  const isMobile = !isDesktop;
   const myDisplayName = localStorage.getItem('username') || localStorage.getItem('userid');
   const navigate = useNavigate();
   const location = useLocation();
@@ -115,11 +121,7 @@ function Navbar() {
     console.log("[LetsChat] App Version 2.0.6 Initialized");
   }, [userId]);
 
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  
 
   // Always reset bottom nav to visible on page navigation
   useEffect(() => {
@@ -236,13 +238,10 @@ function Navbar() {
     let socket = getsocket();
     socket.close();
 
-    const deviceId = localStorage.getItem('deviceId');
-    if (deviceId) {
-      try {
-        await removeFCMToken(deviceId);
-      } catch (err) {
-        console.error('Failed to remove FCM token on logout:', err);
-      }
+    try {
+      await cleanupFCMOnLogout();
+    } catch (err) {
+      console.warn('Logout FCM cleanup failed:', err);
     }
 
     localStorage.clear();
@@ -957,7 +956,10 @@ const mobileBottomNavStyle = (visible) => ({
   display: 'flex',
   justifyContent: 'space-around',
   alignItems: 'center',
-  padding: '6px 0',
+  paddingTop: '6px',
+  paddingBottom: 'calc(6px + env(safe-area-inset-bottom, 0px))',
+  paddingLeft: 'env(safe-area-inset-left, 0px)',
+  paddingRight: 'env(safe-area-inset-right, 0px)',
   zIndex: 99,
   boxSizing: 'border-box',
   backdropFilter: 'blur(12px)',
@@ -1029,6 +1031,8 @@ const menuButtonStyle = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
+  minWidth: '44px',
+  minHeight: '44px',
   padding: '8px',
   background: 'var(--bg-card-hover)',
   color: 'var(--text-primary)',

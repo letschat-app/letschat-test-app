@@ -1,3 +1,4 @@
+import useBackClose from '../../hooks/useBackClose';
 import React, { useState, useMemo } from 'react';
 import { X, Search, Trash2, Users } from 'lucide-react';
 import Avatar from '../chat/Avatar';
@@ -12,6 +13,7 @@ export default function SelectedRecipientsModal({
   onDeselect,
   onClearAll
 }) {
+  useBackClose(isOpen, onClose);
   const [searchQuery, setSearchQuery] = useState('');
 
   const resolveChat = (chatId) => {
