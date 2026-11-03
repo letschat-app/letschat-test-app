@@ -98,23 +98,61 @@ export const getVideoThumbnail = (file) =>
     resolve = (blob) => metaPromise.then(duration => originalResolve({ blob, duration }));
   });
 
-/** Render page 1 of a PDF to a high-resolution WebP Blob using pdf.js. */
-export const getPdfThumbnail = async (file) => {
-  try {
-    if (!window.pdfjsLib) {
+let pdfjsLibPromise = null;
+
+const loadPdfJs = async () => {
+  if (window.pdfjsLib) return window.pdfjsLib;
+  if (pdfjsLibPromise) return pdfjsLibPromise;
+
+  pdfjsLibPromise = (async () => {
+    // 1. Try dynamic import of ESM build (works in modern browsers & Vite)
+    try {
+      const mod = await import(/* @vite-ignore */ 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.mjs');
+      const lib = mod?.getDocument ? mod : mod?.default;
+      if (lib?.getDocument) {
+        lib.GlobalWorkerOptions.workerSrc =
+          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.mjs';
+        window.pdfjsLib = lib;
+        return lib;
+      }
+    } catch (e) {
+      console.warn('[loadPdfJs] ESM dynamic import failed, trying fallback:', e);
+    }
+
+    // 2. Try classic UMD script tag fallback (which assigns to window.pdfjsLib)
+    try {
       await new Promise((resolve, reject) => {
         const s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.min.mjs';
-        s.type = 'module';
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
         s.onload = resolve;
         s.onerror = reject;
         document.head.appendChild(s);
-      }).catch(() => null);
-      await new Promise(r => setTimeout(r, 300));
-      if (!window.pdfjsLib) return null;
+      });
+      const lib = window.pdfjsLib || window['pdfjs-dist/build/pdf'];
+      if (lib) {
+        lib.GlobalWorkerOptions.workerSrc =
+          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        window.pdfjsLib = lib;
+        return lib;
+      }
+    } catch (e) {
+      console.warn('[loadPdfJs] UMD script fallback failed:', e);
     }
-    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.2.67/pdf.worker.min.mjs';
+
+    return null;
+  })();
+
+  return pdfjsLibPromise;
+};
+
+/** Render page 1 of a PDF to a high-resolution WebP Blob using pdf.js. */
+export const getPdfThumbnail = async (file) => {
+  try {
+    const pdfjs = await loadPdfJs();
+    if (!pdfjs) {
+      console.warn('[getPdfThumbnail] pdfjs library not available');
+      return { blob: null, noOfPages: 0 };
+    }
 
     let arrayBuffer;
     if (typeof file === 'string') {
@@ -129,7 +167,9 @@ export const getPdfThumbnail = async (file) => {
       return { blob: null, noOfPages: 0 };
     }
 
-    const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
+    const pdf = await loadingTask.promise;
+    const numPages = pdf.numPages || 1;
     const page = await pdf.getPage(1);
     const unscaledViewport = page.getViewport({ scale: 1.0 });
     // Crisp preview: scale up to sharp resolution (target ~1000px width or scale 1.5 - 2.5)
@@ -141,7 +181,7 @@ export const getPdfThumbnail = async (file) => {
     canvas.height = viewport.height;
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
     const blob = await new Promise(resolve => canvas.toBlob(blob => resolve(blob ?? null), 'image/webp', 0.8));
-    return { blob, noOfPages: pdf.numPages };
+    return { blob, noOfPages: numPages };
   } catch (err) {
     console.warn('[getPdfThumbnail] Error generating PDF thumbnail:', err);
     return { blob: null, noOfPages: 0 };
@@ -168,22 +208,25 @@ export const uploadMedia = async (file, onProgress = () => { }, signal) => {
   const category = getFileCategory(originalMime, file.name);
   const userId = localStorage.getItem('userid');
 
-  onProgress({ stage: 'preparing_metadata', progress: 2 });
-  const [fileHash, fileDuration] = await Promise.all([
-    calculateFileHash(file),
-    (category === 'audio') ? getAudioDuration(file) : Promise.resolve(0)
-  ]);
-
   let mainBlob = file;
   let mainMime = originalMime;
 
+  // Universal Image Compression entry point: every image is compressed to WebP before upload
   if (category === 'image') {
     onProgress({ stage: 'compressing_image', progress: 10 });
     try {
       mainBlob = await compressImageBlob(file, 1920, 1080, 0.75);
       mainMime = 'image/webp';
-    } catch { /* skip */ }
+    } catch (err) {
+      console.warn('[MediaUploader] Image compression failed, using original file:', err);
+    }
   }
+
+  onProgress({ stage: 'preparing_metadata', progress: 12 });
+  const [fileHash, fileDuration] = await Promise.all([
+    calculateFileHash(mainBlob),
+    (category === 'audio') ? getAudioDuration(file) : Promise.resolve(0)
+  ]);
 
   onProgress({ stage: 'requesting_urls', progress: 15 });
   const urlRes = await fetch(`${API}/files/put-url`, {
@@ -213,20 +256,26 @@ export const uploadMedia = async (file, onProgress = () => { }, signal) => {
 
   if (category === 'image') {
     onProgress({ stage: 'creating_thumbnail', progress: 25 });
-    try { thumbBlob = await compressImageBlob(file, 320, 320, 0.3); } catch { }
+    try { 
+      thumbBlob = await compressImageBlob(file, 320, 320, 0.3); 
+    } catch { }
+    // Fallback: if creating small thumbnail fails, use mainBlob so thumbnail is never null
+    if (!thumbBlob && mainBlob) {
+      thumbBlob = mainBlob;
+    }
   } else if (category === 'video') {
     onProgress({ stage: 'extracting_frame', progress: 25 });
     try {
       const videoResult = await getVideoThumbnail(file);
-      thumbBlob = videoResult.blob;
-      finalDuration = videoResult.duration;
+      thumbBlob = videoResult?.blob || null;
+      finalDuration = videoResult?.duration || fileDuration;
     } catch { }
   } else if (category === 'pdf') {
     onProgress({ stage: 'rendering_pdf', progress: 25 });
     try {
       const pdfResult = await getPdfThumbnail(file);
-      thumbBlob = pdfResult.blob;
-      noOfPages = pdfResult.noOfPages;
+      thumbBlob = pdfResult?.blob || null;
+      noOfPages = pdfResult?.noOfPages || 0;
     } catch { }
   }
   onProgress({ stage: 'uploading_main', progress: 45 });
@@ -235,8 +284,13 @@ export const uploadMedia = async (file, onProgress = () => { }, signal) => {
   let resolvedThumbKey = null;
   if (supportsThumbnail && thumbBlob && thumbPutUrl) {
     onProgress({ stage: 'uploading_thumbnail', progress: 85 });
-    await putToUrl(thumbPutUrl, thumbBlob, thumbMime, signal);
-    resolvedThumbKey = thumbKey;
+    try {
+      await putToUrl(thumbPutUrl, thumbBlob, thumbMime, signal);
+      resolvedThumbKey = thumbKey;
+    } catch (err) {
+      console.warn('[MediaUploader] Failed to upload thumbnail to R2:', err);
+      resolvedThumbKey = null;
+    }
   }
 
   onProgress({ stage: 'registering', progress: 95 });

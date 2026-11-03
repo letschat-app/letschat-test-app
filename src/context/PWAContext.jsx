@@ -131,6 +131,8 @@ export const PWAProvider = ({ children }) => {
     if (!('serviceWorker' in navigator)) return;
 
     let registration = null;
+    let visibilityHandler = null;
+    let updateIntervalId = null;
 
     const setup = async () => {
       try {
@@ -149,6 +151,21 @@ export const PWAProvider = ({ children }) => {
 
         registration = await navigator.serviceWorker.register(swPath, { scope: import.meta.env.BASE_URL });
         console.log('[PWA] Service Worker registered via Workbox:', registration.scope);
+
+        // ── Register Periodic Background Sync if supported ──
+        if ('periodicSync' in registration) {
+          try {
+            const status = await navigator.permissions.query({ name: 'periodic-background-sync' });
+            if (status.state === 'granted') {
+              await registration.periodicSync.register('check-update', {
+                minInterval: 60 * 60 * 1000 // 1 hour
+              });
+              console.log('[PWA] Periodic background sync registered for check-update');
+            }
+          } catch {
+            // Periodic sync not permitted or supported
+          }
+        }
 
         // ── Guard: Check if an update is ALREADY waiting (handles page refresh) ──
         if (registration.waiting) {
@@ -177,17 +194,21 @@ export const PWAProvider = ({ children }) => {
         };
 
         // ── Check for updates on regain focus (background tab scenario) ──
-        const handleVisibilityChange = () => {
+        visibilityHandler = () => {
           if (document.visibilityState === 'visible') {
             registration.update().catch(err =>
               console.warn('[PWA] Background update check failed:', err)
             );
           }
         };
-        document.addEventListener('visibilitychange', handleVisibilityChange);
+        document.addEventListener('visibilitychange', visibilityHandler);
 
-        // Cleanup visibility listener
-        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+        // ── Periodic update check in foreground ──
+        updateIntervalId = setInterval(() => {
+          registration.update().catch(err =>
+            console.warn('[PWA] Foreground update check failed:', err)
+          );
+        }, 60 * 60 * 1000);
 
       } catch (err) {
         console.error('[PWA] Service Worker registration failed:', err);
@@ -214,6 +235,8 @@ export const PWAProvider = ({ children }) => {
     return () => {
       navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
       navigator.serviceWorker.removeEventListener('message', handleSWMessage);
+      if (visibilityHandler) document.removeEventListener('visibilitychange', visibilityHandler);
+      if (updateIntervalId) clearInterval(updateIntervalId);
       clearTimeout(stuckTimerRef.current);
     };
   }, []);

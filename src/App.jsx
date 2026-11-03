@@ -47,7 +47,6 @@ const lazyWithSplash = (importFunc) => {
 const Search = lazyWithSplash(() => import("./pages/Search"));
 const Rooms = lazyWithSplash(() => import("./pages/Rooms"));
 const ChatNames = lazyWithSplash(() => import("./pages/ChatNames"));
-const Profileupdate = lazyWithSplash(() => import("./pages/Profileupdate"));
 const ProfilePage = lazyWithSplash(() => import("./pages/ProfilePage"));
 const ChatBox = lazyWithSplash(() => import("./pages/ChatBox"));
 const Communities = lazyWithSplash(() => import("./pages/Communities"));
@@ -251,7 +250,7 @@ function App() {
               <Route path="/rooms" element={<Rooms />} />
               <Route path="/calendar" element={<SmoothCalendar/>}/>
               <Route path="/profile/:targetUserId?" element={<ProfilePage/>}/>
-              <Route path="/profileupdate" element={<Profileupdate/>}/>
+              <Route path="/profileupdate" element={<Navigate to="/profile" replace />} />
               <Route path="/starred" element={<StarredMessages />} />
               <Route path="/labs" element={<LabsPage />} />
               <Route path="/batch-message" element={<BatchMessagingPage />} />

@@ -58,9 +58,40 @@ const API = "https://letschat-5dxg.onrender.com/api";
 const DB_VERSION = 16;
 const APP_VERSION = '2.1.1';
 
+const showUpdateNotification = async () => {
+  try {
+    console.log('[SW] Showing background update notification');
+    await self.registration.showNotification('New version of LetsChat available', {
+      body: 'A new version of LetsChat is available. Tap to update.',
+      icon: NOTIFICATION_ICON,
+      badge: NOTIFICATION_BADGE,
+      tag: 'app-update-available',
+      renotify: true,
+      requireInteraction: true,
+      data: { type: 'APP_UPDATE' }
+    });
+  } catch (err) {
+    console.warn('[SW] Failed to show update notification in SW:', err);
+  }
+};
+
 // ─── Service Worker Lifecycle & User-Controlled Activation ───────────────────
 self.addEventListener('install', (event) => {
   console.log('[SW] New Service Worker installing...');
+  // If an active service worker already exists, this is an UPDATE (not a fresh install)
+  const isUpdate = Boolean(self.registration && self.registration.active);
+  if (isUpdate) {
+    console.log('[SW] Update detected during install event (active worker exists)');
+    event.waitUntil(showUpdateNotification());
+  }
+});
+
+// Periodic background sync event for update checks
+self.addEventListener('periodicsync', (event) => {
+  if (event.tag === 'check-update') {
+    console.log('[SW] Periodic sync check-update triggered');
+    event.waitUntil(self.registration.update().catch(() => {}));
+  }
 });
 
 self.addEventListener('message', (event) => {
@@ -143,6 +174,9 @@ self.addEventListener('fetch', (event) => {
 // ─── FCM: Background Message Handler ─────────────────────────────────────────
 onBackgroundMessage(messaging, async (payload) => {
   console.log('[SW] FCM background message received:', payload);
+  try {
+    self.registration.update().catch(() => {});
+  } catch (e) {}
 
   const data = payload.data || {};
 

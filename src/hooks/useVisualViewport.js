@@ -7,6 +7,11 @@ import { useEffect, useState } from 'react';
 export function useVisualViewport() {
   const [isInputFocused, setIsInputFocused] = useState(false);
 
+  const isIOS = typeof navigator !== 'undefined' && (
+    /iPad|iPhone|iPod/.test(navigator.userAgent || '') ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  );
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -50,7 +55,7 @@ export function useVisualViewport() {
     };
   }, []);
 
-  return { isInputFocused };
+  return { isInputFocused, isIOS };
 }
 
 export default useVisualViewport;

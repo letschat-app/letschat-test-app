@@ -79,7 +79,15 @@ const ResultList = ({
                 onClick={() => onSelectUser(user)}
                 className={`search-result-item ${isHighlighted ? 'active' : ''}`}
               >
-                <Avatar chat={user} size={38} />
+                <Avatar
+                  chat={{
+                    ...user,
+                    profile: user.profile || user.Profile || user.profilePic || user.userProfilePath || user.user_profile,
+                    userName: user.userName || user.publicName || user.name || user.userId,
+                    id: user.userId || user.id
+                  }}
+                  size={38}
+                />
                 <div className="search-result-info">
                   <div className="search-result-name-row">
                     <span className="search-result-name">

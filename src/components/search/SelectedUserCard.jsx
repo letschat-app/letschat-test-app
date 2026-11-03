@@ -85,7 +85,15 @@ const SelectedUserCard = ({ user, onClose, commonGroupsText, commonGroupsList, s
 
       <div className="search-selected-card-body">
         <div className="search-selected-user-info">
-          <Avatar chat={user} size={48} />
+          <Avatar
+            chat={{
+              ...user,
+              profile: user.profile || user.Profile || user.profilePic || user.userProfilePath || user.user_profile,
+              userName: user.userName || user.publicName || user.name || user.userId,
+              id: user.userId || user.id
+            }}
+            size={48}
+          />
           <div className="search-selected-details">
             <div className="search-selected-name-row">
               <span className="search-selected-name">{user.userName || user.publicName || user.name || user.userId}</span>

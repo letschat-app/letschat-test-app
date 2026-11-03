@@ -870,6 +870,7 @@ const lastChatSyncTimes = {};
 const ChatBox = () => {
 
   const { chatid } = useParams();
+  const { isInputFocused, isIOS } = useVisualViewport();
 
   useEffect(() => {
     if (chatid) {

@@ -13,6 +13,7 @@ import userDiscoveryStore from '../../service/UserDiscoveryStore';
 const UserCard = memo(({ user, commonGroupsText, onCardClick }) => {
   const streak = user.pulseStreak || user.streak || 0;
   const displayName = user.userName || user.publicName || user.name || user.userId;
+  const profileVal = user.profile || user.Profile || user.profilePic || user.userProfilePath || user.user_profile;
 
   const handleClick = () => {
     onCardClick(user.userId);
@@ -25,7 +26,15 @@ const UserCard = memo(({ user, commonGroupsText, onCardClick }) => {
       aria-label={`Open profile of ${displayName}`}
       className="community-user-card"
     >
-      <Avatar chat={user} size={48} />
+      <Avatar
+        chat={{
+          ...user,
+          profile: profileVal,
+          userName: displayName,
+          id: user.userId || user.id
+        }}
+        size={48}
+      />
       <div className="community-card-name-row">
         <span className="community-card-name">{displayName}</span>
         {streak > 0 && <StreakBadge streak={streak} size="sm" />}

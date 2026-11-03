@@ -63,9 +63,16 @@ export const getMediaInfo = async (mediaId) => {
     // 1. Check Cache
     const cached = await db.get('mediaInfo', mediaId);
     if (cached) {
+      const data = { ...(cached.data || {}) };
+      if (typeof data.thumbnailKey === 'string' && (data.thumbnailKey.endsWith('/null') || data.thumbnailKey.endsWith('=null') || data.thumbnailKey === 'null')) {
+        data.thumbnailKey = null;
+      }
+      if (typeof data.fileKey === 'string' && (data.fileKey.endsWith('/null') || data.fileKey.endsWith('=null') || data.fileKey === 'null')) {
+        data.fileKey = null;
+      }
       // Update lastUsed in background
-      db.put('mediaInfo', { ...cached, lastUsed: Date.now() });
-      return cached.data;
+      db.put('mediaInfo', { ...cached, data, lastUsed: Date.now() });
+      return data;
     }
     
     // 2. Fetch from Network
@@ -78,6 +85,14 @@ export const getMediaInfo = async (mediaId) => {
       });
       if (!response.ok) throw new Error('Failed to fetch media info');
       const data = await response.json();
+      if (data) {
+        if (typeof data.thumbnailKey === 'string' && (data.thumbnailKey.endsWith('/null') || data.thumbnailKey.endsWith('=null') || data.thumbnailKey === 'null')) {
+          data.thumbnailKey = null;
+        }
+        if (typeof data.fileKey === 'string' && (data.fileKey.endsWith('/null') || data.fileKey.endsWith('=null') || data.fileKey === 'null')) {
+          data.fileKey = null;
+        }
+      }
       
       // 3. Save to Cache
       await db.put('mediaInfo', {
@@ -136,12 +151,24 @@ export const getMediaBlob = async (cacheKey, fetchUrl, storeName) => {
         }
         return blobUrl;
       }
+
+      // Fast check: If requesting thumb, see if full image is already cached in mainCache
+      if (storeName === 'thumbCache') {
+        const fullKey = cacheKey.replace('_thumb', '_full');
+        const fullCached = await db.get('mainCache', fullKey);
+        if (fullCached) {
+          console.log(`[MediaCache] HIT (mainCache reuse for thumb): ${fullKey}`);
+          const blobUrl = URL.createObjectURL(fullCached.blob);
+          saveToMemory(cacheKey, blobUrl);
+          return blobUrl;
+        }
+      }
     } catch (err) {
       console.warn(`[MediaCache] IDB lookup error for ${cacheKey}:`, err);
     }
     
     // 3. Fetch from Network
-    if (!fetchUrl) return null;
+    if (!fetchUrl || (typeof fetchUrl === 'string' && (fetchUrl.endsWith('/null') || fetchUrl.endsWith('=null')))) return null;
     console.log(`[MediaCache] MISS: ${storeName}/${cacheKey}. Fetching...`);
 
     try {
@@ -158,8 +185,11 @@ export const getMediaBlob = async (cacheKey, fetchUrl, storeName) => {
       }
       return blobUrl;
     } catch (err) {
-      console.warn('[MediaCache] Network fetch failed, falling back to URL:', err);
-      return fetchUrl; // Return original URL as fallback
+      console.warn('[MediaCache] Network fetch failed:', err);
+      if (fetchUrl && typeof fetchUrl === 'string' && !fetchUrl.endsWith('/null') && !fetchUrl.endsWith('=null') && !fetchUrl.includes('/null?')) {
+        return fetchUrl; // Return original URL as fallback only if not null
+      }
+      return null;
     }
   })().finally(() => {
     inFlightBlobPromises.delete(inFlightKey);
