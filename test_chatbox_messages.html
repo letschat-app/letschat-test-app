@@ -1,0 +1,1641 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>LetsChat - Chat Message UI Redesign Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* ==========================================================================
+       1. Theme Tokens (Mirrors src/index.css)
+       ========================================================================== */
+    :root {
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.5;
+      font-weight: 400;
+      color-scheme: dark;
+
+      /* Default theme variables (Midnight Blue) */
+      --bg-primary: #0b0f19;
+      --bg-secondary: #111827;
+      --bg-gradient: linear-gradient(165deg, #111827 0%, #0b0f19 100%);
+      --bg-card: #1f2937;
+      --bg-card-hover: rgba(55, 65, 81, 0.8);
+      --bg-hover: rgba(255, 255, 255, 0.06);
+      --border-color: rgba(255, 255, 255, 0.1);
+      --border-focus: rgba(99, 102, 241, 0.5);
+      
+      --accent-color: #6366f1;
+      --accent-color-hover: #4f46e5;
+      --accent-gradient: linear-gradient(135deg, #5b5fee 0%, #4f46e5 100%);
+      --accent-solid: #5b5fee;
+      --accent-text: #8b8ff8;
+      
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #8a909b;
+      --text-on-accent: #ffffff;
+      
+      --danger-color: #f43f5e;
+      --success-color: #10b981;
+      --warning-color: #f59e0b;
+      --status-eye-stroke: rgba(255, 255, 255, 0.9);
+      
+      color: var(--text-primary);
+      background-color: var(--bg-primary);
+    }
+
+    [data-theme="blue"] {
+      color-scheme: dark;
+      --bg-primary: #0b0f19;
+      --bg-secondary: #111827;
+      --bg-gradient: linear-gradient(165deg, #111827 0%, #0b0f19 100%);
+      --bg-card: #1f2937;
+      --bg-card-hover: rgba(55, 65, 81, 0.8);
+      --bg-hover: rgba(255, 255, 255, 0.06);
+      --border-color: rgba(255, 255, 255, 0.1);
+      --border-focus: rgba(99, 102, 241, 0.5);
+      
+      --accent-color: #6366f1;
+      --accent-color-hover: #4f46e5;
+      --accent-gradient: linear-gradient(135deg, #5b5fee 0%, #4f46e5 100%);
+      --accent-solid: #5b5fee;
+      --accent-text: #8b8ff8;
+      
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #8a909b;
+      --text-on-accent: #ffffff;
+      --danger-color: #f43f5e;
+      --success-color: #10b981;
+      --warning-color: #f59e0b;
+      --status-eye-stroke: rgba(255, 255, 255, 0.9);
+    }
+
+    [data-theme="dark"] {
+      color-scheme: dark;
+      --bg-primary: #09090b;
+      --bg-secondary: #121215;
+      --bg-gradient: linear-gradient(165deg, #121215 0%, #09090b 100%);
+      --bg-card: #18181b;
+      --bg-card-hover: #27272a;
+      --bg-hover: rgba(255, 255, 255, 0.08);
+      --border-color: rgba(255, 255, 255, 0.12);
+      --border-focus: rgba(129, 140, 248, 0.5);
+      
+      --accent-color: #818cf8;
+      --accent-color-hover: #6366f1;
+      --accent-gradient: linear-gradient(135deg, #5a60e8 0%, #4338ca 100%);
+      --accent-solid: #5a60e8;
+      --accent-text: #818cf8;
+      
+      --text-primary: #fafafa;
+      --text-secondary: #a1a1aa;
+      --text-muted: #818189;
+      --text-on-accent: #ffffff;
+      --danger-color: #fb7185;
+      --success-color: #34d399;
+      --warning-color: #fbbf24;
+      --status-eye-stroke: rgba(255, 255, 255, 0.9);
+    }
+
+    [data-theme="light"] {
+      color-scheme: light;
+      --bg-primary: #f8fafc;
+      --bg-secondary: #ffffff;
+      --bg-gradient: linear-gradient(165deg, #ffffff 0%, #f1f5f9 100%);
+      --bg-card: #ffffff;
+      --bg-card-hover: #f1f5f9;
+      --bg-hover: rgba(0, 0, 0, 0.05);
+      --border-color: #e2e8f0;
+      --border-focus: rgba(59, 130, 246, 0.5);
+      
+      --accent-color: #2563eb;
+      --accent-color-hover: #1d4ed8;
+      --accent-gradient: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      --accent-solid: #2563eb;
+      --accent-text: #2563eb;
+      
+      --text-primary: #0f172a;
+      --text-secondary: #4b5768;
+      --text-muted: #697483;
+      --text-on-accent: #ffffff;
+      --danger-color: #e11d48;
+      --success-color: #10b981;
+      --warning-color: #f59e0b;
+      --status-eye-stroke: rgba(255, 255, 255, 0.9);
+    }
+
+    [data-theme="pink"] {
+      color-scheme: dark;
+      --bg-primary: #170b14;
+      --bg-secondary: #23101e;
+      --bg-gradient: linear-gradient(165deg, #23101e 0%, #170b14 100%);
+      --bg-card: #2e1528;
+      --bg-card-hover: rgba(77, 30, 62, 0.7);
+      --bg-hover: rgba(244, 114, 182, 0.12);
+      --border-color: rgba(244, 114, 182, 0.18);
+      --border-focus: rgba(236, 72, 153, 0.5);
+      
+      --accent-color: #ec4899;
+      --accent-color-hover: #db2777;
+      --accent-gradient: linear-gradient(135deg, #d02a7c 0%, #be123c 100%);
+      --accent-solid: #d02a7c;
+      --accent-text: #f06aa8;
+      
+      --text-primary: #fdf2f8;
+      --text-secondary: #cf98b5;
+      --text-muted: #ab7492;
+      --text-on-accent: #ffffff;
+      --danger-color: #f43f5e;
+      --success-color: #10b981;
+      --warning-color: #f59e0b;
+      --status-eye-stroke: rgba(255, 255, 255, 0.9);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transition: background-color 0.25s ease, color 0.25s ease;
+      overflow-x: hidden;
+    }
+
+    /* ─── Control Header ─────────────────────────────────────────────────── */
+    .preview-header {
+      width: 100%;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      padding: 12px 20px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      backdrop-filter: blur(12px);
+    }
+
+    .preview-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .preview-brand svg {
+      width: 28px;
+      height: 28px;
+      color: var(--accent-solid);
+    }
+
+    .preview-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+    }
+
+    .preview-badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--accent-solid);
+      color: var(--text-on-accent);
+    }
+
+    .preview-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .theme-button-group {
+      display: flex;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 999px;
+      padding: 2px;
+      gap: 2px;
+    }
+
+    .theme-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .theme-btn.active {
+      background: var(--accent-solid);
+      color: var(--text-on-accent);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .theme-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .device-button-group {
+      display: flex;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 999px;
+      padding: 2px;
+      gap: 2px;
+    }
+
+    .device-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.2s ease;
+    }
+
+    .device-btn.active {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+    }
+
+    /* ─── Chat Viewport Container ────────────────────────────────────────── */
+    .preview-container {
+      width: 100%;
+      max-width: 780px;
+      padding: 24px 16px 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      transition: max-width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .preview-container.is-mobile {
+      max-width: 390px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--border-color);
+      border-radius: 28px;
+      margin: 20px 0;
+      background: var(--bg-primary);
+      padding: 16px 12px 24px;
+    }
+
+    /* Mock Chat Header */
+    .mock-chat-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 8px;
+    }
+
+    .mock-user-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .mock-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #6366f1, #a855f7);
+      color: #ffffff;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      position: relative;
+    }
+
+    .mock-online-dot {
+      width: 10px;
+      height: 10px;
+      background: var(--success-color);
+      border: 2px solid var(--bg-primary);
+      border-radius: 50%;
+      position: absolute;
+      bottom: 0;
+      right: 0;
+    }
+
+    .mock-name {
+      font-weight: 700;
+      font-size: 14.5px;
+      color: var(--text-primary);
+    }
+
+    .mock-sub {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    /* Date Separator */
+    .date-separator {
+      align-self: center;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 12px;
+      border-radius: 999px;
+      margin: 8px 0;
+      letter-spacing: 0.02em;
+    }
+
+    /* Message Stream */
+    .messages-stream {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+    }
+
+    /* ==========================================================================
+       2. Exact Messages CSS (from src/components/chat/messages.css)
+       ========================================================================== */
+    .msg-bubble {
+      position: relative;
+      word-wrap: break-word;
+      font-size: 13.5px;
+      line-height: 1.45;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+      transition: transform 0.15s ease, background-color 0.2s ease;
+      user-select: text;
+      -webkit-user-select: text;
+      max-width: 70%;
+    }
+
+    @media (max-width: 768px) {
+      .msg-bubble {
+        max-width: 86%;
+      }
+    }
+
+    .preview-container.is-mobile .msg-bubble {
+      max-width: 86%;
+    }
+
+    /* Sent vs. Received Bubble Surfaces */
+    .msg-bubble-sent {
+      align-self: flex-end;
+      background-color: var(--accent-solid);
+      color: var(--text-on-accent);
+      border-radius: 18px 18px 6px 18px;
+    }
+
+    .msg-bubble-received {
+      align-self: flex-start;
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      border-radius: 18px 18px 18px 6px;
+    }
+
+    /* Padding Variations */
+    .msg-bubble-text {
+      padding: 8px 12px 6px;
+    }
+
+    .msg-bubble-media {
+      padding: 3px;
+      overflow: hidden;
+      width: fit-content;
+      max-width: 266px;
+    }
+
+    @media (max-width: 768px) {
+      .msg-bubble-media {
+        max-width: min(86%, 286px);
+      }
+    }
+
+    .preview-container.is-mobile .msg-bubble-media {
+      max-width: 286px;
+    }
+
+    /* Time & Status Typography */
+    .msg-time-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 4px;
+      margin-top: 4px;
+      font-size: 11px;
+      opacity: 0.75;
+      font-variant-numeric: tabular-nums;
+      user-select: none;
+    }
+
+    .msg-bubble-sent .msg-time-row {
+      color: var(--text-on-accent);
+    }
+
+    .msg-bubble-received .msg-time-row {
+      color: var(--text-secondary);
+    }
+
+    /* Glass Chip Overlay (on Image / Video) */
+    .msg-glass-chip {
+      position: absolute;
+      background: rgba(10, 16, 22, 0.65);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      color: #ffffff !important;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      pointer-events: none;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    }
+
+    .msg-glass-chip.bottom-right {
+      bottom: 8px;
+      right: 8px;
+    }
+
+    .msg-glass-chip.bottom-left {
+      bottom: 8px;
+      left: 8px;
+    }
+
+    /* Text Message Formatting */
+    .msg-link {
+      color: inherit;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      cursor: pointer;
+      transition: opacity 0.15s ease;
+    }
+
+    .msg-link:hover {
+      opacity: 0.85;
+    }
+
+    .msg-inline-code {
+      font-family: 'JetBrains Mono', Consolas, Monaco, monospace;
+      font-size: 0.9em;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .msg-bubble-received .msg-inline-code {
+      background: var(--bg-hover);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+    }
+
+    /* Code Block */
+    .msg-code-block {
+      margin: 8px 0 4px;
+      border-radius: 10px;
+      background: color-mix(in srgb, var(--bg-primary) 80%, transparent);
+      border: 1px solid var(--border-color);
+      overflow: hidden;
+      font-family: 'JetBrains Mono', Consolas, Monaco, monospace;
+      font-size: 12.5px;
+    }
+
+    .msg-code-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 12px;
+      background: var(--bg-hover);
+      border-bottom: 1px solid var(--border-color);
+      font-size: 11px;
+      color: var(--text-secondary);
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .msg-code-copy-btn {
+      background: transparent;
+      border: none;
+      color: var(--accent-text);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      outline: none;
+      transition: background 0.15s;
+    }
+
+    .msg-code-copy-btn:hover {
+      background: var(--bg-hover);
+    }
+
+    .msg-code-pre {
+      margin: 0;
+      padding: 12px;
+      overflow-x: auto;
+      color: var(--text-primary);
+      white-space: pre-wrap;
+      line-height: 1.5;
+    }
+
+    /* Image Message UI */
+    .msg-image-wrap {
+      position: relative;
+      width: 260px;
+      max-width: 100%;
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+    }
+
+    @media (max-width: 768px) {
+      .msg-image-wrap {
+        width: 100%;
+        max-width: 280px;
+      }
+    }
+
+    .preview-container.is-mobile .msg-image-wrap {
+      width: 100%;
+      max-width: 280px;
+    }
+
+    .msg-image-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: opacity 0.2s ease, filter 0.2s ease;
+    }
+
+    .msg-image-gradient {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 56px;
+      background: linear-gradient(to top, rgba(0, 0, 0, 0.6) 0%, transparent 100%);
+      pointer-events: none;
+    }
+
+    
+
+    .msg-media-overlay-dim {
+      filter: grayscale(0.6) opacity(0.8);
+    }
+
+    .msg-progress-circle {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.35);
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .msg-retry-pill {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--danger-color);
+      color: #ffffff;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+      z-index: 6;
+      transition: transform 0.15s ease;
+    }
+
+    .msg-retry-pill:hover {
+      transform: translate(-50%, -50%) scale(1.04);
+    }
+
+    /* Audio Message UI */
+    .msg-audio-wrap {
+      width: 260px;
+      max-width: 300px;
+      padding: 10px 12px 8px;
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    @media (max-width: 768px) {
+      .msg-audio-wrap {
+        width: 100%;
+        max-width: 300px;
+      }
+    }
+
+    .preview-container.is-mobile .msg-audio-wrap {
+      width: 100%;
+      max-width: 300px;
+    }
+
+    .msg-audio-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .msg-audio-play-btn {
+      width: 40px;
+      height: 40px;
+      min-width: 40px;
+      border-radius: 50%;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      outline: none;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+
+    .msg-audio-play-btn:active {
+      transform: scale(0.94);
+    }
+
+    .msg-bubble-sent .msg-audio-play-btn {
+      background: #ffffff;
+      color: var(--accent-solid);
+    }
+
+    .msg-bubble-received .msg-audio-play-btn {
+      background: var(--accent-solid);
+      color: #ffffff;
+    }
+
+    .msg-waveform {
+      flex: 1;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      touch-action: none;
+      cursor: pointer;
+      user-select: none;
+      outline: none;
+    }
+
+    .msg-waveform:focus-visible {
+      outline: 2px solid var(--accent-solid);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+
+    .msg-waveform-bar {
+      flex: 1;
+      border-radius: 1px;
+      transition: background-color 0.15s ease;
+    }
+
+    .msg-speed-chip {
+      border: none;
+      border-radius: 999px;
+      padding: 2px 7px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      outline: none;
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+      min-height: 24px;
+      transition: background 0.15s;
+    }
+
+    .msg-bubble-sent .msg-speed-chip {
+      background: rgba(0, 0, 0, 0.2);
+      color: var(--text-on-accent);
+    }
+
+    .msg-bubble-received .msg-speed-chip {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+
+    .msg-audio-bottom {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      opacity: 0.85;
+      padding: 0 2px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Video Message UI */
+    .msg-video-wrap {
+      position: relative;
+      width: 260px;
+      max-width: 280px;
+      aspect-ratio: 16 / 10;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000000;
+      cursor: pointer;
+      border: 1px solid var(--border-color);
+    }
+
+    @media (max-width: 768px) {
+      .msg-video-wrap {
+        width: 100%;
+        max-width: 280px;
+      }
+    }
+
+    .preview-container.is-mobile .msg-video-wrap {
+      width: 100%;
+      max-width: 280px;
+    }
+
+    .msg-video-thumb {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .msg-video-play-btn {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: #ffffff;
+      color: #111827;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+      pointer-events: none;
+      transition: transform 0.15s ease;
+    }
+
+    .msg-video-wrap:hover .msg-video-play-btn {
+      transform: translate(-50%, -50%) scale(1.08);
+    }
+
+    /* Document & PDF UI (Paper-in-a-Pocket) */
+    .msg-doc-stack-wrap {
+      width: 260px;
+      max-width: 280px;
+      padding: 12px 12px 0;
+      position: relative;
+      cursor: pointer;
+    }
+
+    @media (max-width: 768px) {
+      .msg-doc-stack-wrap {
+        width: 100%;
+        max-width: 280px;
+      }
+    }
+
+    .preview-container.is-mobile .msg-doc-stack-wrap {
+      width: 100%;
+      max-width: 280px;
+    }
+
+    .msg-doc-stack-area {
+      height: 136px;
+      margin: 0 10px;
+      position: relative;
+    }
+
+    .msg-doc-back-sheet-1 {
+      position: absolute;
+      inset: 0;
+      background: #ffffff;
+      border-radius: 6px 6px 0 0;
+      transform-origin: bottom center;
+      transform: rotate(-4.5deg);
+      opacity: 0.45;
+      pointer-events: none;
+    }
+
+    .msg-doc-back-sheet-2 {
+      position: absolute;
+      inset: 0;
+      background: #ffffff;
+      border-radius: 6px 6px 0 0;
+      transform-origin: bottom center;
+      transform: rotate(3deg);
+      opacity: 0.7;
+      pointer-events: none;
+    }
+
+    .msg-doc-front-sheet {
+      position: absolute;
+      inset: 0;
+      border-radius: 6px 6px 0 0;
+      overflow: hidden;
+      box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.12);
+      clip-path: polygon(0 0, calc(100% - 24px) 0, 100% 24px, 100% 100%, 0 100%);
+      background: #ffffff;
+    }
+
+    .msg-doc-front-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top;
+      display: block;
+    }
+
+    .msg-doc-corner-triangle {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 24px;
+      height: 24px;
+      background: color-mix(in srgb, var(--border-color) 70%, #CBD3DB);
+      border-bottom-left-radius: 4px;
+      pointer-events: none;
+    }
+
+    .msg-doc-pocket {
+      margin: -18px -12px 0;
+      padding: 14px 12px 10px;
+      border-radius: 14px 14px 0 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      position: relative;
+      z-index: 3;
+    }
+
+    .msg-bubble-sent .msg-doc-pocket {
+      background: rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      color: var(--text-on-accent);
+    }
+
+    .msg-bubble-received .msg-doc-pocket {
+      background: var(--bg-hover);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      color: var(--text-primary);
+      border-top: 1px solid var(--border-color);
+    }
+
+    .msg-doc-pocket-info {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .msg-doc-pocket-title {
+      font-size: 13.5px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .msg-doc-pocket-sub {
+      font-size: 11.5px;
+      opacity: 0.8;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .msg-doc-download-btn {
+      width: 36px;
+      height: 36px;
+      min-width: 36px;
+      border-radius: 50%;
+      border: 1px solid var(--border-color);
+      background: var(--bg-hover);
+      color: inherit;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      outline: none;
+      transition: background 0.15s ease, transform 0.15s ease;
+    }
+
+    .msg-doc-download-btn:active {
+      transform: scale(0.92);
+    }
+
+    /* Generic Row Doc (without thumbnail) */
+    .msg-doc-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px 6px;
+      width: 260px;
+      max-width: 300px;
+      cursor: pointer;
+    }
+
+    @media (max-width: 768px) {
+      .msg-doc-row {
+        width: 100%;
+        max-width: 300px;
+      }
+    }
+
+    .preview-container.is-mobile .msg-doc-row {
+      width: 100%;
+      max-width: 300px;
+    }
+
+    .msg-doc-ext-tile {
+      width: 40px;
+      height: 48px;
+      border-radius: 6px;
+      position: relative;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding-bottom: 4px;
+      flex-shrink: 0;
+      overflow: hidden;
+      clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.3px;
+    }
+
+    .msg-doc-ext-tile.is-pdf {
+      background: var(--danger-color);
+      color: #ffffff;
+    }
+
+    .msg-doc-ext-tile.is-other {
+      background: var(--accent-solid);
+      color: #ffffff;
+    }
+
+    .msg-doc-ext-tile-flap {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 12px;
+      height: 12px;
+      background: rgba(0, 0, 0, 0.25);
+      border-bottom-left-radius: 3px;
+    }
+
+    /* Status Eye SVG Animation */
+    .status-eye {
+      color: currentColor;
+      flex-shrink: 0;
+      display: inline-block;
+      vertical-align: middle;
+    }
+
+    .status-eye.s0 {
+      transform: translateY(1.5px);
+    }
+
+    .status-eye .lid2 {
+      stroke-dasharray: 1;
+      stroke-dashoffset: 1;
+      opacity: 0;
+      transition: stroke-dashoffset .4s ease, opacity .1s ease;
+    }
+
+    .status-eye .pup {
+      opacity: 0;
+      fill: transparent;
+      transform-box: fill-box;
+      transform-origin: center;
+      transform: scale(.3);
+      transition: opacity .25s ease .1s, transform .3s ease .1s, fill .3s ease;
+    }
+
+    .status-eye.s1 .lid2, .status-eye.s2 .lid2, .status-eye.s3 .lid2 {
+      stroke-dashoffset: 0;
+      opacity: 1;
+    }
+
+    .status-eye.s2 .pup, .status-eye.s3 .pup {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .status-eye.s3 .pup {
+      fill: currentColor;
+    }
+
+    /* Category Labels */
+    .section-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-secondary);
+      margin: 12px 4px 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border-color);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation Controls -->
+  <header class="preview-header">
+    <div class="preview-brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+      </svg>
+      <span class="preview-title">Chat Message UI Showcase</span>
+      <span class="preview-badge">v2 Redesign</span>
+    </div>
+
+    <div class="preview-controls">
+      <!-- Theme Switcher -->
+      <div class="theme-button-group" role="radiogroup" aria-label="Theme selection">
+        <button class="theme-btn active" data-theme-val="dark" onclick="setTheme('dark')">
+          <span class="theme-indicator" style="background: #18181b; border: 1px solid #818cf8;"></span>
+          Dark OLED
+        </button>
+        <button class="theme-btn" data-theme-val="blue" onclick="setTheme('blue')">
+          <span class="theme-indicator" style="background: #111827; border: 1px solid #6366f1;"></span>
+          Blue Midnight
+        </button>
+        <button class="theme-btn" data-theme-val="light" onclick="setTheme('light')">
+          <span class="theme-indicator" style="background: #ffffff; border: 1px solid #2563eb;"></span>
+          Light
+        </button>
+        <button class="theme-btn" data-theme-val="pink" onclick="setTheme('pink')">
+          <span class="theme-indicator" style="background: #23101e; border: 1px solid #ec4899;"></span>
+          Pink Rose
+        </button>
+      </div>
+
+      <!-- Viewport Mode Switcher -->
+      <div class="device-button-group" role="radiogroup" aria-label="Viewport size">
+        <button class="device-btn active" id="btn-desktop" onclick="setViewport(false)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
+          Desktop
+        </button>
+        <button class="device-btn" id="btn-mobile" onclick="setViewport(true)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+            <line x1="12" y1="18" x2="12.01" y2="18"></line>
+          </svg>
+          Mobile (390px)
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Chat Viewport Container -->
+  <main class="preview-container" id="chat-viewport">
+    
+    <!-- Mock Top Chat Header -->
+    <div class="mock-chat-header">
+      <div class="mock-user-meta">
+        <div class="mock-avatar">
+          AC
+          <span class="mock-online-dot"></span>
+        </div>
+        <div>
+          <div class="mock-name">Alex Chen</div>
+          <div class="mock-sub">online · active now</div>
+        </div>
+      </div>
+      <div style="font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 8px;">
+        <span>All 4 Themes Tested</span>
+      </div>
+    </div>
+
+    <!-- Date Separator -->
+    <div class="date-separator">Today</div>
+
+    <div class="messages-stream">
+
+      <!-- ─── SECTION 1: TEXT MESSAGES & CODE ─────────────────────────────── -->
+      <div class="section-label">1. Text & Code Formatting</div>
+
+      <!-- 1. Received Text Message -->
+      <div class="msg-bubble msg-bubble-received msg-bubble-text">
+        <div>
+          Hey! Have you seen the updated design on <span class="msg-link" onclick="handleLinkClick(event)">letschat.app/explore</span>? The message bubble curves, border accents, and typography are now strictly synchronized with our 4 theme tokens! ✨
+        </div>
+        <div class="msg-time-row">
+          <span>10:40 AM</span>
+        </div>
+      </div>
+
+      <!-- 2. Sent Text Message -->
+      <div class="msg-bubble msg-bubble-sent msg-bubble-text">
+        <div>
+          Yes! We eliminated all hardcoded colors and verified that <strong>bold</strong>, <em>italic</em>, and <code class="msg-inline-code">const token = true;</code> work flawlessly across OLED, Blue, Light, and Pink modes.
+        </div>
+        <div class="msg-time-row">
+          <span>10:41 AM</span>
+          <svg class="status-eye s3" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M2 12s3-7 10-7 10 7 10 7"></path>
+            <path class="lid2" pathLength="1" d="M2 12s3 7 10 7 10-7 10-7"></path>
+            <circle class="pup" cx="12" cy="12" r="3"></circle>
+          </svg>
+        </div>
+      </div>
+
+      <!-- 3. Received Code Block -->
+      <div class="msg-bubble msg-bubble-received msg-bubble-text">
+        <div>Here is the coordinate tracker function:</div>
+        <div class="msg-code-block">
+          <div class="msg-code-header">
+            <span>JavaScript</span>
+            <button class="msg-code-copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre class="msg-code-pre"><code>export function calculateWaveformScrub(e, rect) {
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  return ratio;
+}</code></pre>
+        </div>
+        <div class="msg-time-row">
+          <span>10:42 AM</span>
+        </div>
+      </div>
+
+      <!-- ─── SECTION 2: IMAGE MESSAGES ───────────────────────────────────── -->
+      <div class="section-label">2. Images (Normal, Uploading, Failed)</div>
+
+      <!-- 4. Received Image Message with Glass Chip & Caption -->
+      <div class="msg-bubble msg-bubble-received msg-bubble-media">
+        <div class="msg-image-wrap" style="aspect-ratio: 4 / 3;">
+          <img class="msg-image-img" 
+               src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='600' viewBox='0 0 800 600'><defs><linearGradient id='sky' x1='0' y1='0' x2='0' y2='1'><stop offset='0%25' stop-color='%231e3a8a'/><stop offset='60%25' stop-color='%23701a75'/><stop offset='100%25' stop-color='%23f97316'/></linearGradient><linearGradient id='sun' x1='0' y1='0' x2='0' y2='1'><stop offset='0%25' stop-color='%23fef08a'/><stop offset='100%25' stop-color='%23f97316'/></linearGradient></defs><rect width='800' height='600' fill='url(%23sky)'/><circle cx='400' cy='320' r='120' fill='url(%23sun)' opacity='0.9'/><path d='M0 450 Q 200 360, 400 440 T 800 420 L 800 600 L 0 600 Z' fill='%230f172a'/><path d='M0 500 Q 300 430, 550 490 T 800 470 L 800 600 L 0 600 Z' fill='%23020617' opacity='0.8'/></svg>"
+               alt="Landscape">
+          <div class="msg-image-gradient"></div>
+          <div class="msg-glass-chip bottom-right">
+            <span>10:43 AM</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Sent Image (Uploading State with 44px Progress Ring) -->
+      <div class="msg-bubble msg-bubble-sent msg-bubble-media">
+        <div class="msg-image-wrap" style="aspect-ratio: 4 / 3;">
+          <img class="msg-image-img msg-media-overlay-dim" 
+               src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='600' fill='%23334155'><rect width='800' height='600'/><circle cx='400' cy='300' r='140' fill='%23475569'/></svg>"
+               alt="Uploading upload">
+          <!-- 44px Progress Ring -->
+          <div class="msg-progress-circle">
+            <svg width="44" height="44" viewBox="0 0 44 44">
+              <circle cx="22" cy="22" r="18" fill="none" stroke="rgba(255, 255, 255, 0.25)" stroke-width="3"></circle>
+              <circle cx="22" cy="22" r="18" fill="none" stroke="#ffffff" stroke-width="3"
+                      stroke-dasharray="113.1" stroke-dashoffset="36.2" stroke-linecap="round"
+                      transform="rotate(-90 22 22)"></circle>
+            </svg>
+          </div>
+          <div class="msg-image-gradient"></div>
+          <div class="msg-glass-chip bottom-right">
+            <span>Uploading 68%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6. Sent Image (Failed Upload with Retry Pill) -->
+      <div class="msg-bubble msg-bubble-sent msg-bubble-media">
+        <div class="msg-image-wrap" style="aspect-ratio: 4 / 3;">
+          <img class="msg-image-img msg-media-overlay-dim" 
+               src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='800' height='600' fill='%231e293b'><rect width='800' height='600'/></svg>"
+               alt="Failed upload">
+          <button class="msg-retry-pill" onclick="simulateRetry(this)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+            </svg>
+            Retry upload
+          </button>
+          <div class="msg-image-gradient"></div>
+          <div class="msg-glass-chip bottom-right">
+            <span>Failed</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── SECTION 3: VIDEO MESSAGES ───────────────────────────────────── -->
+      <div class="section-label">3. Video Message</div>
+
+      <!-- 7. Received Video Message -->
+      <div class="msg-bubble msg-bubble-received msg-bubble-media">
+        <div class="msg-video-wrap">
+          <img class="msg-video-thumb" 
+               src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='640' height='400' fill='%230f172a'><rect width='640' height='400'/><path d='M0 250 C 150 180, 300 320, 640 220 L 640 400 L 0 400 Z' fill='%231e293b'/><circle cx='520' cy='100' r='50' fill='%2338bdf8' opacity='0.3'/></svg>"
+               alt="Video">
+          <div class="msg-video-play-btn">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="6 3 20 12 6 21 6 3"></polygon>
+            </svg>
+          </div>
+          <!-- Duration bottom left -->
+          <div class="msg-glass-chip bottom-left">
+            <span>02:14</span>
+          </div>
+          <!-- Time + Status bottom right -->
+          <div class="msg-glass-chip bottom-right">
+            <span>10:45 AM</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── SECTION 4: AUDIO / VOICE NOTES ──────────────────────────────── -->
+      <div class="section-label">4. Audio & Voice Notes (Waveform Scrubbing)</div>
+
+      <!-- 8. Received Audio Message -->
+      <div class="msg-bubble msg-bubble-received">
+        <div class="msg-audio-wrap" id="audio-recv">
+          <div class="msg-audio-row">
+            <button class="msg-audio-play-btn" onclick="toggleAudio('recv')">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" id="icon-recv">
+                <polygon points="6 3 20 12 6 21 6 3"></polygon>
+              </svg>
+            </button>
+            <div class="msg-waveform" id="waveform-recv" role="slider" aria-valuenow="14" aria-valuemin="0" aria-valuemax="38" tabindex="0">
+              <!-- 30 bars generated dynamically -->
+            </div>
+            <button class="msg-speed-chip" id="speed-recv" onclick="cycleSpeed('recv')">1x</button>
+          </div>
+          <div class="msg-audio-bottom">
+            <span id="duration-recv">0:14 / 0:38</span>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <span>10:46 AM</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 9. Sent Audio Message -->
+      <div class="msg-bubble msg-bubble-sent">
+        <div class="msg-audio-wrap" id="audio-sent">
+          <div class="msg-audio-row">
+            <button class="msg-audio-play-btn" onclick="toggleAudio('sent')">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" id="icon-sent">
+                <polygon points="6 3 20 12 6 21 6 3"></polygon>
+              </svg>
+            </button>
+            <div class="msg-waveform" id="waveform-sent" role="slider" aria-valuenow="22" aria-valuemin="0" aria-valuemax="45" tabindex="0">
+              <!-- 30 bars generated dynamically -->
+            </div>
+            <button class="msg-speed-chip" id="speed-sent" onclick="cycleSpeed('sent')">1.5x</button>
+          </div>
+          <div class="msg-audio-bottom">
+            <span id="duration-sent">0:22 / 0:45</span>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <span>10:47 AM</span>
+              <svg class="status-eye s3" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <path d="M2 12s3-7 10-7 10 7 10 7"></path>
+                <path class="lid2" pathLength="1" d="M2 12s3 7 10 7 10-7 10-7"></path>
+                <circle class="pup" cx="12" cy="12" r="3"></circle>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── SECTION 5: DOCUMENTS & PDFS ─────────────────────────────────── -->
+      <div class="section-label">5. Documents & PDFs (Paper-in-a-Pocket & Tile)</div>
+
+      <!-- 10. Received PDF Document ("Paper in a pocket" multi-page stack) -->
+      <div class="msg-bubble msg-bubble-received">
+        <div class="msg-doc-stack-wrap">
+          <div class="msg-doc-stack-area">
+            <!-- Sheet 1 (rotated -4.5deg) -->
+            <div class="msg-doc-back-sheet-1"></div>
+            <!-- Sheet 2 (rotated 3deg) -->
+            <div class="msg-doc-back-sheet-2"></div>
+            <!-- Front sheet with clipped folded corner -->
+            <div class="msg-doc-front-sheet">
+              <img class="msg-doc-front-img" 
+                   src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300' fill='%23f8fafc'><rect width='400' height='300'/><rect x='30' y='30' width='160' height='16' rx='4' fill='%232563eb'/><rect x='30' y='60' width='340' height='8' rx='2' fill='%2394a3b8'/><rect x='30' y='76' width='300' height='8' rx='2' fill='%23cbd5e1'/><rect x='30' y='92' width='320' height='8' rx='2' fill='%23cbd5e1'/><rect x='30' y='120' width='140' height='80' rx='6' fill='%23e2e8f0'/><rect x='190' y='120' width='180' height='80' rx='6' fill='%23e2e8f0'/></svg>"
+                   alt="Document preview">
+              <div class="msg-doc-corner-triangle"></div>
+            </div>
+          </div>
+
+          <!-- Frosted Overlapping Pocket -->
+          <div class="msg-doc-pocket">
+            <div class="msg-doc-pocket-info">
+              <div class="msg-doc-pocket-title">Q3_Financial_Quarterly_Report.pdf</div>
+              <div class="msg-doc-pocket-sub">12 pages · 3.4 MB · 10:48 AM</div>
+            </div>
+            <button class="msg-doc-download-btn" title="Download" onclick="handleDownload(event, 'Q3_Financial_Quarterly_Report.pdf')">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 11. Sent Generic Document (Without thumbnail: Row tile with folded corner) -->
+      <div class="msg-bubble msg-bubble-sent">
+        <div class="msg-doc-row">
+          <div class="msg-doc-ext-tile is-other">
+            DOCX
+            <div class="msg-doc-ext-tile-flap"></div>
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              System_Architecture_v2.docx
+            </div>
+            <div style="font-size: 11.5px; opacity: 0.8; font-variant-numeric: tabular-nums;">
+              540 KB
+            </div>
+          </div>
+          <button class="msg-doc-download-btn" title="Download" onclick="handleDownload(event, 'System_Architecture_v2.docx')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+          </button>
+        </div>
+        <div class="msg-time-row" style="padding: 0 12px 6px;">
+          <span>10:49 AM</span>
+          <svg class="status-eye s3" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M2 12s3-7 10-7 10 7 10 7"></path>
+            <path class="lid2" pathLength="1" d="M2 12s3 7 10 7 10-7 10-7"></path>
+            <circle class="pup" cx="12" cy="12" r="3"></circle>
+          </svg>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Interactive Scripts -->
+  <script>
+    // 1. Theme Controller
+    function setTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      document.querySelectorAll('.theme-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-theme-val') === theme);
+      });
+      updateWaveformColors();
+    }
+
+    // 2. Viewport Switcher
+    function setViewport(isMobile) {
+      const container = document.getElementById('chat-viewport');
+      container.classList.toggle('is-mobile', isMobile);
+      document.getElementById('btn-desktop').classList.toggle('active', !isMobile);
+      document.getElementById('btn-mobile').classList.toggle('active', isMobile);
+    }
+
+    // 3. Code Copy Interaction
+    function copyCode(btn) {
+      const pre = btn.closest('.msg-code-block').querySelector('code');
+      if (pre) {
+        navigator.clipboard.writeText(pre.innerText).then(() => {
+          btn.innerText = 'Copied';
+          setTimeout(() => { btn.innerText = 'Copy'; }, 1500);
+        }).catch(() => {
+          btn.innerText = 'Copied';
+          setTimeout(() => { btn.innerText = 'Copy'; }, 1500);
+        });
+      }
+    }
+
+    // 4. Waveform Audio Simulator
+    const FALLBACK_BARS = [
+      8, 12, 16, 12, 8, 14, 20, 24, 18, 12, 10, 16, 22, 18, 10,
+      8, 12, 16, 12, 8, 14, 20, 24, 18, 12, 10, 16, 22, 18, 10
+    ];
+
+    const audioState = {
+      recv: { isPlaying: false, progress: 0.37, timer: null, speed: 1, duration: 38 },
+      sent: { isPlaying: false, progress: 0.48, timer: null, speed: 1.5, duration: 45 }
+    };
+
+    function renderWaveform(id) {
+      const container = document.getElementById(`waveform-${id}`);
+      if (!container) return;
+      container.innerHTML = '';
+      const state = audioState[id];
+      const isSent = id === 'sent';
+
+      FALLBACK_BARS.forEach((h, index) => {
+        const bar = document.createElement('div');
+        bar.className = 'msg-waveform-bar';
+        bar.style.height = `${h}px`;
+
+        const isActive = (index / FALLBACK_BARS.length) <= state.progress;
+        if (isSent) {
+          bar.style.backgroundColor = isActive ? '#ffffff' : 'rgba(255, 255, 255, 0.35)';
+        } else {
+          bar.style.backgroundColor = isActive ? 'var(--accent-solid)' : 'var(--border-color)';
+        }
+        container.appendChild(bar);
+      });
+
+      // Attach scrubber events
+      container.onpointerdown = (e) => handleScrub(e, id);
+    }
+
+    function handleScrub(e, id) {
+      const container = document.getElementById(`waveform-${id}`);
+      const rect = container.getBoundingClientRect();
+      const onMove = (moveEvt) => {
+        const clientX = moveEvt.clientX;
+        const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+        audioState[id].progress = ratio;
+        updateAudioTime(id);
+        renderWaveform(id);
+      };
+      const onUp = () => {
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+      onMove(e);
+    }
+
+    function updateAudioTime(id) {
+      const state = audioState[id];
+      const current = Math.floor(state.progress * state.duration);
+      const curM = Math.floor(current / 60);
+      const curS = (current % 60).toString().padStart(2, '0');
+      const durM = Math.floor(state.duration / 60);
+      const durS = (state.duration % 60).toString().padStart(2, '0');
+      const label = document.getElementById(`duration-${id}`);
+      if (label) {
+        label.innerText = `${curM}:${curS} / ${durM}:${durS}`;
+      }
+    }
+
+    function toggleAudio(id) {
+      const state = audioState[id];
+      // Single playback coordination: stop other
+      const otherId = id === 'recv' ? 'sent' : 'recv';
+      if (audioState[otherId].isPlaying) {
+        pauseAudio(otherId);
+      }
+
+      if (state.isPlaying) {
+        pauseAudio(id);
+      } else {
+        playAudio(id);
+      }
+    }
+
+    function playAudio(id) {
+      const state = audioState[id];
+      state.isPlaying = true;
+      const icon = document.getElementById(`icon-${id}`);
+      if (icon) {
+        icon.innerHTML = '<rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect>';
+      }
+
+      state.timer = setInterval(() => {
+        state.progress += (0.015 * state.speed);
+        if (state.progress >= 1) {
+          state.progress = 0;
+          pauseAudio(id);
+        }
+        updateAudioTime(id);
+        renderWaveform(id);
+      }, 100);
+    }
+
+    function pauseAudio(id) {
+      const state = audioState[id];
+      state.isPlaying = false;
+      if (state.timer) clearInterval(state.timer);
+      const icon = document.getElementById(`icon-${id}`);
+      if (icon) {
+        icon.innerHTML = '<polygon points="6 3 20 12 6 21 6 3"></polygon>';
+      }
+    }
+
+    function cycleSpeed(id) {
+      const speeds = [1, 1.5, 2];
+      const state = audioState[id];
+      const curIdx = speeds.indexOf(state.speed);
+      state.speed = speeds[(curIdx + 1) % speeds.length];
+      document.getElementById(`speed-${id}`).innerText = `${state.speed}x`;
+    }
+
+    function updateWaveformColors() {
+      renderWaveform('recv');
+      renderWaveform('sent');
+    }
+
+    // 5. Retry Simulator
+    function simulateRetry(btn) {
+      btn.innerText = 'Retrying...';
+      btn.style.opacity = '0.7';
+      setTimeout(() => {
+        btn.innerText = 'Retry upload';
+        btn.style.opacity = '1';
+      }, 1200);
+    }
+
+    // 6. Link & Download handlers
+    function handleLinkClick(e) {
+      e.stopPropagation();
+      alert('Navigating to: https://letschat.app/explore');
+    }
+
+    function handleDownload(e, filename) {
+      e.stopPropagation();
+      alert(`Downloading: ${filename}`);
+    }
+
+    // Init
+    window.addEventListener('DOMContentLoaded', () => {
+      const hash = window.location.hash.toLowerCase();
+      if (hash.includes('light')) setTheme('light');
+      else if (hash.includes('pink')) setTheme('pink');
+      else if (hash.includes('blue')) setTheme('blue');
+      else if (hash.includes('dark')) setTheme('dark');
+      
+      if (hash.includes('mobile')) {
+        setViewport(true);
+      }
+
+      renderWaveform('recv');
+      renderWaveform('sent');
+      updateAudioTime('recv');
+      updateAudioTime('sent');
+    });
+  </script>
+</body>
+</html>
