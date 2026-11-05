@@ -1,8 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Download, FileText, Play, Pause, Music, ExternalLink, Loader2, Mic, RotateCcw } from 'lucide-react';
+import { Download, Play, Pause, Loader2, RotateCcw } from 'lucide-react';
 import { API } from '../../service/UserAuth';
 import { downloadFile, getPdfThumbnail } from '../../service/MediaUploader';
 import { getMediaInfo, getMediaBlob, saveBlobToCache, memoryThumbCache } from '../../service/MediaCache';
+import { formatTime12Hour } from '../../service/ChatUtils';
+import EyeIcon from './EyeIcon';
+import messageStore from '../../pages/MessageStore';
+import { PREVIEW_BLUR_PX } from '../../service/TinyPreview';
+import './messages.css';
+
+export { PREVIEW_BLUR_PX };
 
 /**
  * Format bytes to human readable size
@@ -14,7 +21,7 @@ const formatSize = (bytes) => {
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.min(Math.floor(Math.log(num) / Math.log(k)), sizes.length - 1);
-  return parseFloat((num / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  return `${parseFloat((num / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 };
 
 /**
@@ -33,45 +40,90 @@ const isPdfFile = (name) => {
   return name.toLowerCase().endsWith('.pdf');
 };
 
-export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMode, onOpenViewer, onRetry }) {
-  if (!msg) return null;
+const getFileExtension = (name, type) => {
+  if (typeof name === 'string' && name.includes('.')) {
+    const ext = name.split('.').pop().trim().toUpperCase();
+    if (ext.length <= 5) return ext;
+  }
+  if (type === 'pdf') return 'PDF';
+  return (type || 'DOC').toUpperCase();
+};
 
+// Module-level audio tracker so only one audio plays at a time
+let activeAudioInstance = null;
+
+// Fallback 30 waveform bar heights
+const FALLBACK_BARS = [
+  8, 12, 16, 12, 8, 14, 20, 24, 18, 12, 10, 16, 22, 18, 10,
+  8, 12, 16, 12, 8, 14, 20, 24, 18, 12, 10, 16, 22, 18, 10
+];
+
+export default function MediaMessage({
+  msg,
+  isReceived,
+  isSelectionMode,
+  onOpenViewer,
+  onRetry
+}) {
   const [mediaInfo, setMediaInfo] = useState(() => {
-    if (msg.isOptimistic || msg.optimisticUrl) {
+    if (msg?.isOptimistic || msg?.optimisticUrl) {
       return {
-        fileType: msg.type,
-        fileName: msg.fileName,
-        fileSize: msg.fileSize,
-        fileKey: msg.optimisticUrl,
-        thumbnailKey: msg.optimisticThumbUrl || msg.optimisticUrl,
+        fileType: msg?.type,
+        fileName: msg?.fileName,
+        fileSize: msg?.fileSize,
+        fileKey: msg?.optimisticUrl,
+        thumbnailKey: msg?.optimisticThumbUrl || msg?.optimisticUrl,
+        width: msg?.width,
+        height: msg?.height,
+        duration: msg?.duration,
+        noOfPages: msg?.noOfPages,
+      };
+    }
+    if (msg?.pendingid && messageStore.pendingInfo?.has(msg.pendingid)) {
+      const p = messageStore.pendingInfo.get(msg.pendingid);
+      return {
+        fileType: p.kind || msg.type,
+        fileName: p.fileName || msg.fileName,
+        fileSize: p.fileSize || msg.fileSize,
+        duration: p.duration || msg.duration,
+        noOfPages: p.noOfPages || msg.noOfPages,
+        width: p.w || msg.width,
+        height: p.h || msg.height,
+        thumbnailUrl: p.thumb || null,
       };
     }
     return null;
   });
-  const [loading, setLoading] = useState(!msg.isOptimistic && !msg.optimisticUrl && !msg.optimisticThumbUrl);
-  const [showFull, setShowFull] = useState(false);
+  const [loading, setLoading] = useState(!msg?.isOptimistic && !msg?.optimisticUrl && !msg?.optimisticThumbUrl && !(msg?.pendingid && messageStore.pendingInfo?.has(msg.pendingid)));
   const [error, setError] = useState(null);
   const [thumbError, setThumbError] = useState(false);
+  const [mainLoaded, setMainLoaded] = useState(false);
 
-  const mediaId = msg.content;
-  const isOptimistic = msg.isOptimistic;
-  const uploadProgress = msg.uploadProgress || 0;
-  const status = msg.status; // 'uploading', 'failed', 'sent'
+  const mediaId = msg?.content;
+  const isOptimistic = msg?.isOptimistic;
+  const uploadProgress = msg?.uploadProgress || 0;
+  const status = msg?.status; // 'uploading', 'failed', 'sent', 'delivered', 'read'
 
   // Resolution states for cached URLs
   const [resolvedThumb, setResolvedThumb] = useState(() => {
-    const idbKey = isOptimistic ? `${msg.tempmsgid}_thumb` : `${mediaId}_thumb`;
+    const idbKey = isOptimistic ? `${msg?.tempmsgid}_thumb` : `${mediaId}_thumb`;
     return (
       memoryThumbCache?.get(idbKey) ||
-      (msg.tempmsgid ? memoryThumbCache?.get(`${msg.tempmsgid}_thumb`) : null) ||
-      msg.optimisticThumbUrl ||
+      (msg?.tempmsgid ? memoryThumbCache?.get(`${msg?.tempmsgid}_thumb`) : null) ||
+      msg?.optimisticThumbUrl ||
+      (msg?.pendingid && messageStore.pendingInfo?.get(msg.pendingid)?.thumb) ||
       null
     );
   });
-  const [resolvedMain, setResolvedMain] = useState(() => {
-    return msg.optimisticUrl || null;
-  });
+  const [resolvedMain, setResolvedMain] = useState(() => msg?.optimisticUrl || null);
   const blobUrls = useRef(new Set());
+
+  // Audio playback state
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const audioRef = useRef(null);
+  const waveformRef = useRef(null);
 
   // Keep optimistic blob URLs synced if they arrive after mount
   useEffect(() => {
@@ -83,42 +135,48 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
     }
   }, [msg.optimisticThumbUrl, msg.optimisticUrl]);
 
-  // Audio playback state
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const audioRef = useRef(null);
-
-  const s = (val) => val === 'null' || val === 'undefined' ? null : val;
+  const s = (val) => (val === 'null' || val === 'undefined' ? null : val);
 
   const fileKey = mediaInfo?.fileKey;
   const thumbnailKey = mediaInfo?.thumbnailKey;
-  const fileType = mediaInfo?.fileType;
-  const fileName = mediaInfo?.fileName;
-  const fileSize = mediaInfo?.fileSize;
-  const duration = mediaInfo?.duration;
-  const noOfPages = mediaInfo?.noOfPages;
+  const fileType = mediaInfo?.fileType || msg.type;
+  const fileName = mediaInfo?.fileName || msg.fileName;
+  const fileSize = mediaInfo?.fileSize || msg.fileSize;
+  const duration = mediaInfo?.duration || msg.duration;
+  const noOfPages = mediaInfo?.noOfPages || msg.noOfPages;
 
-  // Final fallback URLs (if not resolved to blob, and preserving exact presigned URLs if backend gave them)
-  const fileUrl = s(mediaInfo?.url) || s(mediaInfo?.fileUrl) || (s(fileKey) ? (fileKey.startsWith('http') || fileKey.startsWith('blob:') ? fileKey : `${API}/files/media/serve/${fileKey}`) : null);
-  const thumbnailUrl = s(mediaInfo?.thumbnailUrl) || (s(thumbnailKey) ? (thumbnailKey.startsWith('http') || thumbnailKey.startsWith('blob:') ? thumbnailKey : `${API}/files/media/serve/${thumbnailKey}`) : null);
+  // Final fallback URLs
+  const fileUrl =
+    s(mediaInfo?.url) ||
+    s(mediaInfo?.fileUrl) ||
+    (s(fileKey)
+      ? fileKey.startsWith('http') || fileKey.startsWith('blob:')
+        ? fileKey
+        : `${API}/files/media/serve/${fileKey}`
+      : null);
+  const thumbnailUrl =
+    s(mediaInfo?.thumbnailUrl) ||
+    (s(thumbnailKey)
+      ? thumbnailKey.startsWith('http') || thumbnailKey.startsWith('blob:')
+        ? thumbnailKey
+        : `${API}/files/media/serve/${thumbnailKey}`
+      : null);
 
-  // 1. Fetch Media Info (Metadata)
+  // 1. Fetch Media Metadata
   useEffect(() => {
-    // If optimistic, we already have basic info from msg object
     if (isOptimistic) {
       setMediaInfo({
         fileType: msg.type,
         fileName: msg.fileName,
         fileSize: msg.fileSize,
         fileKey: msg.optimisticUrl,
-        thumbnailKey: msg.optimisticThumbUrl || msg.optimisticUrl, // Support native fast-path thumb injection
+        thumbnailKey: msg.optimisticThumbUrl || msg.optimisticUrl,
       });
       setLoading(false);
       return;
     }
 
     if (!mediaId || mediaId === msg.tempmsgid) {
-      // Still in optimistic state or invalid
       if (!isOptimistic) setLoading(false);
       return;
     }
@@ -138,68 +196,37 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
 
     loadInfo();
     return () => { isMounted = false; };
-  }, [mediaId, isOptimistic, msg]);
+  }, [mediaId, isOptimistic, msg.type, msg.fileName, msg.fileSize, msg.optimisticUrl, msg.optimisticThumbUrl, msg.tempmsgid]);
 
-  // 2. Resolve Thumbnail and Main URLs
+  // 2. Fetch Blobs
   useEffect(() => {
-    if (!mediaInfo) return;
+    if (!mediaInfo && !isOptimistic) return;
 
     let isMounted = true;
-    const { thumbnailKey, fileKey, fileType } = mediaInfo;
-
     const resolveUrls = async () => {
       try {
-        // Helper to get correct fetch URL for non-optimistic messages
-        const getFetchUrl = (key, explicitUrl) => {
-          const cleanExplicit = explicitUrl === 'null' || explicitUrl === 'undefined' ? null : explicitUrl;
-          const cleanKey = key === 'null' || key === 'undefined' ? null : key;
-          if (cleanExplicit) return cleanExplicit;
-          if (!cleanKey) return null;
-          return cleanKey.startsWith('http') ? cleanKey : `${API}/files/media/serve/${cleanKey}`;
+        const getFetchUrl = (key, fallback) => {
+          if (!key) return fallback;
+          if (key.startsWith('http') || key.startsWith('blob:')) return key;
+          return `${API}/files/media/serve/${key}`;
         };
 
-        // A. Resolve Thumbnail
-        if (isOptimistic) {
-          // Try IDB-persisted thumb first (survives reload/offline), then fall back to session blob URL
-          const idbKey = `${msg.tempmsgid}_thumb`;
-          const sessionBlobUrl = msg.optimisticThumbUrl || null;
-          console.log('[THUMB DEBUG] MediaMessage resolving thumb | idbKey:', idbKey, '| sessionBlobUrl:', sessionBlobUrl);
+        // Thumbnail Resolution
+        if (thumbnailKey || isOptimistic) {
+          const thumbSrc = isOptimistic ? (msg?.optimisticThumbUrl || msg?.optimisticUrl) : null;
+          const cacheKey = isOptimistic ? `${msg?.tempmsgid}_thumb` : `${mediaId}_thumb`;
+          const fetchUrl = isOptimistic ? thumbSrc : getFetchUrl(thumbnailKey, mediaInfo?.thumbnailUrl);
 
-          // getMediaBlob will return IDB-cached blob URL if available, else try to fetch sessionBlobUrl
-          const cachedUrl = await getMediaBlob(idbKey, sessionBlobUrl, 'thumbCache');
-          console.log('[THUMB DEBUG] getMediaBlob returned:', cachedUrl);
-          if (cachedUrl && isMounted) {
-            setResolvedThumb(cachedUrl);
-            // DO NOT track thumbCache blob URLs here! MediaCache manages their memory globally.
-          } else if (sessionBlobUrl && isMounted) {
-            console.log('[THUMB DEBUG] Falling back to sessionBlobUrl:', sessionBlobUrl);
-            // Same-session fallback: blob URL still valid. 
-            // DO NOT add this to blobUrls.current! We did not create this URL, ChatBox did.
-            // Revoking it on unmount breaks the optimistic state globally.
-            setResolvedThumb(sessionBlobUrl);
-          } else {
-            console.warn('[THUMB DEBUG] No thumb resolved! msg.optimisticThumbUrl:', msg.optimisticThumbUrl);
-          }
-        } else {
-          // Finalized message
-          const cacheKey = `${mediaId}_thumb`;
-          const fetchUrl = getFetchUrl(thumbnailKey, mediaInfo?.thumbnailUrl);
-
-          // ALWAYS check cache first, even if fetchUrl is null (since we locally generate & cache PDF thumbs)
-          const url = await getMediaBlob(cacheKey, fetchUrl, 'thumbCache');
-          if (isMounted && url) {
-            setResolvedThumb(url);
-            // DO NOT track thumbCache blob URLs here! MediaCache manages their memory globally.
-          } else if (isMounted && msg.tempmsgid) {
-            const tempUrl = await getMediaBlob(`${msg.tempmsgid}_thumb`, null, 'thumbCache');
-            if (isMounted && tempUrl) setResolvedThumb(tempUrl);
+          if (fetchUrl && !fetchUrl.endsWith('/null')) {
+            const url = await getMediaBlob(cacheKey, fetchUrl, 'thumbCache');
+            if (isMounted && url) setResolvedThumb(url);
+            if (url && url.startsWith('blob:')) blobUrls.current.add(url);
           }
         }
 
-        // B. Resolve Main
+        // Main Blob Resolution
         const shouldResolveMain = isOptimistic ||
           fileType === 'audio' ||
-          showFull ||
           fileType === 'image' ||
           fileType === 'pdf';
 
@@ -208,7 +235,7 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
           const cacheKey = isOptimistic ? msg?.tempmsgid : `${mediaId}_full`;
           const fetchUrl = isOptimistic ? mainSrc : getFetchUrl(fileKey, mediaInfo?.url || mediaInfo?.fileUrl);
 
-          if (fetchUrl) {
+          if (fetchUrl && !fetchUrl.endsWith('/null')) {
             const url = await getMediaBlob(cacheKey, fetchUrl, 'mainCache');
             if (isMounted && url) setResolvedMain(url);
             if (url && url.startsWith('blob:')) blobUrls.current.add(url);
@@ -223,11 +250,10 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
     };
 
     resolveUrls();
-
     return () => { isMounted = false; };
-  }, [mediaInfo, showFull, isOptimistic, msg.tempmsgid, msg.optimisticUrl, msg.optimisticThumbUrl]);
+  }, [mediaInfo, isOptimistic, msg?.tempmsgid, msg?.optimisticUrl, msg?.optimisticThumbUrl, mediaId, fileKey, thumbnailKey, fileType]);
 
-  // 3. Fallback: Generate PDF thumbnail client-side if missing on receiver
+  // 3. Fallback PDF thumbnail generator client-side
   useEffect(() => {
     const isPDF = isPdfFile(fileName) || fileType === 'pdf' || fileType === 'application/pdf';
     if (!isPDF) return;
@@ -262,27 +288,41 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
     return () => { isMounted = false; };
   }, [mediaId, isOptimistic, fileType, fileName, resolvedThumb, thumbnailUrl, thumbError, resolvedMain, fileUrl]);
 
-  // 3. Final Cleanup: Revoke all tracked Blob URLs when component truly unmounts
+  // Cleanup Blob URLs on unmount
   useEffect(() => {
     return () => {
-      blobUrls.current.forEach(url => {
-        // Check if it's a blob URL before revoking
+      blobUrls.current.forEach((url) => {
         if (url && url.startsWith('blob:')) {
           URL.revokeObjectURL(url);
         }
       });
       blobUrls.current.clear();
+      if (activeAudioInstance === audioRef.current) {
+        activeAudioInstance = null;
+      }
     };
   }, []);
 
+  useEffect(() => {
+    setThumbError(false);
+  }, [resolvedThumb, thumbnailUrl]);
 
-
-  const togglePlayPause = () => {
+  // Audio Playback Controls
+  const togglePlayPause = (e) => {
+    if (isSelectionMode) return;
+    e.stopPropagation();
     if (!audioRef.current) return;
+
     if (isPlaying) {
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
+      if (activeAudioInstance && activeAudioInstance !== audioRef.current) {
+        activeAudioInstance.pause();
+      }
+      activeAudioInstance = audioRef.current;
+      audioRef.current.playbackRate = playbackSpeed;
+
       const playPromise = audioRef.current.play();
       if (playPromise !== undefined) {
         playPromise.catch((err) => {
@@ -291,6 +331,16 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
         });
       }
       setIsPlaying(true);
+    }
+  };
+
+  const cycleSpeed = (e) => {
+    if (isSelectionMode) return;
+    e.stopPropagation();
+    const next = playbackSpeed === 1 ? 1.5 : playbackSpeed === 1.5 ? 2 : 1;
+    setPlaybackSpeed(next);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = next;
     }
   };
 
@@ -305,23 +355,127 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
     setCurrentTime(0);
   };
 
-  // 4. Recover from transient errors if the image source successfully recovers/swaps
-  useEffect(() => {
-    setThumbError(false);
-  }, [resolvedThumb, thumbnailUrl]);
+  const handleWaveformSeek = (e) => {
+    if (isSelectionMode) return;
+    e.stopPropagation();
+    if (!audioRef.current || !duration) return;
 
+    const rect = waveformRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clickX = Math.max(0, Math.min(clientX - rect.left, rect.width));
+    const newTime = (clickX / rect.width) * duration;
+    audioRef.current.currentTime = newTime;
+    setCurrentTime(newTime);
+  };
+
+  const handleWaveformKeyDown = (e) => {
+    if (!audioRef.current || !duration) return;
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const newTime = Math.max(0, currentTime - 5);
+      audioRef.current.currentTime = newTime;
+      setCurrentTime(newTime);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      const newTime = Math.min(duration, currentTime + 5);
+      audioRef.current.currentTime = newTime;
+      setCurrentTime(newTime);
+    }
+  };
+
+  // Guard against missing msg after all hooks have run
+  if (!msg) return null;
+
+  // Loading and Error States (Part A: Immediate Skeletons matching real dimensions)
   if (loading && !resolvedMain && !resolvedThumb && !msg.optimisticUrl && !msg.optimisticThumbUrl) {
+    const rawType = msg.type || 'file';
+    let aspectRatioStyle = '4 / 3';
+    if (msg.width && msg.height && msg.height > 0) {
+      const r = msg.width / msg.height;
+      const clamped = Math.min(Math.max(r, 0.75), 1.777);
+      aspectRatioStyle = `${clamped}`;
+    }
+
+    if (rawType === 'image' || rawType === 'video') {
+      return (
+        <div
+          className="msg-skeleton-shimmer"
+          style={{
+            width: '280px',
+            maxWidth: '100%',
+            aspectRatio: aspectRatioStyle,
+            borderRadius: '12px',
+            border: '1px solid var(--border-color)',
+            overflow: 'hidden',
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <div className="msg-glass-chip bottom-right">
+            <span>{formatTime12Hour(msg.timestamp)}</span>
+          </div>
+        </div>
+      );
+    }
+
+    if (rawType === 'audio') {
+      return (
+        <div
+          className="msg-skeleton-shimmer"
+          style={{
+            width: '300px',
+            maxWidth: '100%',
+            height: '68px',
+            borderRadius: '14px',
+            border: '1px solid var(--border-color)',
+            padding: '10px 14px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxSizing: 'border-box',
+          }}
+        >
+          <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--border-color)', opacity: 0.5 }} />
+          <div style={{ flex: 1, margin: '0 12px', height: '14px', background: 'var(--border-color)', borderRadius: '6px', opacity: 0.4 }} />
+          <div className="msg-time-row" style={{ margin: 0 }}>
+            <span>{formatTime12Hour(msg.timestamp)}</span>
+          </div>
+        </div>
+      );
+    }
+
+    // Default: document / file / pdf
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: 'rgba(0,0,0,0.1)', borderRadius: '8px' }}>
-        <Loader2 className="animate-spin" size={18} color="var(--text-secondary)" />
-        <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Loading media...</span>
+      <div
+        className="msg-skeleton-shimmer"
+        style={{
+          width: '300px',
+          maxWidth: '100%',
+          height: '64px',
+          borderRadius: '12px',
+          border: '1px solid var(--border-color)',
+          padding: '10px 14px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          boxSizing: 'border-box',
+        }}
+      >
+        <div style={{ width: '40px', height: '44px', borderRadius: '6px', background: 'var(--border-color)', opacity: 0.5 }} />
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div style={{ width: '60%', height: '12px', background: 'var(--border-color)', borderRadius: '4px', opacity: 0.5 }} />
+          <div style={{ width: '35%', height: '10px', background: 'var(--border-color)', borderRadius: '4px', opacity: 0.4 }} />
+        </div>
       </div>
     );
   }
 
   if ((error || !mediaInfo) && !resolvedMain && !resolvedThumb && !msg.optimisticUrl && !msg.optimisticThumbUrl) {
     return (
-      <div style={{ padding: '8px', borderLeft: '3px solid var(--danger-color)', background: 'var(--danger-tint)', fontSize: '12px' }}>
+      <div style={{ padding: '8px 12px', borderLeft: '3px solid var(--danger-color)', background: 'var(--danger-tint)', fontSize: '12px', borderRadius: '4px' }}>
         Media unavailable
       </div>
     );
@@ -329,563 +483,420 @@ export default function MediaMessage({ msg, isReceived, isMobile, isSelectionMod
 
   // ── Renderers ─────────────────────────────────────────────────────────────
 
-  const renderOptimisticOverlay = () => {
-    if (!isOptimistic || status === 'sent') return null;
+  // 1. Image Renderer
+  const renderImage = () => {
+    const isUploading = status === 'uploading';
+    const isFailed = status === 'failed';
+    const imageSrc = resolvedMain || resolvedThumb || thumbnailUrl || fileUrl || msg.optimisticThumbUrl || msg.optimisticUrl;
+
+    // Aspect ratio clamping between 3:4 (0.75) and 16:9 (1.777)
+    let aspectRatioStyle = '4 / 3';
+    if (msg.width && msg.height && msg.height > 0) {
+      const r = msg.width / msg.height;
+      const clamped = Math.min(Math.max(r, 0.75), 1.777);
+      aspectRatioStyle = `${clamped}`;
+    }
+
+    const isBlurry = !isOptimistic && !mainLoaded && Boolean(resolvedThumb || thumbnailUrl);
 
     return (
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(0,0,0,0.2)', // Very light dimming
-        zIndex: 5,
-        borderRadius: 'inherit',
-        backdropFilter: 'none', // Remove blur
-        pointerEvents: 'none' // Let clicks pass through to media while uploading
-      }}>
-        {status === 'uploading' && (
-          <div style={{ 
-            width: '40px', height: '40px', 
-            background: 'rgba(0,0,0,0.5)', 
-            borderRadius: '50%', 
-            display: 'flex', alignItems: 'center', justifyContent: 'center' 
-          }}>
-            <div style={{ position: 'relative', width: '30px', height: '30px' }}>
+      <div
+        className="msg-image-wrap"
+          style={{ aspectRatio: aspectRatioStyle }}
+          onClick={(e) => {
+            if (isSelectionMode) return;
+            e.stopPropagation();
+            if (isFailed) return;
+            if (!resolvedMain && !fileUrl) return; // Tap guard: do not open viewer until full media exists!
+            onOpenViewer?.({ fileUrl: resolvedMain || fileUrl, fileName, fileType: 'image' });
+          }}
+        >
+          <img
+            src={imageSrc}
+            alt={fileName || 'Image'}
+            loading="lazy"
+            onLoad={() => {
+              if (resolvedMain) setMainLoaded(true);
+            }}
+            style={{
+              filter: isBlurry ? `blur(${PREVIEW_BLUR_PX}px)` : 'none',
+              transition: 'filter 0.6s ease',
+              transform: isBlurry ? 'scale(1.08)' : 'none',
+            }}
+            className={`msg-image-img ${isUploading ? 'msg-media-overlay-dim' : ''} ${isFailed ? 'msg-media-overlay-dim' : ''}`}
+          />
+
+          {/* Bottom gradient overlay for glass chip legibility */}
+          <div className="msg-image-gradient" />
+
+          {/* Centered Upload Progress Ring */}
+          {isUploading && (
+            <div className="msg-progress-circle">
+              <div style={{ position: 'relative', width: '44px', height: '44px' }}>
+                <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
+                  <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="3.5" />
+                  <circle
+                    cx="18"
+                    cy="18"
+                    r="15"
+                    fill="none"
+                    stroke="#ffffff"
+                    strokeWidth="3.5"
+                    strokeDasharray="100"
+                    strokeDashoffset={100 - (uploadProgress || 0)}
+                    style={{ transition: 'stroke-dashoffset 0.2s ease' }}
+                  />
+                </svg>
+              </div>
+            </div>
+          )}
+
+          {/* Centered Retry Pill on Failed State */}
+          {isFailed && (
+            <button
+              type="button"
+              className="msg-retry-pill"
+              onClick={(e) => {
+                if (isSelectionMode) return;
+                e.stopPropagation();
+                onRetry?.(msg);
+              }}
+              aria-label="Retry upload"
+            >
+              <RotateCcw size={13} />
+              <span>Retry upload</span>
+            </button>
+          )}
+
+          {/* Bottom Right Glass Chip (Time + Status or Uploading %) */}
+          <div className="msg-glass-chip bottom-right">
+            {isUploading ? (
+              <span>Uploading {uploadProgress || 0}%</span>
+            ) : (
+              <>
+                <span>{formatTime12Hour(msg.timestamp)}</span>
+                {!isReceived && <EyeIcon status={msg.status || 'sending'} />}
+              </>
+            )}
+          </div>
+      </div>
+    );
+  };
+
+  // 2. Video Renderer
+  const renderVideo = () => {
+    const isUploading = status === 'uploading';
+    const isFailed = status === 'failed';
+    const videoThumb = resolvedThumb || thumbnailUrl || msg.optimisticThumbUrl;
+
+    const isVideoBlurry = !isOptimistic && !resolvedMain && Boolean(videoThumb);
+
+    return (
+      <div
+        className="msg-video-wrap"
+        onClick={(e) => {
+          if (isSelectionMode) return;
+          e.stopPropagation();
+          if (isFailed) return;
+          if (!resolvedMain && !fileUrl) return; // Tap guard
+          onOpenViewer?.({ fileUrl: resolvedMain || fileUrl, fileName, fileType: 'video' });
+        }}
+      >
+        {videoThumb ? (
+          <img
+            src={videoThumb}
+            alt="Video preview"
+            loading="lazy"
+            style={{
+              filter: isVideoBlurry ? `blur(${PREVIEW_BLUR_PX}px)` : 'none',
+              transition: 'filter 0.6s ease',
+              transform: isVideoBlurry ? 'scale(1.08)' : 'none',
+            }}
+            className={`msg-video-thumb ${isUploading || isFailed ? 'msg-media-overlay-dim' : ''}`}
+          />
+        ) : (
+          <div style={{ width: '100%', height: '100%', background: '#09090b' }} />
+        )}
+
+        {/* Centered 52px Play Button Overlay */}
+        {!isUploading && !isFailed && (
+          <div className="msg-video-play-btn" aria-hidden="true">
+            <Play fill="#111827" color="#111827" size={26} style={{ marginLeft: '3px' }} />
+          </div>
+        )}
+
+        {/* Centered Upload Progress Ring */}
+        {isUploading && (
+          <div className="msg-progress-circle">
+            <div style={{ position: 'relative', width: '44px', height: '44px' }}>
               <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
-                <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="4" />
-                <circle 
-                  cx="18" cy="18" r="16" fill="none" stroke="var(--accent-text)" strokeWidth="4" 
-                  strokeDasharray="100" strokeDashoffset={100 - uploadProgress}
-                  style={{ transition: 'stroke-dashoffset 0.3s ease' }}
+                <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="3.5" />
+                <circle
+                  cx="18"
+                  cy="18"
+                  r="15"
+                  fill="none"
+                  stroke="#ffffff"
+                  strokeWidth="3.5"
+                  strokeDasharray="100"
+                  strokeDashoffset={100 - (uploadProgress || 0)}
+                  style={{ transition: 'stroke-dashoffset 0.2s ease' }}
                 />
               </svg>
             </div>
           </div>
         )}
 
-      </div>
-    );
-  };
-
-  const renderImage = () => (
-    <div
-      onClick={(e) => {
-        if (isSelectionMode) return;
-        e.stopPropagation();
-        if (status === 'failed') return;
-        // Immediate full screen on first click
-        onOpenViewer?.({ fileUrl: resolvedMain || fileUrl, fileName, fileType });
-      }}
-      style={{
-        position: 'relative',
-        width: isMobile ? '100%' : '280px',
-        maxWidth: '280px',
-        borderRadius: '12px',
-        overflow: 'hidden',
-        cursor: 'pointer',
-        background: 'var(--bg-secondary)',
-        border: '1px solid var(--border-color)'
-      }}
-    >
-      <img
-        src={resolvedMain || resolvedThumb || thumbnailUrl || fileUrl || msg.optimisticThumbUrl || msg.optimisticUrl}
-        alt={fileName}
-        style={{
-          width: '100%',
-          height: 'auto',
-          display: 'block',
-          maxHeight: '400px',
-          objectFit: 'contain',
-          transition: 'filter 0.3s ease, opacity 0.3s ease',
-          opacity: status === 'uploading' ? 0.6 : 1
-        }}
-      />
-
-      {renderOptimisticOverlay()}
-
-      {(!isOptimistic || status === 'failed') && (
-        <div
-          style={{
-            position: 'absolute', bottom: '8px', right: '8px',
-            display: 'flex', alignItems: 'center', gap: '8px',
-            zIndex: 6
-          }}
-        >
-          {status === 'failed' && (
-            <div
-              onClick={(e) => {
-                if (isSelectionMode) return;
-                e.stopPropagation();
-                onRetry?.(msg);
-              }}
-              title="Retry Upload"
-              style={{
-                display: 'flex', alignItems: 'center', gap: '6px',
-                background: 'var(--danger-tint-border)', padding: '4px 8px', borderRadius: '12px',
-                color: 'white', fontSize: '11px', fontWeight: '500',
-                border: '1px solid rgba(255,255,255,0.2)',
-                cursor: 'pointer', transition: 'background 0.2s ease'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--danger-tint)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'var(--danger-tint)'}
-            >
-              <RotateCcw size={14} />
-              <span>Retry</span>
-            </div>
-          )}
-
-          {!isOptimistic && (
-            <div
-              onClick={(e) => {
-                if (isSelectionMode) return;
-                e.stopPropagation();
-                const url = resolvedMain || fileUrl;
-                if (!url) return;
-                if (url.startsWith('blob:')) {
-                  const link = document.createElement('a');
-                  link.href = url;
-                  link.setAttribute('download', fileName || 'download');
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
-                } else {
-                  downloadFile(url, fileName);
-                }
-              }}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '6px',
-                background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
-                padding: '4px 8px', borderRadius: '12px',
-                color: 'white', fontSize: '11px', fontWeight: '500',
-                border: '1px solid rgba(255,255,255,0.2)',
-                cursor: 'pointer', transition: 'background 0.2s ease',
-                boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.8)'}
-              onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.6)'}
-            >
-              <span>{formatSize(fileSize)}</span>
-              <Download size={14} />
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-
-  const renderVideo = () => (
-    <div 
-      onClick={(e) => {
-        if (isSelectionMode) return;
-        e.stopPropagation();
-        onOpenViewer?.({ fileUrl: resolvedMain || fileUrl, fileName, fileType });
-      }}
-      style={{
-        width: isMobile ? '100%' : '280px',
-        maxWidth: '280px',
-        borderRadius: '12px',
-        overflow: 'hidden',
-        background: '#000',
-        position: 'relative',
-        cursor: 'pointer'
-      }}
-    >
-      <img 
-        src={resolvedThumb || thumbnailUrl || msg.optimisticThumbUrl} 
-        style={{ 
-          width: '100%', 
-          height: 'auto',
-          display: 'block',
-          opacity: status === 'uploading' ? 0.3 : 0.7 
-        }} 
-        alt="Video thumbnail" 
-      />
-      
-      {renderOptimisticOverlay()}
-
-      {/* Play Button Overlay */}
-      <div style={{ 
-        position: 'absolute', 
-        inset: 0, 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        pointerEvents: 'none' // Let clicks pass through to the main container
-      }}>
-        <div style={{ 
-          background: 'rgba(255,255,255,0.25)', 
-          borderRadius: '50%', 
-          padding: '12px', 
-          backdropFilter: 'blur(4px)',
-          border: '1px solid rgba(255,255,255,0.3)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center'
-        }}>
-          <Play fill="white" color="white" size={32} style={{ marginLeft: '4px' }} />
-        </div>
-      </div>
-
-      <div style={{
-        position: 'absolute', bottom: '8px', right: '8px',
-        display: 'flex', alignItems: 'center', gap: '8px',
-        zIndex: 6
-      }}>
-        {status === 'failed' && (
-          <div
+        {/* Centered Retry Pill on Failed State */}
+        {isFailed && (
+          <button
+            type="button"
+            className="msg-retry-pill"
             onClick={(e) => {
               if (isSelectionMode) return;
               e.stopPropagation();
               onRetry?.(msg);
             }}
-            title="Retry Upload"
-            style={{
-              padding: '6px 10px', borderRadius: '12px', background: 'var(--danger-tint-border)',
-              border: '1px solid rgba(255,255,255,0.2)', color: 'white',
-              display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer',
-              fontSize: '11px', fontWeight: '500'
-            }}
+            aria-label="Retry upload"
           >
-            <RotateCcw size={14} />
-            <span>Retry</span>
+            <RotateCcw size={13} />
+            <span>Retry upload</span>
+          </button>
+        )}
+
+        {/* Duration Glass Chip Bottom Left */}
+        {duration && (
+          <div className="msg-glass-chip bottom-left">
+            <span>{formatDuration(duration)}</span>
           </div>
         )}
-        <div style={{
-          background: 'rgba(0,0,0,0.7)', padding: '4px 8px', borderRadius: '12px',
-          fontSize: '11px', color: 'white', border: '1px solid var(--border-color)'
-        }}>
-          {formatDuration(duration)}
+
+        {/* Time + Status Glass Chip Bottom Right */}
+        <div className="msg-glass-chip bottom-right">
+          {isUploading ? (
+            <span>Uploading {uploadProgress || 0}%</span>
+          ) : (
+            <>
+              <span>{formatTime12Hour(msg.timestamp)}</span>
+              {!isReceived && <EyeIcon status={msg.status || 'sending'} />}
+            </>
+          )}
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
+  // 3. Audio / Voice Note Renderer
   const renderAudio = () => {
-    // Simulated waveform bars
-    const bars = [8, 12, 16, 12, 8, 14, 20, 24, 18, 12, 10, 16, 22, 18, 10, 8, 12, 16, 12, 8, 14, 20, 24, 18, 12, 10, 16, 22, 18, 10, 24, 18, 10, 8, 12, 16, 12, 8, 14, 20];
+    const barsData = (Array.isArray(msg.waveform) && msg.waveform.length >= 20)
+      ? msg.waveform.slice(0, 30)
+      : FALLBACK_BARS;
+
+    const audioSrc = resolvedMain || fileUrl;
 
     return (
-      <div style={{
-        width: isMobile ? '100%' : '300px',
-        maxWidth: '300px',
-        padding: '12px 16px',
-        background: isReceived ? 'var(--bg-card)' : 'rgba(0, 0, 0, 0.18)',
-        backdropFilter: 'blur(10px)',
-        border: isReceived ? '1px solid var(--border-color)' : '1px solid var(--border-color)',
-        borderRadius: '16px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '4px',
-        position: 'relative',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
-      }}>
-        {/* Main row: Icon + Waveform */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* Action Button: Uploading Ring, Download, or Play */}
-          {isOptimistic && status === 'uploading' ? (
-            <div
-              style={{
-                width: '48px', height: '48px', borderRadius: '50%',
-                background: 'rgba(0,0,0,0.3)', border: '1px solid var(--accent-tint-border)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                flexShrink: 0
-              }}
-            >
-              <div style={{ position: 'relative', width: '28px', height: '28px' }}>
-                <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
-                  <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="3.5" />
-                  <circle 
-                    cx="18" cy="18" r="15" fill="none" stroke={isReceived ? "var(--accent-color)" : "#ffffff"} strokeWidth="3.5" 
-                    strokeDasharray="100" strokeDashoffset={100 - uploadProgress}
-                    style={{ transition: 'stroke-dashoffset 0.2s ease' }}
-                  />
-                </svg>
-              </div>
-            </div>
-          ) : !showFull ? (
-            <button
-              onClick={(e) => { 
-                if (isSelectionMode) return;
-                e.stopPropagation(); 
-                setShowFull(true); 
-              }}
-              style={{
-                width: '48px', height: '48px', borderRadius: '50%',
-                background: isReceived ? 'var(--bg-hover)' : 'var(--border-color)', border: 'none',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: isReceived ? 'var(--accent-color)' : '#ffffff', cursor: 'pointer', flexShrink: 0, outline: 'none'
-              }}
-            >
-              <Download size={24} />
-            </button>
-          ) : (
-            <button
-              onClick={(e) => { 
-                if (isSelectionMode) return;
-                e.stopPropagation(); 
-                togglePlayPause(); 
-              }}
-              style={{
-                width: '48px', height: '48px', borderRadius: '50%',
-                background: 'transparent', border: 'none',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: isReceived ? 'var(--accent-color)' : '#ffffff', cursor: 'pointer', flexShrink: 0, outline: 'none'
-              }}
-            >
-              {isPlaying ? <Pause size={30} fill={isReceived ? 'var(--accent-color)' : '#fff'} /> : <Play size={30} fill={isReceived ? 'var(--accent-color)' : '#fff'} />}
-            </button>
-          )}
+      <div className="msg-audio-wrap">
+        <div className="msg-audio-row">
+          {/* Circular 40px Play/Pause Button */}
+          <button
+            type="button"
+            className="msg-audio-play-btn"
+            onClick={togglePlayPause}
+            aria-label={isPlaying ? 'Pause audio' : 'Play audio'}
+          >
+            {isPlaying ? (
+              <Pause size={20} fill="currentColor" color="currentColor" />
+            ) : (
+              <Play size={20} fill="currentColor" color="currentColor" style={{ marginLeft: '2px' }} />
+            )}
+          </button>
 
-          {/* Waveform Visualization */}
-          <div style={{
-            flex: 1, height: '32px', display: 'flex', alignItems: 'center', gap: '2.5px',
-            opacity: showFull ? 1 : 0.6
-          }}>
-            {bars.map((h, i) => {
-              const progress = (currentTime / (duration || 1)) * bars.length;
+          {/* Tappable/Scrubbable Waveform Slider */}
+          <div
+            ref={waveformRef}
+            className="msg-waveform"
+            role="slider"
+            tabIndex={0}
+            aria-label="Audio scrubber"
+            aria-valuenow={Math.round(currentTime)}
+            aria-valuemin={0}
+            aria-valuemax={Math.round(duration || 1)}
+            onClick={handleWaveformSeek}
+            onKeyDown={handleWaveformKeyDown}
+            onTouchStart={handleWaveformSeek}
+            onTouchMove={handleWaveformSeek}
+          >
+            {barsData.map((h, i) => {
+              const progress = (currentTime / (duration || 1)) * barsData.length;
               const isActive = i < progress;
+              const barHeight = Math.max(6, Math.min(Number(h) || 12, 28));
+
+              let barBg;
+              if (isReceived) {
+                barBg = isActive ? 'var(--accent-solid)' : 'var(--border-color)';
+              } else {
+                barBg = isActive ? '#ffffff' : 'rgba(255, 255, 255, 0.35)';
+              }
+
               return (
                 <div
                   key={i}
+                  className="msg-waveform-bar"
                   style={{
-                    flex: 1, height: `${h}px`, borderRadius: '1.5px',
-                    background: isActive ? (isReceived ? 'var(--accent-color)' : '#ffffff') : (isReceived ? 'var(--border-color)' : 'rgba(255, 255, 255, 0.35)'),
-                    transition: 'all 0.2s ease',
-                    boxShadow: isActive ? `0 0 8px ${isReceived ? 'var(--accent-color)' : 'rgba(255, 255, 255, 0.5)'}` : 'none'
+                    height: `${barHeight}px`,
+                    backgroundColor: barBg,
                   }}
                 />
               );
             })}
           </div>
 
-          {/* Hidden Audio Element */}
-          {showFull && (
-            <audio
-              ref={audioRef}
-              src={resolvedMain || fileUrl}
-              onTimeUpdate={onTimeUpdate}
-              onEnded={onEnded}
-              style={{ display: 'none' }}
-            />
-          )}
+          {/* Speed Chip (Cycles 1x -> 1.5x -> 2x) */}
+          <button
+            type="button"
+            className="msg-speed-chip"
+            onClick={cycleSpeed}
+            aria-label={`Playback speed: ${playbackSpeed}x`}
+          >
+            {playbackSpeed}x
+          </button>
+        </div>
 
-          {/* Mic Icon (Standard Voice Note Indicator) */}
-          <div style={{ 
-            color: isReceived ? 'var(--accent-color)' : '#ffffff', 
-            display: 'flex', 
-            alignItems: 'center', 
-            opacity: isOptimistic ? 0.4 : 1,
-          }}>
-            <Mic size={20} fill={isReceived ? 'var(--accent-color)' : '#ffffff'} />
+        {/* Bottom Details Row: Elapsed/Total Duration on Left, Time + Status on Right */}
+        <div className="msg-audio-bottom">
+          <span>
+            {formatDuration(isPlaying || currentTime > 0 ? currentTime : duration)}
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span>{formatTime12Hour(msg.timestamp)}</span>
+            {!isReceived && <EyeIcon status={msg.status || 'sending'} />}
           </div>
         </div>
 
-        {/* Info row: Duration only (since parent renders timestamp) */}
-        {!isOptimistic && (
-          <div style={{
-            display: 'flex', justifyContent: 'flex-start',
-            paddingLeft: '60px', opacity: 0.85
-          }}>
-            <span style={{ fontSize: '10px', color: isReceived ? 'var(--text-secondary)' : 'rgba(255, 255, 255, 0.85)', fontFamily: 'monospace' }}>
-              {isPlaying || currentTime > 0 ? formatDuration(currentTime) : formatDuration(duration)} • {formatSize(fileSize)}
-            </span>
-          </div>
-        )}
+        {/* Native Audio Element */}
+        <audio
+          ref={audioRef}
+          src={audioSrc}
+          onTimeUpdate={onTimeUpdate}
+          onEnded={onEnded}
+          style={{ display: 'none' }}
+        />
       </div>
     );
   };
 
+  // 4. Document / PDF Renderer
   const renderDocument = () => {
-    // 1. Consolidated PDF detection (Safe, single declaration)
-    const isPDF = isPdfFile(fileName) || fileType === 'pdf' || fileType === 'application/pdf';
+    const ext = getFileExtension(fileName, fileType);
+    const isPDF = ext === 'PDF' || isPdfFile(fileName) || fileType === 'pdf';
+    const hasThumb = isPDF && Boolean(resolvedThumb || thumbnailUrl || msg.optimisticThumbUrl) && !thumbError;
+    const downloadTargetUrl = resolvedMain || fileUrl;
 
-    // 2. Resolve thumbnail presence logic — only show thumbnail for PDFs, not generic docs
-    const hasThumb = isPDF && !!(resolvedThumb || thumbnailUrl || msg.optimisticThumbUrl) && !thumbError;
+    const handleDownload = (e) => {
+      e.stopPropagation();
+      if (!downloadTargetUrl) return;
+      downloadFile(downloadTargetUrl, fileName || 'document');
+    };
 
-    const docColor = isPDF ? 'var(--danger-color)' : 'var(--accent-text)';
+    const handleCardOpen = (e) => {
+      if (isSelectionMode) return;
+      e.stopPropagation();
+      if (downloadTargetUrl) {
+        window.open(downloadTargetUrl, '_blank');
+      }
+    };
 
-    return (
-      <div
-        style={{
-          width: isMobile ? '100%' : '300px',
-          maxWidth: '300px',
-          background: isReceived ? 'var(--bg-card)' : 'rgba(0, 0, 0, 0.18)',
-          borderRadius: '12px',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          position: 'relative',
-          cursor: 'pointer',
-          border: isReceived ? '1px solid var(--border-color)' : '1px solid var(--border-color)',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
-        }}
-        onClick={(e) => {
-          if (isSelectionMode) return;
-          e.stopPropagation();
-          const url = resolvedMain || fileUrl;
-          if (url) window.open(url, '_blank');
-        }}
-      >
-        {renderOptimisticOverlay()}
+    // A) Paper in a Pocket (First-Page Thumbnail Present)
+    if (hasThumb) {
+      return (
+        <div className="msg-doc-stack-wrap" onClick={handleCardOpen}>
+          {/* Stack Area */}
+          <div className="msg-doc-stack-area">
+            {/* Background Sheet 1 (-4.5deg) */}
+            {noOfPages !== 1 && <div className="msg-doc-back-sheet-1" />}
 
-        {/* Thumbnail Hero Section (Top-Crop Style) */}
-        {hasThumb && (
-          <div style={{
-            width: '100%', height: '120px', 
-            background: 'rgba(0, 0, 0, 0.2)', 
-            position: 'relative',
-            overflow: 'hidden'
-          }}>
-            <img
-              src={resolvedThumb || thumbnailUrl || msg.optimisticThumbUrl}
-              style={{
-                width: '100%', height: '100%',
-                objectFit: 'cover',
-                objectPosition: 'top'
-              }}
-              alt="Document preview"
-              onError={() => setThumbError(true)}
-            />
-            {/* Bottom Gradient Fade */}
-            <div style={{
-              position: 'absolute', bottom: 0, left: 0, right: 0, height: '40px',
-              background: `linear-gradient(to top, ${isReceived ? 'var(--bg-card)' : 'rgba(0,0,0,0.3)'}, transparent)`
-            }}/>
-          </div>
-        )}
+            {/* Background Sheet 2 (3deg) */}
+            {noOfPages !== 1 && <div className="msg-doc-back-sheet-2" />}
 
-        {/* Bottom Details Block */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '14px',
-          padding: '12px 14px',
-          background: isReceived ? 'var(--bg-card)' : 'transparent' 
-        }}>
-
-          {/* Folded Document Icon */}
-          <div style={{
-            width: '38px', height: '46px',
-            background: docColor,
-            borderRadius: '6px',
-            position: 'relative',
-            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-            paddingBottom: '4px', flexShrink: 0,
-            overflow: 'hidden'
-          }}>
-            {/* The folded dog-ear corner */}
-            <div style={{
-              position: 'absolute', top: 0, right: 0,
-              width: '12px', height: '12px',
-              background: 'rgba(0,0,0,0.2)',
-              borderBottomLeftRadius: '6px'
-            }} />
-            <div style={{
-              position: 'absolute', top: '-12px', right: '-12px',
-              width: '24px', height: '24px',
-              background: isReceived ? 'var(--bg-card)' : 'transparent',
-              transform: 'rotate(45deg)'
-            }} />
-
-            <span style={{ fontSize: '10px', fontWeight: '900', color: 'white', letterSpacing: '0.2px', zIndex: 1 }}>
-              {isPDF ? 'PDF' : 'DOC'}
-            </span>
-          </div>
-
-          {/* Text Information */}
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
-            <div style={{
-              fontSize: '14px', fontWeight: '600', color: isReceived ? 'var(--text-primary)' : '#ffffff',
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-            }}>
-              {fileName || 'Document'}
-            </div>
-            <div style={{ fontSize: '11px', color: isReceived ? 'var(--text-secondary)' : 'rgba(255, 255, 255, 0.85)', fontWeight: '500' }}>
-              {noOfPages ? `${noOfPages} pages • ` : ''}
-              {isPDF ? 'PDF' : (fileType || 'Doc').toUpperCase()} • {formatSize(fileSize)}
+            {/* Front Sheet with Folded Corner */}
+            <div className="msg-doc-front-sheet">
+              <img
+                src={resolvedThumb || thumbnailUrl || msg.optimisticThumbUrl}
+                alt="Document preview"
+                className="msg-doc-front-img"
+                onError={() => setThumbError(true)}
+              />
+              <div className="msg-doc-corner-triangle" />
             </div>
           </div>
 
-          {/* Action Buttons Area */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {status === 'failed' && (
-              <div
-                onClick={(e) => {
-                  if (isSelectionMode) return;
-                  e.stopPropagation();
-                  onRetry?.(msg);
-                }}
-                title="Retry Upload"
-                style={{
-                  padding: '8px', borderRadius: '50%', background: 'var(--danger-tint)',
-                  border: '1px solid var(--danger-tint-border)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                  transition: 'background 0.2s', color: 'var(--danger-color)'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.background = 'var(--danger-tint)'}
-                onMouseLeave={(e) => e.currentTarget.style.background = 'var(--danger-tint)'}
-              >
-                <RotateCcw size={16} />
-              </div>
-            )}
+          {/* Pocket Overlap */}
+          <div className="msg-doc-pocket">
+            <div className="msg-doc-pocket-info">
+              <span className="msg-doc-pocket-title">
+                {fileName || 'Document.pdf'}
+              </span>
+              <span className="msg-doc-pocket-sub">
+                {noOfPages ? `${noOfPages} pages · ` : ''}
+                {formatSize(fileSize)} · {formatTime12Hour(msg.timestamp)}
+              </span>
+            </div>
 
-            {isOptimistic && status === 'uploading' ? (
-              <div
-                style={{
-                  width: '34px', height: '34px', borderRadius: '50%',
-                  background: 'rgba(0,0,0,0.3)', border: '1px solid var(--accent-tint-border)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  flexShrink: 0
-                }}
-              >
-                <div style={{ position: 'relative', width: '22px', height: '22px' }}>
-                  <svg viewBox="0 0 36 36" style={{ width: '100%', height: '100%', transform: 'rotate(-90deg)' }}>
-                    <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="3.5" />
-                    <circle 
-                      cx="18" cy="18" r="15" fill="none" stroke={isReceived ? "var(--accent-color)" : "var(--accent-text)"} strokeWidth="3.5" 
-                      strokeDasharray="100" strokeDashoffset={100 - uploadProgress}
-                      style={{ transition: 'stroke-dashoffset 0.2s ease' }}
-                    />
-                  </svg>
-                </div>
-              </div>
-            ) : (
-              <div
-                onClick={(e) => {
-                  if (isSelectionMode) return;
-                  e.stopPropagation();
-                  const url = resolvedMain || fileUrl;
-                  if (url) downloadFile(url, fileName);
-                }}
-                style={{
-                  padding: '8px', borderRadius: '50%', background: isReceived ? 'var(--bg-hover)' : 'var(--border-color)',
-                  border: isReceived ? '1px solid var(--border-color)' : '1px solid var(--border-color)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                  transition: 'background 0.2s'
-                }}
-              >
-                <Download size={18} color={isReceived ? 'var(--text-primary)' : '#ffffff'} />
-              </div>
-            )}
+            {/* 36px Circular Download Button */}
+            <button
+              type="button"
+              className="msg-doc-download-btn"
+              onClick={handleDownload}
+              aria-label="Download document"
+            >
+              <Download size={16} />
+            </button>
           </div>
         </div>
+      );
+    }
+
+    // B) Generic Row Tile (Without Thumbnail)
+    return (
+      <div className="msg-doc-row" onClick={handleCardOpen}>
+        {/* 40x48px Extension Tile */}
+        <div className={`msg-doc-ext-tile ${isPDF ? 'is-pdf' : 'is-other'}`}>
+          <div className="msg-doc-ext-tile-flap" />
+          <span>{ext}</span>
+        </div>
+
+        {/* Text Information */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <span style={{ fontSize: '13.5px', fontWeight: '600', color: 'inherit', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {fileName || 'Document'}
+          </span>
+          <span style={{ fontSize: '11px', opacity: 0.8, fontVariantNumeric: 'tabular-nums' }}>
+            {noOfPages ? `${noOfPages} pages · ` : ''}
+            {formatSize(fileSize)} · {formatTime12Hour(msg.timestamp)}
+          </span>
+        </div>
+
+        {/* 36px Download Button */}
+        <button
+          type="button"
+          className="msg-doc-download-btn"
+          onClick={handleDownload}
+          aria-label="Download document"
+        >
+          <Download size={16} />
+        </button>
       </div>
     );
   };
 
-  return (
-    <>
-      <style>{`
-        @keyframes muSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .animate-spin { animation: muSpin 1s linear infinite; }
-      `}</style>
-      {(() => {
-        switch (fileType) {
-          case 'image': return renderImage();
-          case 'video': return renderVideo();
-          case 'audio': return renderAudio();
-          default: return renderDocument();
-        }
-      })()}
-    </>
-  );
+  switch (fileType) {
+    case 'image':
+      return renderImage();
+    case 'video':
+      return renderVideo();
+    case 'audio':
+      return renderAudio();
+    default:
+      return renderDocument();
+  }
 }

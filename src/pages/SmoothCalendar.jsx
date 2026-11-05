@@ -573,7 +573,6 @@ const SmoothCalendar = () => {
         setActiveBookingAction(null);
         setShowAddEvent(false);
         setShowEventDetails(false);
-        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -3370,93 +3369,6 @@ const SmoothCalendar = () => {
                   style={{ minHeight: '44px', padding: '8px 18px', borderRadius: '10px', backgroundColor: 'var(--danger-color)', color: 'var(--text-on-accent)', border: 'none', fontWeight: '700', cursor: 'pointer' }}
                 >
                   {submittingAction ? 'Cancelling...' : 'Confirm'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* LOCAL CONFIRMATION DIALOG */}
-        {confirmDialog.isOpen && (
-          <div
-            style={{
-              position: 'fixed',
-              inset: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.65)',
-              backdropFilter: 'blur(4px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 20000,
-              padding: '16px',
-              animation: 'fadeIn 0.2s ease-out'
-            }}
-            onClick={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
-            role="presentation"
-          >
-            <div
-              style={{
-                backgroundColor: 'var(--bg-card)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '20px',
-                padding: '24px',
-                width: '100%',
-                maxWidth: '380px',
-                boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '12px',
-                boxSizing: 'border-box'
-              }}
-              onClick={(e) => e.stopPropagation()}
-              role="alertdialog"
-              aria-modal="true"
-              aria-label={confirmDialog.title}
-            >
-              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)' }}>
-                {confirmDialog.title}
-              </h3>
-              <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-                {confirmDialog.message}
-              </p>
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
-                  style={{
-                    padding: '10px 18px',
-                    borderRadius: '10px',
-                    backgroundColor: 'var(--bg-secondary)',
-                    border: '1px solid var(--border-color)',
-                    color: 'var(--text-secondary)',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    minHeight: '44px'
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const action = confirmDialog.onConfirm;
-                    setConfirmDialog(prev => ({ ...prev, isOpen: false }));
-                    if (action) action();
-                  }}
-                  style={{
-                    padding: '10px 18px',
-                    borderRadius: '10px',
-                    backgroundColor: 'var(--danger-color)',
-                    color: 'var(--text-on-accent)',
-                    border: 'none',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    minHeight: '44px'
-                  }}
-                >
-                  Confirm
                 </button>
               </div>
             </div>

@@ -129,6 +129,16 @@ export function initWebsocket() {
       return;
     }
 
+    // 3.1 Ephemeral Media Pending Placeholders
+    if (msg.type === 'media_pending') {
+      messageStore.addPendingMedia(msg);
+      return;
+    }
+    if (msg.type === 'media_pending_cancel') {
+      messageStore.removePendingMedia(msg.chatid, msg.pendingid, false, msg.senderid);
+      return;
+    }
+
     // 3.5 Real-Time Poll Updates & Voting ACKs
     if (msg.type === 'poll-update' || msg.user_votes || (msg.poll_id && ('options' in msg || 'total_voters' in msg))) {
       console.log("[Websocket] Poll update / ACK received:", msg);
@@ -260,8 +270,9 @@ export function initWebsocket() {
 export async function sendSafe(msg) {
   // 1. Identify "Strictly Ephemeral" messages that must NOT be stored/queued
   const isIndicator = msg.type === 'indicator';
+  const isMediaPending = msg.type === 'media_pending' || msg.type === 'media_pending_cancel';
   const isPresenceSignal = ['check-out'].includes(msg.purpose);
-  const isEphemeral = isIndicator || isPresenceSignal;
+  const isEphemeral = isIndicator || isMediaPending || isPresenceSignal;
 
   // 2. Handle Persistent Messages (standard chat messages)
   if (!isEphemeral && msg.tempmsgid && !messageStore.isVolatile(msg.chatid || msg.userchatId)) {
@@ -272,6 +283,9 @@ export async function sendSafe(msg) {
   if (!socket) {
     if (!isEphemeral) {
       console.log(`[Websocket] No socket, relying on sync queue (spaceid: ${msg.spaceid})`);
+      if (navigator.onLine && localStorage.getItem('sleepMode') !== 'true') {
+        initWebsocket();
+      }
     } else {
       console.warn(`[Websocket] No socket: Ephemeral ${msg.type || msg.purpose} discarded`);
     }
@@ -281,6 +295,7 @@ export async function sendSafe(msg) {
   switch (socket.readyState) {
     case WebSocket.OPEN:
       try {
+        SyncService.flushQueue(socket);
         socket.send(JSON.stringify(msg));
         if (import.meta.env.DEV) console.log("[Websocket] Sent immediately:", msg.purpose || msg.type || 'message');
       } catch (err) {

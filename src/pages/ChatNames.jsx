@@ -2483,7 +2483,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
             
             <div style={{
               textAlign: 'center',
-              padding: '24px 0 36px 0',
+              padding: isDesktop ? '24px 0 36px 0' : '24px 0 calc(110px + env(safe-area-inset-bottom, 0px)) 0',
               color: 'var(--text-secondary)',
               fontSize: '12px',
               fontWeight: '600',

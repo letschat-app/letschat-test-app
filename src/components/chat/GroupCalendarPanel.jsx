@@ -15,7 +15,7 @@ export const parseEventDate = (val) => {
   return new Date(val);
 };
 
-const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onOpenEvent }) => {
+const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onOpenEvent, highlightEventId }) => {
   const [events, setEvents] = useState(() => {
     if (!chatId) return [];
     try {
@@ -104,6 +104,40 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onO
       window.removeEventListener('letschat_refresh_events', fetchGroupEvents);
     };
   }, [chatId]);
+
+  useEffect(() => {
+    if (!highlightEventId || events.length === 0) return;
+    const target = events.find(e =>
+      e.groupEventId === highlightEventId ||
+      String(e.eventId) === String(highlightEventId)
+    );
+    if (target) {
+      const dStart = parseEventDate(target.startTime);
+      const startMs = dStart && !isNaN(dStart.getTime()) ? dStart.getTime() : 0;
+      const dEnd = parseEventDate(target.endTime);
+      const endMs = dEnd && !isNaN(dEnd.getTime()) ? dEnd.getTime() : (startMs + 60 * 60 * 1000);
+      const isCancelled = target.action === "cancelled";
+      const isOngoing = startMs <= Date.now() && endMs >= Date.now() && !isCancelled;
+      const isUpcoming = startMs >= Date.now() - 15 * 60 * 1000 && !isCancelled;
+
+      if (selectedFilter === "ongoing" && !isOngoing) {
+        setSelectedFilter(isUpcoming ? "upcoming" : "all");
+      } else if (selectedFilter === "upcoming" && (!isUpcoming || isCancelled)) {
+        setSelectedFilter("all");
+      }
+    }
+  }, [highlightEventId, events]);
+
+  useEffect(() => {
+    if (!highlightEventId) return;
+    const timer = setTimeout(() => {
+      const el = document.getElementById(`group-event-${highlightEventId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [highlightEventId, selectedFilter, events]);
 
   const handleVote = async (groupEventId, rsvpStatus) => {
     try {
@@ -504,26 +538,49 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onO
               (ev.creatorName && currentUsername && ev.creatorName === currentUsername)
             );
 
+            const isTargetHighlight = Boolean(highlightEventId && (
+              ev.groupEventId === highlightEventId ||
+              String(ev.eventId) === String(highlightEventId)
+            ));
+
             return (
               <div
+                id={`group-event-${ev.groupEventId || ev.eventId}`}
                 key={ev.eventId || ev.groupEventId}
                 onClick={() => onOpenEvent && onOpenEvent(ev)}
                 style={{
-                  backgroundColor: 'var(--bg-hover)',
+                  backgroundColor: isTargetHighlight ? 'var(--accent-tint)' : 'var(--bg-hover)',
                   borderRadius: '16px',
-                  border: `1px solid ${isCancelled ? 'var(--danger-tint-border)' : isOngoing ? 'rgba(16, 185, 129, 0.3)' : 'var(--bg-hover)'}`,
+                  border: isTargetHighlight
+                    ? '2px solid var(--accent-solid)'
+                    : `1px solid ${isCancelled ? 'var(--danger-tint-border)' : isOngoing ? 'rgba(16, 185, 129, 0.3)' : 'var(--bg-hover)'}`,
+                  boxShadow: isTargetHighlight ? '0 0 18px var(--accent-tint)' : undefined,
                   padding: '16px',
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '12px',
                   position: 'relative',
                   opacity: isCancelled ? 0.7 : isPast ? 0.82 : 1,
-                  cursor: onOpenEvent ? 'pointer' : 'default'
+                  cursor: onOpenEvent ? 'pointer' : 'default',
+                  transition: 'all 0.3s ease'
                 }}
               >
                 {/* Event Top Badge */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {isTargetHighlight && (
+                      <span style={{
+                        padding: '4px 8px',
+                        borderRadius: '8px',
+                        fontSize: '10px',
+                        fontWeight: '700',
+                        textTransform: 'uppercase',
+                        backgroundColor: 'var(--accent-color)',
+                        color: '#ffffff'
+                      }}>
+                        📌 Pinned
+                      </span>
+                    )}
                     <span style={{
                       padding: '4px 10px',
                       borderRadius: '8px',

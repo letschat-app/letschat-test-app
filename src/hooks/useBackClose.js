@@ -113,11 +113,13 @@ export function useBackClose(isOpen = true, onClose) {
       if (index !== -1) {
         const [removed] = modalStack.splice(index, 1);
         if (removed && removed.pushed && !removed.closedViaPopstate) {
-          isProgrammaticBack = true;
-          try {
-            window.history.back();
-          } catch {
-            isProgrammaticBack = false;
+          if (typeof window !== 'undefined' && window.history.state?.lcModal === id) {
+            isProgrammaticBack = true;
+            try {
+              window.history.back();
+            } catch {
+              isProgrammaticBack = false;
+            }
           }
         }
       }

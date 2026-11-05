@@ -19,6 +19,7 @@ function getHigherStatus(currentStatus, incomingStatus) {
 
 // MessageStore.js
 import { saveMessageToDB, getMessagesFromDB, getUnreadMessagesForChat, getLatestMessagesForAllSpaces, getUnreadCountsBySpaceFromDB, initDB } from "../service/db";
+import { previewToDataURL } from "../service/TinyPreview";
 
 const messageStore = {
   messages: {},
@@ -51,6 +52,9 @@ const messageStore = {
   volatileQueue: [],
   volatileChats: new Set(JSON.parse(localStorage.getItem('roomRegistry') || '[]')), // Hydrate from localStorage
   transientIndicators: {}, // { chatid: { userid: { content, sendername, expiry } } }
+  pendingMedia: {}, // { [chatid]: { [pendingid]: frame } }
+  pendingInfo: new Map(), // pendingid -> { thumb, kind, fileName, fileSize, duration, noOfPages, w, h }
+  pendingTimers: {}, // { pendingid: timerId }
   indicatorTimeouts: {}, // To manage cleanup
   onlineStatuses: {}, // { userId: boolean }
   roomCounts: {}, // Separate store for Discovery Room unread counts (FCM driven)
@@ -380,6 +384,10 @@ const messageStore = {
     if (!chatid) {
       console.warn("Message missing chatid:", msg);
       return;
+    }
+
+    if (msg.pendingid) {
+      this.removePendingMedia(chatid, msg.pendingid, true);
     }
 
     // Auto-clear active indicator for this user when a message arrives from them
@@ -1065,6 +1073,90 @@ const messageStore = {
     return Object.keys(map)
       .map(uid => ({ userid: uid, ...map[uid] }))
       .filter(ind => ind.expiry > now);
+  },
+
+  addPendingMedia(frame) {
+    if (!frame || !frame.chatid || !frame.pendingid) return;
+    const cid = String(frame.chatid);
+    const pid = String(frame.pendingid);
+
+    if (!this.pendingMedia[cid]) this.pendingMedia[cid] = {};
+
+    if (this.pendingTimers[pid]) {
+      clearTimeout(this.pendingTimers[pid]);
+    }
+
+    let thumb = null;
+    if (frame.px) {
+      try {
+        thumb = previewToDataURL(frame.px);
+      } catch (e) {
+        console.warn('[MessageStore] previewToDataURL error:', e);
+      }
+    }
+
+    const enhancedFrame = {
+      ...frame,
+      thumb: thumb || frame.thumb || null,
+      isPendingPlaceholder: true
+    };
+
+    this.pendingMedia[cid][pid] = enhancedFrame;
+
+    if (this.pendingInfo.size >= 50) {
+      const oldestKey = this.pendingInfo.keys().next().value;
+      if (oldestKey) this.pendingInfo.delete(oldestKey);
+    }
+    this.pendingInfo.set(pid, {
+      thumb: enhancedFrame.thumb,
+      kind: frame.kind,
+      fileName: frame.fileName,
+      fileSize: frame.fileSize,
+      duration: frame.duration,
+      noOfPages: frame.noOfPages,
+      w: frame.w,
+      h: frame.h,
+      senderid: frame.senderid,
+      sendername: frame.sendername
+    });
+
+    this.pendingTimers[pid] = setTimeout(() => {
+      this.removePendingMedia(cid, pid, false);
+    }, 90000);
+
+    this.notifyListeners({ chatid: cid, pendingChanged: true });
+  },
+
+  removePendingMedia(chatid, pendingid, keepInfo = false, bySenderId = null) {
+    if (!chatid || !pendingid) return;
+    const cid = String(chatid);
+    const pid = String(pendingid);
+
+    const existing = this.pendingMedia[cid]?.[pid];
+    if (!existing) return;
+
+    if (bySenderId && existing.senderid && existing.senderid !== bySenderId) {
+      console.warn(`[MessageStore] Ignored pending cancel from unauthorized sender: ${bySenderId}`);
+      return;
+    }
+
+    if (this.pendingTimers[pid]) {
+      clearTimeout(this.pendingTimers[pid]);
+      delete this.pendingTimers[pid];
+    }
+
+    delete this.pendingMedia[cid][pid];
+
+    if (!keepInfo) {
+      this.pendingInfo.delete(pid);
+    }
+
+    this.notifyListeners({ chatid: cid, pendingChanged: true });
+  },
+
+  getPendingMedia(chatid) {
+    if (!chatid) return [];
+    return Object.values(this.pendingMedia[String(chatid)] || {});
   }
 };
 

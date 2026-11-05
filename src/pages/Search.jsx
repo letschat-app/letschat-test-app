@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import userDiscoveryStore from '../service/UserDiscoveryStore';
 
 import { useCommonGroups } from '../components/search/useCommonGroups';
@@ -112,6 +113,20 @@ const SearchComponent = () => {
       <div className="search-section-wrapper">
         {/* 1. Hero */}
         <div className="search-hero">
+          <button
+            type="button"
+            onClick={() => {
+              if (window.history.state && window.history.state.idx > 0) {
+                navigate(-1);
+              } else {
+                navigate('/chats');
+              }
+            }}
+            className="search-back-btn"
+            aria-label="Back to chats"
+          >
+            <ArrowLeft size={20} />
+          </button>
           <h1 className="search-hero-title">Find & Connect</h1>
           <p className="search-hero-subtitle">Search by name, UserId or email</p>
         </div>

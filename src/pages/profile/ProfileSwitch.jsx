@@ -1,17 +1,39 @@
 import React from 'react';
+import { Loader2 } from 'lucide-react';
 
 /**
  * Accessible 38x22 switch component.
  * Track: var(--border-color) when off, var(--accent-color) when on.
  * Knob: 18px white circle.
+ * When loading=true, displays a centered spinner in place of the switch button
+ * with identical dimensions (38x22) to prevent any layout shift.
  */
 const ProfileSwitch = ({
   checked = false,
   onChange,
   disabled = false,
+  loading = false,
   ariaLabelledBy,
   ariaLabel
 }) => {
+  if (loading) {
+    return (
+      <div
+        role="status"
+        aria-busy="true"
+        aria-label="Updating setting"
+        style={styles.loadingContainer}
+      >
+        <Loader2
+          size={16}
+          className="animate-spin"
+          color="var(--accent-color)"
+          style={{ color: 'var(--accent-color)' }}
+        />
+      </div>
+    );
+  }
+
   return (
     <button
       type="button"
@@ -42,6 +64,15 @@ const ProfileSwitch = ({
 };
 
 const styles = {
+  loadingContainer: {
+    width: '38px',
+    height: '22px',
+    minWidth: '38px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxSizing: 'border-box'
+  },
   track: {
     position: 'relative',
     width: '38px',

@@ -269,8 +269,8 @@ export const EventStorage = ({ children }) => {
       msgId:msgref ?? '',
       chatId:chatid || '',
       action:action ,
-      isAdded:false,
-      isSync:false,
+      isAdded: true,
+      isSync: true,
     }
     console.log(body)
     try {

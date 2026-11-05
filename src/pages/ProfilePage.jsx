@@ -141,6 +141,10 @@ const ProfilePage = () => {
     localStorage.getItem('is2FAEnabled') === 'true'
   );
   const [toggling2FA, setToggling2FA] = useState(false);
+  const [togglingPush, setTogglingPush] = useState(false);
+  const [togglingSleep, setTogglingSleep] = useState(false);
+  const [togglingBooking, setTogglingBooking] = useState(false);
+  const [togglingBusySlots, setTogglingBusySlots] = useState(false);
 
   // Change Password States
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
@@ -506,6 +510,8 @@ const ProfilePage = () => {
 
   // Toggle Meeting Booking Enabled with Optimistic Rollback
   const handleToggleBookingEnabled = async () => {
+    if (togglingBooking) return;
+    setTogglingBooking(true);
     const nextVal = !bookingSettings.isBookingEnabled;
     setBookingSettings((prev) => ({ ...prev, isBookingEnabled: nextVal }));
     try {
@@ -522,11 +528,15 @@ const ProfilePage = () => {
       console.error('Failed to update booking enabled', e);
       setBookingSettings((prev) => ({ ...prev, isBookingEnabled: !nextVal }));
       showToast('Failed to update booking settings');
+    } finally {
+      setTogglingBooking(false);
     }
   };
 
   // Toggle Show Busy Slots with Optimistic Rollback
   const handleToggleShowBusySlots = async () => {
+    if (togglingBusySlots) return;
+    setTogglingBusySlots(true);
     const nextVal = !bookingSettings.showBusySlots;
     setBookingSettings((prev) => ({ ...prev, showBusySlots: nextVal }));
     try {
@@ -543,6 +553,8 @@ const ProfilePage = () => {
       console.error('Failed to update show busy slots', e);
       setBookingSettings((prev) => ({ ...prev, showBusySlots: !nextVal }));
       showToast('Failed to update busy slots setting');
+    } finally {
+      setTogglingBusySlots(false);
     }
   };
 
@@ -767,11 +779,18 @@ const ProfilePage = () => {
     }
   };
 
-  const handleSleepModeToggle = () => {
-    const newValue = !isSleepMode;
-    setIsSleepMode(newValue);
-    toggleSleepMode(newValue);
-    showToast(newValue ? 'Sleep mode enabled' : 'Sleep mode disabled');
+  const handleSleepModeToggle = async () => {
+    if (togglingSleep) return;
+    setTogglingSleep(true);
+    try {
+      const newValue = !isSleepMode;
+      setIsSleepMode(newValue);
+      toggleSleepMode(newValue);
+      showToast(newValue ? 'Sleep mode enabled' : 'Sleep mode disabled');
+      await new Promise((resolve) => setTimeout(resolve, 350));
+    } finally {
+      setTogglingSleep(false);
+    }
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -897,13 +916,23 @@ const ProfilePage = () => {
           action={
             <ProfileSwitch
               checked={isPushActive}
-              disabled={isPushDenied}
+              disabled={isPushDenied || togglingPush}
+              loading={togglingPush}
               ariaLabelledBy="push-notif-label"
-              onChange={(checked) => {
-                if (checked) {
-                  requestPermissionAndGetToken(true);
-                } else {
-                  disableNotifications();
+              onChange={async (checked) => {
+                if (togglingPush) return;
+                setTogglingPush(true);
+                try {
+                  if (checked) {
+                    await requestPermissionAndGetToken(true);
+                  } else {
+                    await disableNotifications();
+                  }
+                } catch (err) {
+                  console.error('Failed to toggle push notifications:', err);
+                  showToast('Failed to update push notifications');
+                } finally {
+                  setTogglingPush(false);
                 }
               }}
             />
@@ -918,6 +947,8 @@ const ProfilePage = () => {
           action={
             <ProfileSwitch
               checked={isSleepMode}
+              disabled={togglingSleep}
+              loading={togglingSleep}
               ariaLabelledBy="sleep-mode-label"
               onChange={handleSleepModeToggle}
             />
@@ -936,15 +967,13 @@ const ProfilePage = () => {
         label="Two-factor authentication"
         subtitle="Email code when you sign in"
         action={
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {toggling2FA && <Loader2 size={15} className="animate-spin" color="var(--accent-color)" />}
-            <ProfileSwitch
-              checked={is2FAEnabled}
-              disabled={toggling2FA}
-              ariaLabelledBy="2fa-label"
-              onChange={handle2FAToggle}
-            />
-          </div>
+          <ProfileSwitch
+            checked={is2FAEnabled}
+            disabled={toggling2FA}
+            loading={toggling2FA}
+            ariaLabelledBy="2fa-label"
+            onChange={handle2FAToggle}
+          />
         }
       />
 
@@ -975,6 +1004,8 @@ const ProfilePage = () => {
         action={
           <ProfileSwitch
             checked={bookingSettings.isBookingEnabled}
+            disabled={togglingBooking}
+            loading={togglingBooking}
             ariaLabelledBy="booking-link-label"
             onChange={handleToggleBookingEnabled}
           />
@@ -1019,6 +1050,8 @@ const ProfilePage = () => {
             action={
               <ProfileSwitch
                 checked={bookingSettings.showBusySlots}
+                disabled={togglingBusySlots}
+                loading={togglingBusySlots}
                 ariaLabelledBy="busy-slots-label"
                 onChange={handleToggleShowBusySlots}
               />

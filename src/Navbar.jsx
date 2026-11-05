@@ -37,6 +37,10 @@ function Navbar() {
   const isMobile = !isDesktop;
   const myDisplayName = localStorage.getItem('username') || localStorage.getItem('userid');
   const navigate = useNavigate();
+  const handleMenuNavigate = (path) => {
+    setIsSidebarOpen(false);
+    navigate(path);
+  };
   const location = useLocation();
   const [bottomNavVisible, setBottomNavVisible] = useState(true);
   const lastScrollY = useRef(0);
@@ -142,22 +146,23 @@ function Navbar() {
       const maxScroll = scrollHeight - clientHeight;
 
       // Do not hide bottom navbar if chat count/content is not enough to scroll down
-      if (maxScroll <= 150) {
+      if (maxScroll <= 30) {
         setBottomNavVisible(true);
         lastScrollY.current = currentY;
         return;
       }
 
       // If near top or rubber-banding, always show
-      if (currentY <= 30) {
+      if (currentY <= 15) {
         setBottomNavVisible(true);
         lastScrollY.current = currentY;
         return;
       }
 
-      if (currentY > lastScrollY.current + 15 && currentY > 60) {
+      const delta = currentY - lastScrollY.current;
+      if (delta > 6 && currentY > 20) {
         setBottomNavVisible(false);
-      } else if (currentY < lastScrollY.current - 10) {
+      } else if (delta < -6) {
         setBottomNavVisible(true);
       }
       lastScrollY.current = currentY;
@@ -688,14 +693,14 @@ function Navbar() {
               <span>Join Classroom</span>
             </button>
 
-            <button onClick={() => { navigate('/starred'); setIsSidebarOpen(false); }} style={menuItemStyle}>
+            <button onClick={() => handleMenuNavigate('/starred')} style={menuItemStyle}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
               </svg>
               <span>Starred Messages</span>
             </button>
 
-            <button onClick={() => { navigate('/profile'); setIsSidebarOpen(false); }} style={menuItemStyle}>
+            <button onClick={() => handleMenuNavigate('/profile')} style={menuItemStyle}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                 <circle cx="12" cy="7" r="4"></circle>
@@ -703,7 +708,7 @@ function Navbar() {
               <span>Profile</span>
             </button>
 
-            <button onClick={() => { navigate('/labs'); setIsSidebarOpen(false); }} style={menuItemStyle}>
+            <button onClick={() => handleMenuNavigate('/labs')} style={menuItemStyle}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M10 2v7.31L4.14 19.33a2 2 0 0 0 1.72 2.67h12.28a2 2 0 0 0 1.72-2.67L14 9.31V2"></path>
                 <line x1="8.5" y1="2" x2="15.5" y2="2"></line>

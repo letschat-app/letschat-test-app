@@ -136,6 +136,9 @@ import EmojiPicker from 'emoji-picker-react';
 import CameraCaptureModal from '../components/modals/CameraCaptureModal';
 
 import MediaMessage from '../components/chat/MediaMessage';
+import PendingMediaBubble from '../components/chat/PendingMediaBubble';
+import { createPackedPreview } from '../service/TinyPreview';
+import '../components/chat/messages.css';
 
 import MediaViewer from '../components/chat/MediaViewer';
 
@@ -870,7 +873,7 @@ const lastChatSyncTimes = {};
 const ChatBox = () => {
 
   const { chatid } = useParams();
-  const { isInputFocused, isIOS } = useVisualViewport();
+  const { isInputFocused = false, isIOS = (typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))) } = useVisualViewport?.() || {};
 
   useEffect(() => {
     if (chatid) {
@@ -1502,6 +1505,9 @@ const ChatBox = () => {
 
 
   const [messages, setMessages] = useState([]);
+  const [pendingMediaItems, setPendingMediaItems] = useState(() => messageStore.getPendingMedia(chatid));
+  const pendingAnnounceTimers = useRef(new Map());
+  const pendingAnnouncedSet = useRef(new Set());
 
 
 
@@ -1573,6 +1579,17 @@ const ChatBox = () => {
 
     let list = allVisibleMessages.filter(msg => msg.spaceid === activeSpace);
 
+    const pendingForSpace = (pendingMediaItems || []).filter(
+      p => (p.spaceid ?? 0) === (activeSpace ?? 0)
+    );
+    if (pendingForSpace.length > 0) {
+      list = [...list, ...pendingForSpace].sort((a, b) => {
+        const ta = new Date(a.timestamp).getTime() || 0;
+        const tb = new Date(b.timestamp).getTime() || 0;
+        return ta - tb;
+      });
+    }
+
     if (filterMember) {
 
       list = list.filter(msg => {
@@ -1597,7 +1614,7 @@ const ChatBox = () => {
 
     return list;
 
-  }, [allVisibleMessages, activeSpace, filterMember]);
+  }, [allVisibleMessages, activeSpace, filterMember, pendingMediaItems]);
 
 
 
@@ -1754,277 +1771,159 @@ const ChatBox = () => {
 
 
 
+  const formatLanguageName = (raw) => {
+    if (!raw) return 'Code';
+    const low = raw.trim().toLowerCase();
+    const map = {
+      js: 'JavaScript',
+      javascript: 'JavaScript',
+      ts: 'TypeScript',
+      typescript: 'TypeScript',
+      jsx: 'JSX',
+      tsx: 'TSX',
+      html: 'HTML',
+      css: 'CSS',
+      json: 'JSON',
+      py: 'Python',
+      python: 'Python',
+      java: 'Java',
+      cpp: 'C++',
+      'c++': 'C++',
+      c: 'C',
+      cs: 'C#',
+      csharp: 'C#',
+      rb: 'Ruby',
+      ruby: 'Ruby',
+      go: 'Go',
+      rs: 'Rust',
+      rust: 'Rust',
+      php: 'PHP',
+      sql: 'SQL',
+      sh: 'Bash',
+      bash: 'Bash',
+      xml: 'XML',
+      yaml: 'YAML',
+      yml: 'YAML',
+      md: 'Markdown',
+    };
+    if (map[low]) return map[low];
+    return low.charAt(0).toUpperCase() + low.slice(1);
+  };
+
+  const renderInlineStyles = (rawText, keyPrefix = '') => {
+    if (!rawText) return null;
+    const tokens = rawText.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g);
+    return tokens.map((token, idx) => {
+      if (!token) return null;
+      if (token.startsWith('`') && token.endsWith('`') && token.length > 2) {
+        return <code key={`${keyPrefix}-code-${idx}`} className="msg-inline-code">{token.slice(1, -1)}</code>;
+      }
+      if (token.startsWith('**') && token.endsWith('**') && token.length > 4) {
+        return <strong key={`${keyPrefix}-b-${idx}`}>{token.slice(2, -2)}</strong>;
+      }
+      if (token.startsWith('*') && token.endsWith('*') && token.length > 2) {
+        return <em key={`${keyPrefix}-i-${idx}`}>{token.slice(1, -1)}</em>;
+      }
+      return token;
+    });
+  };
+
   const renderFormattedText = (text) => {
-
     if (!text) return null;
-
-
-
-    // Check for triple backtick code blocks
 
     if (text.includes('```')) {
-
       const codeBlockParts = text.split('```');
-
       return codeBlockParts.map((part, index) => {
-
         if (index % 2 === 1) {
-
           const lines = part.split('\n');
-
-          let lang = 'CODE';
-
+          let lang = 'Code';
           let codeContent = part;
-
           if (lines.length > 1 && lines[0].trim().length > 0 && !lines[0].includes(' ')) {
-
-            lang = lines[0].trim().toUpperCase();
-
+            lang = formatLanguageName(lines[0].trim());
             codeContent = lines.slice(1).join('\n');
-
           }
-
           return (
-
-            <div
-
-              key={index}
-
-              style={{
-
-                margin: '8px 0',
-
-                borderRadius: '10px',
-
-                backgroundColor: 'var(--bg-primary)',
-
-                border: '1px solid var(--border-color)',
-
-                overflow: 'hidden',
-
-                fontFamily: 'Consolas, Monaco, "Andale Mono", monospace',
-
-                fontSize: '13px'
-
-              }}
-
-            >
-
-              <div
-
-                style={{
-
-                  display: 'flex',
-
-                  alignItems: 'center',
-
-                  justify: 'space-between',
-
-                  padding: '6px 12px',
-
-                  backgroundColor: 'var(--bg-hover)',
-
-                  borderBottom: '1px solid var(--bg-hover)',
-
-                  fontSize: '11px',
-
-                  color: 'var(--text-secondary)',
-
-                  fontWeight: '700',
-
-                  letterSpacing: '0.05em'
-
-                }}
-
-              >
-
+            <div key={index} className="msg-code-block">
+              <div className="msg-code-header">
                 <span>{lang}</span>
-
                 <button
-
+                  type="button"
+                  className="msg-code-copy-btn"
                   onClick={(e) => {
-
                     e.stopPropagation();
-
                     navigator.clipboard.writeText(codeContent.trim());
-
                     const btn = e.currentTarget;
-
-                    btn.innerText = 'Copied! ✓';
-
-                    setTimeout(() => { btn.innerText = 'Copy Code 📋'; }, 2000);
-
+                    btn.innerText = 'Copied';
+                    setTimeout(() => { if (btn) btn.innerText = 'Copy'; }, 1500);
                   }}
-
-                  style={{
-
-                    background: 'none',
-
-                    border: 'none',
-
-                    color: 'var(--accent-text)',
-
-                    cursor: 'pointer',
-
-                    fontSize: '11px',
-
-                    fontWeight: '600',
-
-                    outline: 'none'
-
-                  }}
-
+                  aria-label={`Copy ${lang} code`}
                 >
-
-                  Copy Code 📋
-
+                  Copy
                 </button>
-
               </div>
-
-              <pre style={{ margin: 0, padding: '12px', overflowX: 'auto', color: '#e2e8f0', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
-
+              <pre className="msg-code-pre">
                 {codeContent.trim()}
-
               </pre>
-
             </div>
-
           );
-
         }
-
         return renderLinkifiedText(part);
-
       });
-
     }
 
-
-
     return renderLinkifiedText(text);
-
   };
-
-
 
   const renderLinkifiedText = (text) => {
-
     if (!text) return null;
-
     const parts = text.split(COMBINED_REGEX);
-
     return parts.map((part, i) => {
-
       if (!part) return null;
-
       if (part.match(URL_REGEX)) {
-
+        const displayUrl = part.replace(/^https?:\/\//i, '');
         return (
-
           <span
-
             key={i}
-
+            className="msg-link"
             onClick={(e) => {
-
               e.preventDefault();
-
               e.stopPropagation();
-
-              const rect = e.currentTarget.getBoundingClientRect();
-
               setActiveLinkMenu({
-
                 url: part,
-
                 x: e.clientX,
-
                 y: e.clientY
-
               });
-
             }}
-
-            style={{
-
-              color: 'var(--accent-text)',
-
-              textDecoration: 'underline',
-
-              cursor: 'pointer',
-
-              wordBreak: 'break-all',
-
-              transition: 'color 0.2s ease',
-
-            }}
-
-            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-text)'}
-
-            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-text)'}
-
           >
-
-            {part}
-
+            {displayUrl}
           </span>
-
         );
-
       } else if (part.match(MENTION_REGEX)) {
-
         const match = part.match(/(?:<|&lt;)@([^:]+):(.*?)(?:>|&gt;)/);
-
         if (match) {
-
           const uid = match[1];
-
           const name = match[2];
-
           const isMe = uid === localStorage.getItem('userid');
-
           return (
-
             <span
-
               key={i}
-
               style={{
-
-                color: isMe ? 'var(--warning-color)' : 'var(--accent-text)', // Orange if me, Blue if someone else
-
+                color: isMe ? 'var(--warning-color)' : 'var(--accent-text)',
                 fontWeight: isMe ? 'bold' : '600',
-
                 backgroundColor: isMe ? 'rgba(245, 158, 11, 0.15)' : 'var(--accent-tint)',
-
                 padding: '2px 6px',
-
                 borderRadius: '6px',
-
                 margin: '0 2px'
-
               }}
-
             >
-
               @{name}
-
             </span>
-
           );
-
         }
-
       }
-
-      return part;
-
+      return renderInlineStyles(part, `txt-${i}`);
     });
-
   };
-
-
 
   const handleCopySelected = () => {
 
@@ -3034,6 +2933,14 @@ const ChatBox = () => {
 
       const incomingChatId = msg ? (msg.chatid || msg.chatId || msg.userchatId) : null;
 
+      if (msg && msg.pendingChanged && String(incomingChatId) === String(chatid)) {
+        setPendingMediaItems([...messageStore.getPendingMedia(chatid)]);
+        if (!isScrolledUpRef.current) {
+          scrollToBottom();
+        }
+        return;
+      }
+
       if (msg && String(incomingChatId) === String(chatid)) {
 
         console.log("[ChatBox] Global store updated for chatid:", chatid);
@@ -3041,6 +2948,7 @@ const ChatBox = () => {
         const updatedMessages = [...messageStore.getMessages(chatid)];
 
         setMessages(updatedMessages);
+        setPendingMediaItems([...messageStore.getPendingMedia(chatid)]);
 
 
 
@@ -4094,11 +4002,23 @@ const ChatBox = () => {
 
 
 
+    if (originalMeta?.tempmsgid) {
+      const pid = originalMeta.tempmsgid;
+      const timer = pendingAnnounceTimers.current.get(pid);
+      if (timer) {
+        clearTimeout(timer);
+        pendingAnnounceTimers.current.delete(pid);
+      }
+      pendingAnnouncedSet.current.delete(pid);
+    }
+
     // Merge upload results into the original metadata to preserve ALL fields
 
     const finalMsg = {
 
       ...originalMeta,
+
+      pendingid: originalMeta.tempmsgid || null,
 
       type: msgType,
 
@@ -4208,6 +4128,24 @@ const ChatBox = () => {
 
     } catch (err) {
 
+      if (originalMeta?.tempmsgid) {
+        const pid = originalMeta.tempmsgid;
+        const timer = pendingAnnounceTimers.current.get(pid);
+        if (timer) {
+          clearTimeout(timer);
+          pendingAnnounceTimers.current.delete(pid);
+        }
+        if (pendingAnnouncedSet.current.has(pid)) {
+          pendingAnnouncedSet.current.delete(pid);
+          sendSafe({
+            type: 'media_pending_cancel',
+            chatid,
+            spaceid: activeSpace || 0,
+            pendingid: pid
+          });
+        }
+      }
+
       if (err.name === 'AbortError') {
 
         console.log(`[${typeLabel}] Upload aborted for:`, originalMeta.tempmsgid);
@@ -4235,6 +4173,36 @@ const ChatBox = () => {
   };
 
 
+
+  const schedulePendingAnnouncement = (pid, fileObj, cat, meta, thumbBlob) => {
+    const timer = setTimeout(async () => {
+      try {
+        const px = await createPackedPreview(fileObj, cat, thumbBlob, chat?.type);
+        const pendingFrame = {
+          type: 'media_pending',
+          chatid,
+          spaceid: activeSpace || 0,
+          pendingid: pid,
+          timestamp: meta.timestamp,
+          kind: cat,
+          fileName: (fileObj.name || 'file').slice(0, 120),
+          fileSize: fileObj.size,
+          w: meta.width || null,
+          h: meta.height || null,
+          duration: meta.duration || null,
+          noOfPages: meta.noOfPages || null,
+          px: px || null
+        };
+        sendSafe(pendingFrame);
+        pendingAnnouncedSet.current.add(pid);
+      } catch (err) {
+        console.warn('[ChatBox] Failed to announce media_pending:', err);
+      } finally {
+        pendingAnnounceTimers.current.delete(pid);
+      }
+    }, 400);
+    pendingAnnounceTimers.current.set(pid, timer);
+  };
 
   const handleCaptureFile = async (file, typeLabel = 'Camera Capture', options = {}) => {
 
@@ -4378,7 +4346,8 @@ const ChatBox = () => {
 
     setshowreplytomsg(false);
 
-
+    // Schedule 400ms debounced ephemeral pending placeholder
+    schedulePendingAnnouncement(tempmsgid, file, category, optimisticMsg, thumbBlobForCache);
 
     // Start background process
 
@@ -4395,6 +4364,10 @@ const ChatBox = () => {
     saveBlobToCache(msg.tempmsgid, msg.optimisticFile, 'mainCache').catch(console.error);
 
     messageStore.updateMessage(chatid, msg.tempmsgid, { status: 'uploading', uploadProgress: 0 });
+
+    if (msg.tempmsgid && msg.optimisticFile) {
+      schedulePendingAnnouncement(msg.tempmsgid, msg.optimisticFile, msg.type, msg, null);
+    }
 
     // Pass the whole message object to preserve metadata during retry
 
@@ -7624,31 +7597,132 @@ const ChatBox = () => {
 
 
 
-  const handleDismissBannerPin = (e, pinMsgId) => {
-
+  const handleDismissBannerPin = (e, pinOrId) => {
     if (e) {
-
       e.stopPropagation();
-
       e.preventDefault();
-
     }
-
-    const targetId = pinMsgId;
-
-    const updated = [...dismissedBannerPinIds, targetId];
-
+    const ids = [];
+    if (typeof pinOrId === 'string') {
+      ids.push(pinOrId);
+    } else if (pinOrId && typeof pinOrId === 'object') {
+      if (pinOrId.msgid) ids.push(pinOrId.msgid);
+      if (pinOrId.tempmsgid) ids.push(pinOrId.tempmsgid);
+      if (pinOrId.timestamp) ids.push(String(pinOrId.timestamp));
+    }
+    const updated = Array.from(new Set([...dismissedBannerPinIds, ...ids]));
     setDismissedBannerPinIds(updated);
-
     try {
-
       localStorage.setItem(`dismissed_pins_${chatid}`, JSON.stringify(updated));
-
     } catch (err) {}
-
   };
 
 
+
+  const [groupEventsList, setGroupEventsList] = useState(() => {
+    if (!chatid) return [];
+    try {
+      return JSON.parse(localStorage.getItem(`group_events_${chatid}`) || '[]');
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(Date.now()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!chatid) return;
+    const fetchEventsForChat = async () => {
+      try {
+        const res = await fetch(`${API}/user/event/group/${chatid}`, {
+          headers: {
+            'User-Id': currentUserId || localStorage.getItem('userid'),
+            'ngrok-skip-browser-warning': 'true'
+          }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            setGroupEventsList(data);
+            try {
+              localStorage.setItem(`group_events_${chatid}`, JSON.stringify(data));
+            } catch (err) {}
+          }
+        }
+      } catch (e) {}
+    };
+    fetchEventsForChat();
+    const onRefresh = () => fetchEventsForChat();
+    window.addEventListener('letschat_event_sync', onRefresh);
+    window.addEventListener('letschat_refresh_events', onRefresh);
+    return () => {
+      window.removeEventListener('letschat_event_sync', onRefresh);
+      window.removeEventListener('letschat_refresh_events', onRefresh);
+    };
+  }, [chatid, currentUserId]);
+
+  const isEventPassed = useCallback((m) => {
+    if (!m) return false;
+    const eventId = m.repliedto || m.repliedTo || m.eventid || m.groupEventId || (typeof m.content === 'string' ? m.content.split('/')[2] : null);
+
+    let eventObj = null;
+    if (eventId && groupEventsList.length > 0) {
+      eventObj = groupEventsList.find(e =>
+        e.groupEventId === eventId ||
+        String(e.eventId) === String(eventId) ||
+        String(e.id) === String(eventId)
+      );
+    }
+
+    if (!eventObj && m.content && groupEventsList.length > 0) {
+      const cleaned = (m.content.split('/')[0] || m.content).toLowerCase();
+      eventObj = groupEventsList.find(e => e.eventTitle && cleaned.includes(e.eventTitle.toLowerCase()));
+    }
+
+    if (!eventObj && events) {
+      const allMediatorEvents = Object.values(events).flat();
+      if (eventId) {
+        eventObj = allMediatorEvents.find(e =>
+          e.groupEventId === eventId ||
+          String(e.id) === String(eventId) ||
+          String(e.eventId) === String(eventId)
+        );
+      }
+      if (!eventObj && m.content) {
+        const cleaned = (m.content.split('/')[0] || m.content).toLowerCase();
+        eventObj = allMediatorEvents.find(e => e.title && cleaned.includes(e.title.toLowerCase()));
+      }
+    }
+
+    if (eventObj) {
+      if (eventObj.action === 'cancelled') {
+        return true;
+      }
+      const rawStart = eventObj.startTime || eventObj.start || eventObj.date;
+      const rawEnd = eventObj.endTime || eventObj.end;
+      const parseDateSafe = (val) => {
+        if (!val) return null;
+        if (typeof val === 'number') return val < 1e11 ? val * 1000 : val;
+        if (typeof val === 'string' && /^\d+(\.\d+)?$/.test(val.trim())) {
+          const num = parseFloat(val.trim());
+          return num < 1e11 ? num * 1000 : num;
+        }
+        const parsed = new Date(val).getTime();
+        return isNaN(parsed) ? null : parsed;
+      };
+      const startMs = parseDateSafe(rawStart);
+      const endMs = parseDateSafe(rawEnd) || (startMs ? startMs + 60 * 60 * 1000 : null);
+      if (endMs && endMs <= currentTime) {
+        return true;
+      }
+    }
+    return false;
+  }, [groupEventsList, events, currentTime]);
 
   const isEventBannerPin = useCallback((m) => {
 
@@ -7688,14 +7762,18 @@ const ChatBox = () => {
 
       .filter((m) => {
 
-        if (!m || dismissedBannerPinIds.includes(m.msgid || m.tempmsgid)) return false;
-
-        // Event banner pins: stay pinned indefinitely ("no time when click remove X it goes")
-
+        if (!m) return false;
+        const isDismissed = (
+          dismissedBannerPinIds.includes(m.msgid) ||
+          (m.tempmsgid && dismissedBannerPinIds.includes(m.tempmsgid)) ||
+          (m.timestamp && dismissedBannerPinIds.includes(String(m.timestamp)))
+        );
+        if (isDismissed) return false;        // Event banner pins: stay pinned until event is passed or dismissed with X
         if (isEventBannerPin(m)) {
-
+          if (isEventPassed(m)) {
+            return false;
+          }
           return true;
-
         }
 
         // General banner pins (e.g. name changes): 24-hour expiration
@@ -7712,75 +7790,21 @@ const ChatBox = () => {
 
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-  }, [messages, isWithin24Hours, dismissedBannerPinIds, isEventBannerPin]);
+  }, [messages, isWithin24Hours, dismissedBannerPinIds, isEventBannerPin, isEventPassed]);
 
 
 
-  const handleBannerPinClick = useCallback(async (pin) => {
-
+  const handleBannerPinClick = useCallback((pin) => {
     if (!pin) return;
-
     if (isEventBannerPin(pin)) {
-
-      const eventId = pin.repliedto || pin.repliedTo || pin.eventid || pin.groupEventId;
-
+      const eventId = pin.repliedto || pin.repliedTo || pin.eventid || pin.groupEventId || (typeof pin.content === 'string' ? pin.content.split('/')[2] : null);
+      setCalendarHighlightEventId(eventId || null);
+      setShowEventModal(false);
       setShowGroupCalendar(true);
-
-      if (chatid) {
-
-        try {
-
-          const res = await fetch(`${API}/user/event/group/${chatid}`, {
-
-            headers: { 'User-Id': currentUserId, 'ngrok-skip-browser-warning': 'true' }
-
-          });
-
-          if (res.ok) {
-
-            const groupEvents = await res.json();
-
-            let found = null;
-
-            if (eventId) {
-
-              found = groupEvents.find(e => e.groupEventId === eventId || String(e.eventId) === String(eventId));
-
-            }
-
-            if (!found && pin.content) {
-
-              const cleaned = (pin.content.split('/')[0] || pin.content).toLowerCase();
-
-              found = groupEvents.find(e => e.eventTitle && cleaned.includes(e.eventTitle.toLowerCase()));
-
-            }
-
-            if (found) {
-
-              setSelectedEvent({ ...found, chatid, isGroup: true });
-
-              setShowEventModal(true);
-
-            }
-
-          }
-
-        } catch (err) {
-
-          console.warn('Failed to load event details for banner click:', err);
-
-        }
-
-      }
-
     } else {
-
       scrollToMessage(pin.msgid);
-
     }
-
-  }, [chatid, currentUserId, isEventBannerPin]);
+  }, [isEventBannerPin]);
 
 
 
@@ -8073,6 +8097,7 @@ const ChatBox = () => {
   const [showInfo, setShowInfo] = useState(false);
 
   const [showGroupCalendar, setShowGroupCalendar] = useState(false);
+  const [calendarHighlightEventId, setCalendarHighlightEventId] = useState(null);
 
   const [hasNewGroupEvent, setHasNewGroupEvent] = useState(false);
 
@@ -11186,7 +11211,7 @@ const ChatBox = () => {
 
             return (
 
-              <React.Fragment key={msg.tempmsgid || msg.msgid}>
+              <React.Fragment key={msg.pendingid || msg.tempmsgid || msg.msgid}>
 
                 {showDate && (
 
@@ -11352,7 +11377,13 @@ const ChatBox = () => {
 
                     )}
 
-                    {msg.sendername === "server" || msg.type === "banner" || msg.type === "banner-pin" || msg.type === "event-banner-pin" ? (
+                    {msg.isPendingPlaceholder ? (
+                      <PendingMediaBubble
+                        msg={msg}
+                        isMobile={isMobile}
+                        showSenderName={chat?.type !== 'private'}
+                      />
+                    ) : msg.sendername === "server" || msg.type === "banner" || msg.type === "banner-pin" || msg.type === "event-banner-pin" ? (
 
                       <div
 
@@ -11564,48 +11595,17 @@ const ChatBox = () => {
 
                             }}
 
-                            className={msgFireClass || undefined}
-
+                            className={`msg-bubble ${isReceived ? 'msg-bubble-received' : 'msg-bubble-sent'} ${['image', 'video'].includes(msg.type) ? 'msg-bubble-media' : 'msg-bubble-text'} ${selectedMessages.has(msg) ? 'is-selected' : ''} ${msgFireClass || ''}`}
                             style={{
-
                               alignSelf: isReceived ? "flex-start" : "flex-end",
-
-                              background: selectedMessages.has(msg)
-
-                                ? (isReceived ? "var(--nav-active-bg)" : "var(--accent-color)")
-
-                                : (isReceived ? "var(--message-bg-incoming)" : "var(--message-bg-outgoing)"),
-
-                              color: isReceived ? "var(--text-primary)" : "#ffffff",
-
-                              padding: isMobile ? '8px 12px' : '10px 14px',
-
-                              borderRadius: isReceived ? "16px 16px 16px 4px" : "16px 16px 4px 16px",
-
-                              maxWidth: isMobile ? "80%" : "70%",
-
-                              wordWrap: "break-word",
-
                               cursor: "pointer",
-
-                              boxShadow: "0 2px 4px rgba(0, 0, 0, 0.15)",
-
                               transition: (swipeOffset[msg.msgid] || 0) === 0 ? "all 0.2s ease" : "none",
-
-                              fontSize: isMobile ? '13px' : '14px',
-
                               position: "relative",
-
                               userSelect: "none",
-
                               WebkitUserSelect: "none",
-
-                              touchAction: "pan-y", // Allow native vertical scroll, custom horizontal swipe
-
+                              touchAction: "pan-y",
                               transform: `translateX(${swipeOffset[msg.msgid] || 0}px)`,
-
                             }}
-
                             onMouseEnter={() => !isMobile && setHoveredMsgId(msg.msgid || msg.tempmsgid)}
 
                             onMouseLeave={() => !isMobile && setHoveredMsgId(null)}
@@ -12018,6 +12018,7 @@ const ChatBox = () => {
 
 
 
+                            {(!(['image', 'video'].includes(msg.type) && !msg.isQueuedForMedia && msg.status !== 'waiting_for_upload' && !msg.revived && !msg.isStarred && !(!isMobile && hoveredMsgId === (msg.msgid || msg.tempmsgid)))) && (
                             <div style={{
 
                               display: "flex",
@@ -12147,6 +12148,7 @@ const ChatBox = () => {
                               </div>
 
                             </div>
+                            )}
 
                           </div>
 
@@ -15494,7 +15496,8 @@ const ChatBox = () => {
 
                 groupName={chat?.chatname || 'Group Calendar'}
 
-                onClose={() => setShowGroupCalendar(false)}
+                highlightEventId={calendarHighlightEventId}
+                onClose={() => { setShowGroupCalendar(false); setCalendarHighlightEventId(null); }}
 
                 onOpenCreateEvent={(params) => {
 
@@ -15830,7 +15833,8 @@ const ChatBox = () => {
 
               groupName={chat?.chatname || 'Group Calendar'}
 
-              onClose={() => setShowGroupCalendar(false)}
+              highlightEventId={calendarHighlightEventId}
+                onClose={() => { setShowGroupCalendar(false); setCalendarHighlightEventId(null); }}
 
               onOpenCreateEvent={(params) => {
 
