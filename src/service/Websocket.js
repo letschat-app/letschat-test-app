@@ -295,7 +295,6 @@ export async function sendSafe(msg) {
   switch (socket.readyState) {
     case WebSocket.OPEN:
       try {
-        SyncService.flushQueue(socket);
         socket.send(JSON.stringify(msg));
         if (import.meta.env.DEV) console.log("[Websocket] Sent immediately:", msg.purpose || msg.type || 'message');
       } catch (err) {

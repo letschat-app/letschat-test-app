@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Video, MapPin, Plus, Check, X, Bell, BellOff, Users, ExternalLink, ChevronRight, Edit2 } from 'lucide-react';
+import { useToast } from '../common/ToastProvider';
 import { API } from '../../service/UserAuth';
 import { saveEventToDB } from '../../service/db';
 
@@ -16,6 +17,7 @@ export const parseEventDate = (val) => {
 };
 
 const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onOpenEvent, highlightEventId }) => {
+  const toast = useToast();
   const [events, setEvents] = useState(() => {
     if (!chatId) return [];
     try {
@@ -742,7 +744,7 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onO
                       }}>
                         <Check size={14} /> Added to Calendar
                       </div>
-                    ) : !isCancelled ? (
+                    ) : !isCancelled && !isPastStart && !isPast ? (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -766,11 +768,26 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onO
                       >
                         <Plus size={14} /> + Add to Calendar
                       </button>
+                    ) : !isCancelled && (isPastStart || isPast) ? (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        color: 'var(--text-muted)',
+                        fontSize: '11px',
+                        fontWeight: '500'
+                      }}>
+                        <span>{isPast ? 'Event ended' : 'Event started'}</span>
+                      </div>
                     ) : null}
                   </div>
 
                   {/* Creator-only Edit button */}
-                  {isCreator && (
+                  {isCreator && !isPast && !isPastStart && !isCancelled && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

@@ -139,6 +139,7 @@ export default function MediaUploadButton({
 
   const handleFileSelect = (file) => {
     if (!file) return;
+    Object.values(inputRefs.current).forEach(r => { if (r) r.value = ''; });
     
     if (file.size > 50 * 1024 * 1024) {
       toast.error("This file exceeds the 50MB size limit and cannot be attached.");

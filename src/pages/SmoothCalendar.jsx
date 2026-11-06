@@ -167,6 +167,7 @@ const SmoothCalendar = () => {
       navigator.clipboard.writeText(meetingUrl);
       setCopiedMeetingLink(true);
       setTimeout(() => setCopiedMeetingLink(false), 2500);
+      showToast(`Meeting link copied (@${permanentUsername})`, 'success');
     }
   };
 
@@ -3375,57 +3376,7 @@ const SmoothCalendar = () => {
           </div>
         )}
 
-        {/* LOCAL TOAST NOTIFICATION */}
-        {toast && (
-          <div style={{
-            position: 'fixed',
-            bottom: isMobile ? 'calc(80px + 16px + env(safe-area-inset-bottom, 0px))' : '28px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            backgroundColor: toast.type === 'error' ? 'var(--danger-color)' : toast.type === 'info' ? 'var(--accent-solid)' : 'var(--success-color)',
-            color: 'var(--text-on-accent)',
-            padding: '10px 20px',
-            borderRadius: '999px',
-            fontSize: '14px',
-            fontWeight: '600',
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.35)',
-            zIndex: 99999,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            animation: 'fadeIn 0.2s ease-out',
-            maxWidth: '90vw',
-            boxSizing: 'border-box'
-          }}>
-            {toast.type === 'error' ? <AlertCircle size={16} /> : <Check size={16} strokeWidth={2.5} />}
-            <span>{toast.message}</span>
-          </div>
-        )}
 
-        {/* Floating Copied Toast (Link) */}
-        {copiedMeetingLink && !toast && (
-          <div style={{
-            position: 'fixed',
-            bottom: isMobile ? 'calc(80px + 16px + env(safe-area-inset-bottom, 0px))' : '28px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            backgroundColor: 'var(--success-color)',
-            color: 'var(--text-on-accent)',
-            padding: '10px 20px',
-            borderRadius: '999px',
-            fontSize: '13px',
-            fontWeight: '700',
-            boxShadow: '0 8px 24px rgba(16, 185, 129, 0.4)',
-            zIndex: 99999,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            animation: 'fadeIn 0.2s ease-out'
-          }}>
-            <Check size={16} strokeWidth={3} />
-            <span>Meeting link copied (@{(localStorage.getItem('username') || 'user').toLowerCase()})</span>
-          </div>
-        )}
 
       </div>
     </div>

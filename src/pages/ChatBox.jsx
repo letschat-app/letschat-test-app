@@ -1580,7 +1580,7 @@ const ChatBox = () => {
     let list = allVisibleMessages.filter(msg => msg.spaceid === activeSpace);
 
     const pendingForSpace = (pendingMediaItems || []).filter(
-      p => (p.spaceid ?? 0) === (activeSpace ?? 0)
+      p => (p.spaceid ?? 0) === (activeSpace ?? 0) && String(p.senderid) !== String(currentUserId)
     );
     if (pendingForSpace.length > 0) {
       list = [...list, ...pendingForSpace].sort((a, b) => {
@@ -9139,7 +9139,7 @@ const ChatBox = () => {
 
               <button
 
-                onClick={(e) => { e.stopPropagation(); updateV(); navigate("/chats", { state: { showSpacesForChat: chatid }, replace: true }); messageStore.setCount(chatid) }}
+                onClick={(e) => { e.stopPropagation(); updateV(); messageStore.setCount(chatid); if (window.history.length > 1) { navigate(-1); } else { navigate("/chats", { replace: true }); } }}
 
                 style={{
 

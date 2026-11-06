@@ -12,6 +12,7 @@ export default function MediaPreviewModal({ file, onSend, onCancel, isUploading 
   const [previewUrl, setPreviewUrl] = useState(null);
   const [loadingThumb, setLoadingThumb] = useState(false);
   const [thumbBlob, setThumbBlob] = useState(null); // Store the actual Blob for reliable handoff
+  const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
     setCurrentFile(file);
@@ -223,7 +224,12 @@ export default function MediaPreviewModal({ file, onSend, onCancel, isUploading 
           </div>
         ) : (
           <button
-            onClick={() => onSend(thumbBlob, currentFile)}
+            disabled={isSending}
+            onClick={() => {
+              if (isSending) return;
+              setIsSending(true);
+              onSend(thumbBlob, currentFile);
+            }}
             style={{
               background: '#00a884', color: 'white', border: 'none',
               borderRadius: '50%', width: '60px', height: '60px',

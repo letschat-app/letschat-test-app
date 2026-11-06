@@ -178,53 +178,75 @@ onBackgroundMessage(messaging, async (payload) => {
     self.registration.update().catch(() => {});
   } catch (e) {}
 
-  const data = payload.data || {};
+  try {
+    const data = payload.data || {};
 
-  // ─── Protocol v2 Handler ───
-  if (data.v === '2') {
-    const formatted = formatPushNotification(data, { icon: NOTIFICATION_ICON, badge: NOTIFICATION_BADGE });
-    const isSilent = data.silent === 'true';
+    // ─── Protocol v2 Handler ───
+    if (data.v === '2') {
+      const formatted = formatPushNotification(data, { icon: NOTIFICATION_ICON, badge: NOTIFICATION_BADGE });
+      const isSilent = data.silent === 'true';
 
-    let shouldAlert = !isSilent;
-    if (data.alertKind === 'mention' || data.alertKind === 'reply') {
-      shouldAlert = true; // Mentions and replies always alert
+      let shouldAlert = !isSilent;
+      if (data.alertKind === 'mention' || data.alertKind === 'reply') {
+        shouldAlert = true; // Mentions and replies always alert
+      }
+
+      const notifOptions = {
+        body: formatted.body || '',
+        icon: NOTIFICATION_ICON,
+        badge: NOTIFICATION_BADGE,
+        tag: formatted.tag || 'letschat-default',
+        data: formatted.data || {},
+        renotify: Boolean(formatted.tag) && shouldAlert,
+        silent: !shouldAlert,
+      };
+
+      if (shouldAlert) {
+        notifOptions.vibrate = [200, 100, 200];
+      }
+
+      return await self.registration.showNotification(formatted.title, notifOptions);
     }
 
-    const notifOptions = {
+    // ─── Firebase Console Campaign / Direct Notification Block Fallback ───
+    if (payload.notification) {
+      // R4: When payload.notification is present, Firebase Web SDK automatically displays it.
+      // Manual showNotification here causes duplicate notifications.
+      console.log('[SW] Firebase notification payload detected — handled automatically by SDK.');
+      return;
+    }
+
+    // ─── Non-v2 Data Fallback (Formats using notificationFormat) ───
+    const formatted = formatPushNotification(data, { icon: NOTIFICATION_ICON, badge: NOTIFICATION_BADGE });
+    return await self.registration.showNotification(formatted.title, {
       body: formatted.body || '',
       icon: NOTIFICATION_ICON,
       badge: NOTIFICATION_BADGE,
       tag: formatted.tag || 'letschat-default',
       data: formatted.data || {},
-      renotify: Boolean(formatted.tag) && shouldAlert,
-      silent: !shouldAlert,
-    };
-
-    if (shouldAlert) {
-      notifOptions.vibrate = [200, 100, 200];
+      renotify: Boolean(formatted.tag),
+      vibrate: [200, 100, 200],
+    });
+  } catch (swErr) {
+    console.error('[SW] Error displaying background notification:', swErr);
+    // Bulletproof Fallback: Guarantees a notification is shown so Chrome never penalizes the SW
+    try {
+      const data = payload?.data || {};
+      const fallbackTitle = data.title || data.eventTitle || 'New update in LetsChat';
+      const fallbackBody = data.body || data.description || 'You received a new message or update.';
+      return await self.registration.showNotification(fallbackTitle, {
+        body: fallbackBody,
+        icon: NOTIFICATION_ICON,
+        badge: NOTIFICATION_BADGE,
+        tag: 'letschat-fallback-' + Date.now(),
+        data: data,
+        renotify: true,
+        vibrate: [200, 100, 200]
+      });
+    } catch (fallbackErr) {
+      console.error('[SW] Critical fallback notification display failed:', fallbackErr);
     }
-
-    return self.registration.showNotification(formatted.title, notifOptions);
   }
-
-  // ─── Firebase Console Campaign / Direct Notification Block Fallback ───
-  if (payload.notification) {
-    // R4: When payload.notification is present, Firebase Web SDK automatically displays it.
-    // Manual showNotification here causes duplicate notifications.
-    console.log('[SW] Firebase notification payload detected — handled automatically by SDK.');
-    return;
-  }
-    // ─── Non-v2 Data Fallback (Formats using notificationFormat) ───
-  const formatted = formatPushNotification(data, { icon: NOTIFICATION_ICON, badge: NOTIFICATION_BADGE });
-  return self.registration.showNotification(formatted.title, {
-    body: formatted.body,
-    icon: NOTIFICATION_ICON,
-    badge: NOTIFICATION_BADGE,
-    tag: formatted.tag || 'letschat-default',
-    data: formatted.data || {},
-    renotify: Boolean(formatted.tag),
-    vibrate: [200, 100, 200],
-  });
 });
 
 // ─── Notification Click ───────────────────────────────────────────────────────

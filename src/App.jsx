@@ -235,10 +235,10 @@ function App() {
       <ErrorBoundary key={location.pathname}>
         <SwipeWrapper>
           <Routes location={location}>
-            <Route path="/" element={<Navigate to="/welcome" />} />
-            <Route path="/welcome" element={<LandingPage />} />
-            <Route path="/signin" element={<Signin />} />
-            <Route path="/login" element={<Login />} />
+            <Route path="/" element={<Navigate to={localStorage.getItem("userid") ? "/chats" : "/welcome"} replace />} />
+            <Route path="/welcome" element={localStorage.getItem("userid") ? <Navigate to="/chats" replace /> : <LandingPage />} />
+            <Route path="/signin" element={localStorage.getItem("userid") ? <Navigate to="/chats" replace /> : <Signin />} />
+            <Route path="/login" element={localStorage.getItem("userid") ? <Navigate to="/chats" replace /> : <Login />} />
             <Route path="/book/:userIdentifier" element={<PublicBookingPage />} />
             <Route path="/booking/view/:tokenOrId" element={<PublicBookingView />} />
             {/* New Desktop Layout Routing */}

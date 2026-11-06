@@ -44,11 +44,11 @@ const SwipeWrapper = ({ children }) => {
 
     if (swipe < -threshold && (swipePower > powerThreshold || velocityX > velocityThreshold)) {
       if (currentIndex < swipeableRoutes.length - 1) {
-        navigate(swipeableRoutes[currentIndex + 1]);
+        navigate(swipeableRoutes[currentIndex + 1], { replace: true });
       }
     } else if (swipe > threshold && (swipePower > powerThreshold || velocityX > velocityThreshold)) {
       if (currentIndex > 0) {
-        navigate(swipeableRoutes[currentIndex - 1]);
+        navigate(swipeableRoutes[currentIndex - 1], { replace: true });
       }
     }
   };

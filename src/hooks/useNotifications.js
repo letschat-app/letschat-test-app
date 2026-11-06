@@ -4,6 +4,7 @@ import { registerFCMToken, removeFCMToken } from '../service/UserAuth';
 import { isChatMuted } from '../service/db';
 import { useNavigate } from 'react-router-dom';
 import messageStore from '../pages/MessageStore';
+import { formatPushNotification } from '../sw/notificationFormat.js';
 
 const VAPID_KEY = "BKxC4cRGOl1Kx9VRilXr6Yk5Pf4KFzrw6VW2b3TdtPgbJ9HCBrDfcJ1YH4SIlo-wIuOMilLVpNhVVdx9E6ztbVU";
 
@@ -206,18 +207,25 @@ export const useNotifications = () => {
         }
         const lastSyncedToken = localStorage.getItem('lastSyncedToken');
         const lastSyncedAt = parseInt(localStorage.getItem('lastSyncedAt') || '0', 10);
-        const isExpired = Date.now() - lastSyncedAt > 24 * 60 * 60 * 1000;
-        if (!force && token === lastSyncedToken && !isExpired) {
+        const lastSyncedUserId = localStorage.getItem('lastSyncedUserId');
+        const sessionSynced = sessionStorage.getItem('fcm_session_synced') === 'true';
+        const isExpired = Date.now() - lastSyncedAt > 4 * 60 * 60 * 1000;
+        const needsSync = force || (token !== lastSyncedToken) || (currentUserId !== lastSyncedUserId) || !sessionSynced || isExpired;
+        if (!needsSync) {
           return; // Already synced with backend
         }
         await registerFCMToken({ userId: currentUserId, deviceId, token });
         localStorage.setItem('lastSyncedToken', token);
+        localStorage.setItem('lastSyncedUserId', currentUserId);
+        sessionStorage.setItem('fcm_session_synced', 'true');
         localStorage.setItem('lastSyncedAt', String(Date.now()));
         console.log('[useNotifications] FCM Token registered for user:', currentUserId, 'device:', deviceId);
       } else {
         await removeFCMToken(deviceId);
         localStorage.removeItem('lastSyncedToken');
         localStorage.removeItem('lastSyncedAt');
+        localStorage.removeItem('lastSyncedUserId');
+        sessionStorage.removeItem('fcm_session_synced');
         console.log('FCM Token removed from backend for device:', deviceId);
       }
     } catch (err) {
@@ -264,7 +272,7 @@ export const useNotifications = () => {
           hiddenTimestamp = Date.now();
         } else if (document.visibilityState === 'visible') {
           if (hasNotificationSupport && Notification.permission === 'granted' && !isManuallyDisabled) {
-            const wasLongHidden = hiddenTimestamp > 0 && (Date.now() - hiddenTimestamp > 15 * 60 * 1000);
+            const wasLongHidden = hiddenTimestamp > 0 && (Date.now() - hiddenTimestamp > 5 * 60 * 1000);
             requestPermissionAndGetToken(false, wasLongHidden);
           }
         }
@@ -305,6 +313,64 @@ export const useNotifications = () => {
               if (!isIndicator) {
                 messageStore.setRoomUnreadCount(chatId, unread);
               }
+            }
+
+            // 3. Foreground System Notification: Show notification UNLESS that particular chat is open
+            try {
+              const currentUserId = localStorage.getItem('userid');
+              const senderId = data.senderId || data.senderid;
+
+              // Don't notify self for own sent messages
+              if (!senderId || senderId !== currentUserId) {
+                const incomingChatId = chatId || data.chatId || data.chatid || data.roomid;
+                const activeChatId = messageStore.getActivechatbox();
+                const isPageVisible = typeof document !== 'undefined' && document.visibilityState === 'visible';
+                const isPageFocused = typeof document !== 'undefined' && document.hasFocus && document.hasFocus();
+
+                // Suppress ONLY if it is a chat message and the user is actively viewing that exact chat right now
+                const isChatMessage = type === 'CHAT' || (!type && incomingChatId);
+                const isViewingThisChat = isChatMessage && isPageVisible && isPageFocused && incomingChatId && activeChatId && (String(incomingChatId) === String(activeChatId));
+
+                if (!isViewingThisChat) {
+                  const isMuted = incomingChatId ? await isChatMuted(incomingChatId) : false;
+                  if (!isMuted) {
+                    const iconUrl = `${import.meta.env.BASE_URL}icon-notify.png`.replace(/\/+/g, '/');
+                    const badgeUrl = `${import.meta.env.BASE_URL}badge-96.png`.replace(/\/+/g, '/');
+                    const formatted = formatPushNotification(data, { icon: iconUrl, badge: badgeUrl });
+
+                    const isSilent = data.silent === 'true';
+                    let shouldAlert = !isSilent;
+                    if (data.alertKind === 'mention' || data.alertKind === 'reply') {
+                      shouldAlert = true;
+                    }
+
+                    const notifOptions = {
+                      body: formatted.body || '',
+                      icon: iconUrl,
+                      badge: badgeUrl,
+                      tag: formatted.tag || ('letschat-fg-' + Date.now()),
+                      data: formatted.data || data || {},
+                      renotify: Boolean(formatted.tag) && shouldAlert,
+                      silent: !shouldAlert
+                    };
+
+                    if (shouldAlert) {
+                      notifOptions.vibrate = [200, 100, 200];
+                    }
+
+                    if ('serviceWorker' in navigator) {
+                      const reg = await navigator.serviceWorker.ready;
+                      if (reg && reg.showNotification) {
+                        await reg.showNotification(formatted.title, notifOptions);
+                      }
+                    } else if ('Notification' in window) {
+                      new Notification(formatted.title, notifOptions);
+                    }
+                  }
+                }
+              }
+            } catch (notifErr) {
+              console.warn('[useNotifications] Error showing foreground notification:', notifErr);
             }
           }
         });

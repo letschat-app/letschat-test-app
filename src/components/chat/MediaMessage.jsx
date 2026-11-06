@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Download, Play, Pause, Loader2, RotateCcw } from 'lucide-react';
 import { API } from '../../service/UserAuth';
 import { downloadFile, getPdfThumbnail } from '../../service/MediaUploader';
-import { getMediaInfo, getMediaBlob, saveBlobToCache, memoryThumbCache } from '../../service/MediaCache';
+import { getMediaInfo, getMediaBlob, saveBlobToCache, memoryThumbCache, invalidateThumb, saveThumbToMemory } from '../../service/MediaCache';
 import { formatTime12Hour } from '../../service/ChatUtils';
 import EyeIcon from './EyeIcon';
 import messageStore from '../../pages/MessageStore';
@@ -212,16 +212,16 @@ export default function MediaMessage({
         };
 
         // Thumbnail Resolution
-        if (thumbnailKey || isOptimistic) {
+        const isPDF = isPdfFile(fileName) || fileType === 'pdf' || fileType === 'application/pdf';
+        const shouldResolveThumb = Boolean(thumbnailKey || isOptimistic || isPDF || fileType === 'image' || fileType === 'video');
+
+        if (shouldResolveThumb) {
           const thumbSrc = isOptimistic ? (msg?.optimisticThumbUrl || msg?.optimisticUrl) : null;
           const cacheKey = isOptimistic ? `${msg?.tempmsgid}_thumb` : `${mediaId}_thumb`;
           const fetchUrl = isOptimistic ? thumbSrc : getFetchUrl(thumbnailKey, mediaInfo?.thumbnailUrl);
 
-          if (fetchUrl && !fetchUrl.endsWith('/null')) {
-            const url = await getMediaBlob(cacheKey, fetchUrl, 'thumbCache');
-            if (isMounted && url) setResolvedThumb(url);
-            if (url && url.startsWith('blob:')) blobUrls.current.add(url);
-          }
+          const url = await getMediaBlob(cacheKey, fetchUrl, 'thumbCache');
+          if (isMounted && url) setResolvedThumb(url);
         }
 
         // Main Blob Resolution
@@ -238,7 +238,7 @@ export default function MediaMessage({
           if (fetchUrl && !fetchUrl.endsWith('/null')) {
             const url = await getMediaBlob(cacheKey, fetchUrl, 'mainCache');
             if (isMounted && url) setResolvedMain(url);
-            if (url && url.startsWith('blob:')) blobUrls.current.add(url);
+            // cached in MediaCache
           } else if (!isOptimistic && msg.tempmsgid) {
             const cachedUrl = await getMediaBlob(msg.tempmsgid, null, 'mainCache');
             if (isMounted && cachedUrl) setResolvedMain(cachedUrl);
@@ -257,11 +257,8 @@ export default function MediaMessage({
   useEffect(() => {
     const isPDF = isPdfFile(fileName) || fileType === 'pdf' || fileType === 'application/pdf';
     if (!isPDF) return;
-    if (resolvedThumb || thumbnailUrl || thumbError) return;
+    if (resolvedThumb || thumbError) return;
     if (isOptimistic) return;
-
-    const sourceUrl = resolvedMain || fileUrl;
-    if (!sourceUrl || !mediaId) return;
 
     let isMounted = true;
     const generateFallbackThumb = async () => {
@@ -273,10 +270,14 @@ export default function MediaMessage({
           return;
         }
 
+        const sourceUrl = resolvedMain || fileUrl;
+        if (!sourceUrl || !mediaId) return;
+
         const result = await getPdfThumbnail(sourceUrl);
         if (result?.blob && isMounted) {
           await saveBlobToCache(cacheKey, result.blob, 'thumbCache');
           const blobUrl = URL.createObjectURL(result.blob);
+          saveThumbToMemory(cacheKey, blobUrl);
           setResolvedThumb(blobUrl);
         }
       } catch (err) {
@@ -286,17 +287,11 @@ export default function MediaMessage({
 
     generateFallbackThumb();
     return () => { isMounted = false; };
-  }, [mediaId, isOptimistic, fileType, fileName, resolvedThumb, thumbnailUrl, thumbError, resolvedMain, fileUrl]);
+  }, [mediaId, isOptimistic, fileType, fileName, resolvedThumb, thumbError, resolvedMain, fileUrl]);
 
-  // Cleanup Blob URLs on unmount
+  // Cleanup audio on unmount
   useEffect(() => {
     return () => {
-      blobUrls.current.forEach((url) => {
-        if (url && url.startsWith('blob:')) {
-          URL.revokeObjectURL(url);
-        }
-      });
-      blobUrls.current.clear();
       if (activeAudioInstance === audioRef.current) {
         activeAudioInstance = null;
       }
@@ -824,7 +819,15 @@ export default function MediaMessage({
                 src={resolvedThumb || thumbnailUrl || msg.optimisticThumbUrl}
                 alt="Document preview"
                 className="msg-doc-front-img"
-                onError={() => setThumbError(true)}
+                onError={() => {
+                  const cacheKey = isOptimistic ? `${msg?.tempmsgid}_thumb` : `${mediaId}_thumb`;
+                  invalidateThumb(cacheKey);
+                  if (resolvedThumb) {
+                    setResolvedThumb(null);
+                  } else {
+                    setThumbError(true);
+                  }
+                }}
               />
               <div className="msg-doc-corner-triangle" />
             </div>

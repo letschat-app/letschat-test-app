@@ -156,7 +156,7 @@ export const getMediaBlob = async (cacheKey, fetchUrl, storeName) => {
       if (storeName === 'thumbCache') {
         const fullKey = cacheKey.replace('_thumb', '_full');
         const fullCached = await db.get('mainCache', fullKey);
-        if (fullCached) {
+        if (fullCached && fullCached.blob?.type?.startsWith('image/')) {
           console.log(`[MediaCache] HIT (mainCache reuse for thumb): ${fullKey}`);
           const blobUrl = URL.createObjectURL(fullCached.blob);
           saveToMemory(cacheKey, blobUrl);
@@ -212,6 +212,11 @@ export const saveBlobToCache = async (id, blob, storeName) => {
     size,
     lastUsed: Date.now()
   });
+
+  if (storeName === 'thumbCache') {
+    const blobUrl = URL.createObjectURL(blob);
+    saveToMemory(id, blobUrl);
+  }
   
   // Cleanup check
   const totalSize = await calculateStoreSize(storeName);
@@ -288,4 +293,20 @@ const performLRU = async (storeName) => {
   
   await tx.done;
   console.log(`[MediaCache] LRU Complete for ${storeName}. Current size: ${(currentSize/1024/1024).toFixed(2)}MB`);
+};
+
+/**
+ * Invalidate a thumbnail from in-memory cache
+ */
+export const invalidateThumb = (id) => {
+  if (!id) return;
+  revokeFromMemory(id);
+};
+
+/**
+ * Save thumbnail URL to in-memory cache
+ */
+export const saveThumbToMemory = (id, blobUrl) => {
+  if (!id || !blobUrl) return;
+  saveToMemory(id, blobUrl);
 };

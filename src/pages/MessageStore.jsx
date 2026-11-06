@@ -93,7 +93,6 @@ const messageStore = {
 
     if (msgs && msgs.length > 0) {
       const reversedMsgs = [...msgs].reverse();
-      const existingIds = new Set(this.messages[chatid].map(m => m.msgid || m.tempmsgid || m.timestamp));
       const freshMsgs = [];
 
       reversedMsgs.forEach(msg => {
@@ -113,13 +112,26 @@ const messageStore = {
         // Silently update in IndexedDB for every received message
         saveMessageToDB(msg, idToCheck).catch(err => console.error(err));
 
-        if (!existingIds.has(idToCheck)) {
+        const existingMsgIndex = this.messages[chatid].findIndex(m => {
+          if (msg.msgid && m.msgid && String(m.msgid) === String(msg.msgid)) return true;
+          if (msg.tempmsgid && m.tempmsgid && String(m.tempmsgid) === String(msg.tempmsgid)) return true;
+          if (msg.pendingid && m.tempmsgid && String(m.tempmsgid) === String(msg.pendingid)) return true;
+          if (msg.tempmsgid && m.msgid && String(m.msgid) === String(msg.tempmsgid)) return true;
+          if (msg.msgid && m.tempmsgid && String(m.tempmsgid) === String(msg.msgid)) return true;
+          if (idToCheck && (m.msgid === idToCheck || m.tempmsgid === idToCheck || m.timestamp === idToCheck)) return true;
+          return false;
+        });
+
+        const inFreshIndex = freshMsgs.findIndex(m => {
+          if (msg.msgid && m.msgid && String(m.msgid) === String(msg.msgid)) return true;
+          if (msg.tempmsgid && m.tempmsgid && String(m.tempmsgid) === String(msg.tempmsgid)) return true;
+          return false;
+        });
+
+        if (existingMsgIndex === -1 && inFreshIndex === -1) {
           freshMsgs.push(msg);
           hasAnyChange = true;
-        } else {
-          // If it exists in memory, check if any field changed
-          const existingMsgIndex = this.messages[chatid].findIndex(m => (m.msgid || m.tempmsgid || m.timestamp) === idToCheck);
-          if (existingMsgIndex !== -1) {
+        } else if (existingMsgIndex !== -1) {
             const existingMsg = this.messages[chatid][existingMsgIndex];
             const isChanged = 
               existingMsg.status !== msg.status ||
@@ -137,7 +149,6 @@ const messageStore = {
               hasAnyChange = true;
               this.messages[chatid][existingMsgIndex] = { ...existingMsg, ...msg };
             }
-          }
         }
       });
 
@@ -465,9 +476,15 @@ const messageStore = {
     saveMessageToDB(persistenceMsg, idToCheck).catch(err => console.error("IDB save failed:", err));
 
     // Find if message already exists
-    const index = this.messages[chatid].findIndex(
-      (m) => (m.msgid || m.tempmsgid || m.timestamp) === idToCheck
-    );
+    const index = this.messages[chatid].findIndex((m) => {
+      if (msgid && m.msgid && String(m.msgid) === String(msgid)) return true;
+      if (tempmsgid && m.tempmsgid && String(m.tempmsgid) === String(tempmsgid)) return true;
+      if (msg.pendingid && m.tempmsgid && String(m.tempmsgid) === String(msg.pendingid)) return true;
+      if (tempmsgid && m.msgid && String(m.msgid) === String(tempmsgid)) return true;
+      if (msgid && m.tempmsgid && String(m.tempmsgid) === String(msgid)) return true;
+      if (idToCheck && (m.msgid === idToCheck || m.tempmsgid === idToCheck || m.timestamp === idToCheck)) return true;
+      return false;
+    });
 
     if (index !== -1) {
       const existing = this.messages[chatid][index];
