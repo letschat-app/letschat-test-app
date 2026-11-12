@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { navigateBackOrChats } from '../utils/navigation';
 import { 
   ArrowLeft, Plus, Settings2, Info, Layers, ChevronDown, ChevronUp, 
   Search, Check, X, Users, History, XCircle
@@ -453,7 +454,7 @@ export default function BatchMessagingPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <button
               type="button"
-              onClick={() => navigate('/chats')}
+              onClick={() => navigateBackOrChats(navigate, { isDetail: false })}
               style={{
                 background: 'transparent',
                 border: 'none',

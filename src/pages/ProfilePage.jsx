@@ -804,7 +804,7 @@ const ProfilePage = () => {
 
     return (
       <div className="profile-scroll-page">
-        <ProfileBackRow title="Profile" />
+        <ProfileBackRow title="Profile" isDetail={Boolean(targetUserId)} />
         <div style={styles.mobileContentPadding}>
           <OtherUserProfile
             displayUser={displayUser}

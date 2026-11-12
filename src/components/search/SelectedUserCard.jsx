@@ -46,8 +46,8 @@ const SelectedUserCard = ({ user, onClose, commonGroupsText, commonGroupsList, s
           let chatsMap = {};
           if (Array.isArray(chatData)) {
             chatData.forEach(c => {
-              if (c && (c.id || c.chatId)) {
-                chatsMap[c.id || c.chatId] = c;
+              if (c && (c.chatId || c.id)) {
+                chatsMap[c.chatId || c.id] = c;
               }
             });
           }

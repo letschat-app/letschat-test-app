@@ -130,11 +130,14 @@ mediaOpenedTime: r.mediaopenedtime
 
 // Update IndexedDB silently so subsequent opens have fresh data
 
-updateMessageStatusInDB({
+              const liveStatus = trackData.status || message.status;
+              const isAllRead = liveStatus === 'read' || liveStatus === 'media-opened';
+              updateMessageStatusInDB({
                 msgid: message.msgid,
-                status: getHigherStatus(message.status, trackData.status),
+                status: liveStatus,
+                authoritative: true,
                 delivertime: trackData.delivertime || message.delivertime,
-                readtime: trackData.readtime || message.readtime,
+                readtime: isAllRead ? (trackData.readtime || message.readtime) : null,
                 mediaopenedtime: trackData.mediaopenedtime || message.mediaopenedtime,
                 read_users: trackData.read_users || message.read_users,
                 delivered_users: trackData.delivered_users || message.delivered_users,
@@ -247,15 +250,24 @@ try {
 
 let d;
 
-if (typeof ts === 'number') {
-
-d = new Date(ts < 1e11 ? ts * 1000 : ts);
-
-} else if (typeof ts === 'string') {
-
-const trimmed = ts.trim();
-
-if (/^\d+(\.\d+)?$/.test(trimmed)) {
+      const istArrayToDate = (parts) => {
+        if (!Array.isArray(parts) || parts.length < 3) return null;
+        const utcMs = Date.UTC(parts[0], (parts[1] || 1) - 1, parts[2] || 1, parts[3] || 0, parts[4] || 0, parts[5] || 0);
+        return new Date(utcMs - 19800000);
+      };
+      // 1. Array format [year, month, day, hour, min, sec, nanos] (Jackson LocalDateTime in IST)
+      if (Array.isArray(ts)) {
+        d = istArrayToDate(ts);
+      } else if (typeof ts === 'number') {
+        d = new Date(ts < 1e11 ? ts * 1000 : ts);
+      } else if (typeof ts === 'string') {
+        const trimmed = ts.trim();
+        // 2. Comma separated list "2026,11,6,21,2,24,238386000" (or JSON array string "[2026,11,...]")
+        if (trimmed.includes(',')) {
+          const cleaned = trimmed.replace(/^\[|\]$/g, '');
+          const parts = cleaned.split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n));
+          d = istArrayToDate(parts);
+        } else if (/^\d+(\.\d+)?$/.test(trimmed)) {
 
 const num = parseFloat(trimmed);
 
@@ -285,7 +297,7 @@ d = new Date(ts);
 
 }
 
-if (isNaN(d.getTime())) return String(ts);
+if (!d || isNaN(d.getTime())) return String(ts);
 
 return new Intl.DateTimeFormat('en-IN', {
 
@@ -317,10 +329,11 @@ const isPrivate = !chat || chat.type === 'private' || chat.type === 'direct';
 
 // Merge authoritative live track details if fetched
 
-const effectiveDeliverTime = (liveTrack && liveTrack.delivertime) || message.delivertime || message.deliverTime;
-  const effectiveReadTime = (liveTrack && liveTrack.readtime) || message.readtime || message.readTime;
+  const effectiveStatus = liveTrack ? (liveTrack.status || message.status) : message.status;
+  const effectiveDeliverTime = (liveTrack && liveTrack.delivertime) || message.delivertime || message.deliverTime;
+  const isFullyRead = effectiveStatus === 'read' || effectiveStatus === 'media-opened';
+  const effectiveReadTime = isFullyRead ? ((liveTrack && liveTrack.readtime) || message.readtime || message.readTime) : null;
   const effectiveMediaOpenedTime = (liveTrack && liveTrack.mediaopenedtime) || message.mediaopenedtime || message.mediaOpenedTime;
-  const effectiveStatus = getHigherStatus(message.status, liveTrack?.status);
 
   const sentTime = message.timestamp;
   const deliverTime = effectiveDeliverTime;

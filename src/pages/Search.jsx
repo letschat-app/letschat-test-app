@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { navigateBackOrChats } from '../utils/navigation';
 import { ArrowLeft } from 'lucide-react';
 import userDiscoveryStore from '../service/UserDiscoveryStore';
 
@@ -10,6 +11,7 @@ import SearchBox from '../components/search/SearchBox';
 import ResultList from '../components/search/ResultList';
 import InviteRow from '../components/search/InviteRow';
 import CommunityGrid from '../components/search/CommunityGrid';
+import { shareAppInvite } from '../utils/inviteShare';
 import '../components/search/search.css';
 
 /**
@@ -83,29 +85,7 @@ const SearchComponent = () => {
     clearSearch,
   } = useUserSearch(showToast);
 
-  const handleInviteClick = () => {
-    const inviteUrl = window.location.origin + "/LetsChat/";
-    const shareText = `Join me on LetsChat! ${inviteUrl}`;
-
-    if (navigator.share) {
-      navigator.share({
-        title: 'LetsChat',
-        text: shareText,
-        url: inviteUrl,
-      }).catch((err) => {
-        if (err.name !== 'AbortError') {
-          console.warn('Share error:', err);
-        }
-      });
-    } else {
-      window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`, '_blank');
-      navigator.clipboard.writeText(shareText).then(() => {
-        showToast('Invite message copied');
-      }).catch(() => {
-        showToast('Invite link opened');
-      });
-    }
-  };
+  const handleInviteClick = () => shareAppInvite({ showToast });
 
   return (
     <div className="search-page-container">
@@ -115,13 +95,7 @@ const SearchComponent = () => {
         <div className="search-hero">
           <button
             type="button"
-            onClick={() => {
-              if (window.history.state && window.history.state.idx > 0) {
-                navigate(-1);
-              } else {
-                navigate('/chats');
-              }
-            }}
+            onClick={() => navigateBackOrChats(navigate, { isDetail: false })}
             className="search-back-btn"
             aria-label="Back to chats"
           >

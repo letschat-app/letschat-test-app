@@ -23,7 +23,6 @@ const FONT_STYLES = [
 const CreatePulseModal = ({ isOpen, onClose, onSuccess }) => {
   useBackClose(isOpen, onClose);
   const toast = useToast();
-  if (!isOpen) return null;
 
   const [type, setType] = useState('text'); // text, image, video, audio, image_audio
   const [content, setContent] = useState('');
@@ -51,6 +50,8 @@ const CreatePulseModal = ({ isOpen, onClose, onSuccess }) => {
   const imageInputRef = useRef(null);
   const audioInputRef = useRef(null);
   const videoInputRef = useRef(null);
+
+  if (!isOpen) return null;
 
   const handleImageSelect = (e) => {
     const file = e.target.files?.[0];

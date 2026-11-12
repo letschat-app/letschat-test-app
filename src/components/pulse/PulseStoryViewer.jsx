@@ -20,7 +20,6 @@ const PulseStoryViewer = ({
   isDesktop = false
 }) => {
   useBackClose(Boolean(contactsFeed && contactsFeed.length > 0), onClose);
-  if (!contactsFeed || contactsFeed.length === 0) return null;
 
   const [userIndex, setUserIndex] = useState(initialUserIndex);
   const [pulseIndex, setPulseIndex] = useState(0);
@@ -44,7 +43,7 @@ const PulseStoryViewer = ({
   const touchStartRef = useRef({ x: 0, y: 0, time: 0 });
 
   const myUserId = localStorage.getItem('userid');
-  const currentUser = contactsFeed[userIndex] || contactsFeed[0];
+  const currentUser = contactsFeed?.[userIndex] || contactsFeed?.[0];
   const pulses = currentUser?.pulses || [];
   const currentPulse = pulses[pulseIndex] || pulses[0];
   const isMine = currentUser?.isMine || String(currentUser?.userId || '') === String(myUserId || '');
@@ -113,8 +112,12 @@ const PulseStoryViewer = ({
     };
   }, [userIndex, pulseIndex, isPaused, currentPulse]);
 
+  const contactsCount = contactsFeed?.length || 0;
+
   // Keyboard Navigation Listener
   useEffect(() => {
+    if (contactsCount === 0) return;
+
     const handleKeyDown = (e) => {
       if (e.key === 'ArrowRight') handleNext();
       if (e.key === 'ArrowLeft') handlePrev();
@@ -127,7 +130,9 @@ const PulseStoryViewer = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [userIndex, pulseIndex, pulses.length, contactsFeed.length]);
+  }, [userIndex, pulseIndex, pulses.length, contactsCount]);
+
+  if (contactsCount === 0) return null;
 
   const handleNext = () => {
     if (pulseIndex < pulses.length - 1) {

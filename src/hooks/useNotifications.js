@@ -4,7 +4,7 @@ import { registerFCMToken, removeFCMToken } from '../service/UserAuth';
 import { isChatMuted } from '../service/db';
 import { useNavigate } from 'react-router-dom';
 import messageStore from '../pages/MessageStore';
-import { formatPushNotification } from '../sw/notificationFormat.js';
+import { formatPushNotification, matchesChatNotification } from '../sw/notificationFormat.js';
 
 const VAPID_KEY = "BKxC4cRGOl1Kx9VRilXr6Yk5Pf4KFzrw6VW2b3TdtPgbJ9HCBrDfcJ1YH4SIlo-wIuOMilLVpNhVVdx9E6ztbVU";
 
@@ -331,7 +331,9 @@ export const useNotifications = () => {
                 const isChatMessage = type === 'CHAT' || (!type && incomingChatId);
                 const isViewingThisChat = isChatMessage && isPageVisible && isPageFocused && incomingChatId && activeChatId && (String(incomingChatId) === String(activeChatId));
 
-                if (!isViewingThisChat) {
+                if (isViewingThisChat) {
+                  clearChatNotifications(incomingChatId);
+                } else {
                   const isMuted = incomingChatId ? await isChatMuted(incomingChatId) : false;
                   if (!isMuted) {
                     const iconUrl = `${import.meta.env.BASE_URL}icon-notify.png`.replace(/\/+/g, '/');
@@ -364,7 +366,14 @@ export const useNotifications = () => {
                         await reg.showNotification(formatted.title, notifOptions);
                       }
                     } else if ('Notification' in window) {
-                      new Notification(formatted.title, notifOptions);
+                      const fallbackNotif = new Notification(formatted.title, notifOptions);
+                      fallbackNotif.onclick = () => {
+                        try { window.focus(); } catch { /* ignore */ }
+                        if (notifOptions.data?.path) {
+                          navigate(notifOptions.data.path);
+                        }
+                        fallbackNotif.close();
+                      };
                     }
                   }
                 }
@@ -392,20 +401,15 @@ export const clearChatNotifications = async (chatId) => {
   if (!chatId || !('serviceWorker' in navigator)) return;
   try {
     const reg = await navigator.serviceWorker.ready;
-    const notifs = await reg.getNotifications();
-    for (const notif of notifs) {
-      const data = notif.data || {};
-      const tag = notif.tag || '';
-      if (
-        data.chatId === chatId ||
-        tag === `chat-${chatId}` ||
-        tag === `room-${chatId}` ||
-        tag === String(chatId) ||
-        tag.startsWith(`mention-${chatId}-`) ||
-        tag.startsWith(`reply-${chatId}-`)
-      ) {
-        notif.close();
+    if (typeof reg.getNotifications === 'function') {
+      const notifs = await reg.getNotifications();
+      for (const notif of notifs) {
+        if (matchesChatNotification(notif.data, notif.tag, chatId)) {
+          notif.close();
+        }
       }
+    } else if (reg.active) {
+      reg.active.postMessage({ type: 'CLOSE_CHAT_NOTIFICATIONS', chatId: String(chatId) });
     }
   } catch (err) {
     console.warn('[clearChatNotifications] Error clearing notifications:', err);

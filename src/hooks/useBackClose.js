@@ -4,8 +4,22 @@ import { useEffect, useRef } from 'react';
 const modalStack = [];
 let nextModalId = 1;
 let isProgrammaticBack = false;
+let pendingProgrammaticCallbacks = [];
 let globalListenersAttached = false;
 let currentHref = typeof window !== 'undefined' ? window.location.href : '';
+
+function flushPendingProgrammaticCallbacks() {
+  if (pendingProgrammaticCallbacks.length === 0) return;
+  const callbacks = [...pendingProgrammaticCallbacks];
+  pendingProgrammaticCallbacks = [];
+  callbacks.forEach((cb) => {
+    try {
+      cb();
+    } catch (err) {
+      console.error('Error running post-modal-close callback:', err);
+    }
+  });
+}
 
 function ensureGlobalListeners() {
   if (globalListenersAttached || typeof window === 'undefined') return;
@@ -13,9 +27,11 @@ function ensureGlobalListeners() {
   currentHref = window.location.href;
 
   window.addEventListener('popstate', (e) => {
-    // If triggered programmatically by our own history.back() on UI close, ignore
+    // If triggered programmatically by our own history.back() / history.go() on UI close, ignore modal pop
     if (isProgrammaticBack) {
       isProgrammaticBack = false;
+      currentHref = window.location.href;
+      flushPendingProgrammaticCallbacks();
       return;
     }
 
@@ -119,12 +135,70 @@ export function useBackClose(isOpen = true, onClose) {
               window.history.back();
             } catch {
               isProgrammaticBack = false;
+              flushPendingProgrammaticCallbacks();
             }
           }
         }
       }
     };
   }, [isOpen]);
+}
+
+/**
+ * Dismisses all open useBackClose overlays and unwinds their pushed `{ lcModal }`
+ * history entries before invoking `callback` (e.g. a route change).
+ */
+export function dismissModalsAndRun(callback) {
+  if (typeof window === 'undefined') {
+    callback?.();
+    return;
+  }
+
+  ensureGlobalListeners();
+
+  if (modalStack.length > 0) {
+    let popCount = 0;
+    const active = [...modalStack];
+    modalStack.length = 0;
+
+    for (let i = active.length - 1; i >= 0; i--) {
+      const item = active[i];
+      if (item.pushed && !item.closedViaPopstate) {
+        popCount += 1;
+      }
+      // Mark closed before onClose so React effect cleanup does not trigger a second history.back()
+      item.closedViaPopstate = true;
+      try {
+        item.onCloseRef.current?.();
+      } catch (err) {
+        console.error('Error closing modal before navigation:', err);
+      }
+    }
+
+    if (popCount > 0 && window.history.state?.lcModal != null) {
+      if (typeof callback === 'function') {
+        pendingProgrammaticCallbacks.push(callback);
+      }
+      isProgrammaticBack = true;
+      try {
+        window.history.go(-popCount);
+        return;
+      } catch {
+        isProgrammaticBack = false;
+        flushPendingProgrammaticCallbacks();
+        return;
+      }
+    }
+  }
+
+  if (isProgrammaticBack) {
+    if (typeof callback === 'function') {
+      pendingProgrammaticCallbacks.push(callback);
+    }
+    return;
+  }
+
+  callback?.();
 }
 
 export default useBackClose;

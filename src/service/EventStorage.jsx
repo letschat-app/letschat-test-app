@@ -48,7 +48,9 @@ export const EventStorage = ({ children }) => {
         const res = await fetch(
           `${API}/user/getevents/${userId}`, { headers: { 'ngrok-skip-browser-warning': 'true' } }
         );
+        if (!res.ok) return;
         const data = await res.json();
+        if (!Array.isArray(data)) return;
         const newGrouped = {};
         let hasEventChanges = false;
         const changedIds = [];
@@ -162,14 +164,33 @@ export const EventStorage = ({ children }) => {
           console.warn("[EventStorage] Bookings diff check error:", bErr);
         }
 
+        const serverIds = new Set(data.map(evt => String(evt.eventId)));
+        const serverGroupIds = new Set(data.filter(evt => evt.groupEventId).map(evt => String(evt.groupEventId)));
+        for (const le of (localEvents || [])) {
+          const leId = String(le.id);
+          const isStaleSync = !leId.startsWith('local_') && le.isSync !== false && !serverIds.has(leId);
+          const isSupersededGroup = Boolean(le.groupEventId) && serverGroupIds.has(String(le.groupEventId)) && !serverIds.has(leId);
+          if (isStaleSync || isSupersededGroup) {
+            try { await deleteEventFromDB(le.id); } catch {}
+          }
+        }
+
         setEvents(prev => {
-          const merged = { ...prev };
-          Object.keys(newGrouped).forEach(k => {
-            const existingItems = merged[k] || [];
-            const optimisticOnly = existingItems.filter(e => 
-              String(e.id).startsWith('local_') || (e.isAdded && !newGrouped[k].some(ne => ne.id === e.id || (ne.groupEventId && ne.groupEventId === e.groupEventId)))
-            );
-            merged[k] = [...newGrouped[k], ...optimisticOnly];
+          const merged = { ...newGrouped };
+          Object.entries(prev || {}).forEach(([k, existingItems]) => {
+            const unsyncedLocalOnly = (existingItems || []).filter(e => {
+              const eid = String(e.id);
+              if (serverIds.has(eid)) return false;
+              if (e.groupEventId && serverGroupIds.has(String(e.groupEventId))) return false;
+              return eid.startsWith('local_') || e.isSync === false;
+            });
+            if (unsyncedLocalOnly.length > 0) {
+              const existingKeys = new Set((merged[k] || []).map(ne => String(ne.id)));
+              merged[k] = [
+                ...(merged[k] || []),
+                ...unsyncedLocalOnly.filter(u => !existingKeys.has(String(u.id)))
+              ];
+            }
           });
           return merged;
         });

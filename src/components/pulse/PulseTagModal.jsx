@@ -13,7 +13,6 @@ import { API } from '../../service/UserAuth';
  */
 const PulseTagModal = ({ isOpen, onClose, pulse, pulseOwnerUserId }) => {
   useBackClose(isOpen, onClose);
-  if (!isOpen || !pulse) return null;
 
   const currentUserId = localStorage.getItem('userid');
   const [selectedChatIds, setSelectedChatIds] = useState([]);
@@ -21,12 +20,13 @@ const PulseTagModal = ({ isOpen, onClose, pulse, pulseOwnerUserId }) => {
   const [isSending, setIsSending] = useState(false);
   const [toastText, setToastText] = useState('');
 
-  const pulseId = pulse.pulseId || pulse.pulse_id || pulse.id;
-  const ownerId = pulseOwnerUserId || pulse.user_id || pulse.userId;
-  const visibility = pulse.visibility || 'everyone';
+  const pulseId = pulse?.pulseId || pulse?.pulse_id || pulse?.id;
+  const ownerId = pulseOwnerUserId || pulse?.user_id || pulse?.userId;
+  const visibility = pulse?.visibility || 'everyone';
 
   // Load chats and apply Privacy-Aware Filtering
   const availableChats = useMemo(() => {
+    if (!pulse) return [];
     try {
       const cachedMap = JSON.parse(localStorage.getItem('chatsMap') || '{}');
       let chatsList = Object.values(cachedMap).filter(c => c && c.chatId && c.chatId !== 'BROADCAST_SYSTEM' && c.chatId !== 'simulation_guide' && !c.isSimulation);
@@ -49,7 +49,9 @@ const PulseTagModal = ({ isOpen, onClose, pulse, pulseOwnerUserId }) => {
     } catch (e) {
       return [];
     }
-  }, [ownerId, visibility]);
+  }, [pulse, ownerId, visibility]);
+
+  if (!isOpen || !pulse) return null;
 
   const toggleSelectChat = (chatId) => {
     setSelectedChatIds(prev =>

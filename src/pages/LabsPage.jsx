@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { navigateBackOrChats } from '../utils/navigation';
 import { 
   FlaskConical, 
   ThumbsUp, 
@@ -186,7 +187,7 @@ export default function LabsPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           {isMobile && (
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => navigateBackOrChats(navigate, { isDetail: false })}
               style={{
                 background: 'transparent',
                 border: 'none',

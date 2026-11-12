@@ -1,4 +1,5 @@
 import useIsDesktop from './hooks/useIsDesktop';
+import { navigateFromNav } from './utils/navigation';
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
@@ -44,11 +45,11 @@ const SwipeWrapper = ({ children }) => {
 
     if (swipe < -threshold && (swipePower > powerThreshold || velocityX > velocityThreshold)) {
       if (currentIndex < swipeableRoutes.length - 1) {
-        navigate(swipeableRoutes[currentIndex + 1], { replace: true });
+        navigateFromNav(navigate, swipeableRoutes[currentIndex + 1], location.pathname);
       }
     } else if (swipe > threshold && (swipePower > powerThreshold || velocityX > velocityThreshold)) {
       if (currentIndex > 0) {
-        navigate(swipeableRoutes[currentIndex - 1], { replace: true });
+        navigateFromNav(navigate, swipeableRoutes[currentIndex - 1], location.pathname);
       }
     }
   };

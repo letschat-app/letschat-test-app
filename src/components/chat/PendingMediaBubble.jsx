@@ -1,6 +1,6 @@
 import React from 'react';
 import { Download, Play, Music, FileText, Loader2 } from 'lucide-react';
-import { formatTime12Hour } from '../../service/ChatUtils';
+import { formatTime12Hour, getDocIconInfo } from '../../service/ChatUtils';
 import { PREVIEW_BLUR_PX } from '../../service/TinyPreview';
 import './messages.css';
 
@@ -90,7 +90,7 @@ export function PendingMedia({ msg }) {
           style={{
             position: 'absolute',
             inset: 0,
-            opacity: thumb ? 0.35 : 1,
+            opacity: thumb ? 0.45 : 1,
             pointerEvents: 'none'
           }}
         />
@@ -98,9 +98,11 @@ export function PendingMedia({ msg }) {
         {/* Bottom gradient */}
         <div className="msg-image-gradient" />
 
-        {/* Subtle center spinner */}
-        <div className="msg-progress-circle" style={{ pointerEvents: 'none' }}>
-          <Loader2 className="animate-spin" size={24} color="#ffffff" style={{ opacity: 0.85 }} />
+        {/* Subtle center spinner without hiding shimmer sweep */}
+        <div className="msg-progress-circle" style={{ pointerEvents: 'none', background: thumb ? 'rgba(0,0,0,0.22)' : 'transparent' }}>
+          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Loader2 className="animate-spin" size={22} color="#ffffff" style={{ opacity: 0.9 }} />
+          </div>
         </div>
 
         {/* Bottom Right Glass Chip */}
@@ -144,14 +146,16 @@ export function PendingMedia({ msg }) {
           style={{
             position: 'absolute',
             inset: 0,
-            opacity: thumb ? 0.35 : 1,
+            opacity: thumb ? 0.45 : 1,
             pointerEvents: 'none'
           }}
         />
 
-        {/* Subtle center spinner */}
-        <div className="msg-progress-circle" style={{ pointerEvents: 'none' }}>
-          <Loader2 className="animate-spin" size={24} color="#ffffff" style={{ opacity: 0.85 }} />
+        {/* Subtle center spinner without hiding shimmer sweep */}
+        <div className="msg-progress-circle" style={{ pointerEvents: 'none', background: thumb ? 'rgba(0,0,0,0.22)' : 'transparent' }}>
+          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Loader2 className="animate-spin" size={22} color="#ffffff" style={{ opacity: 0.9 }} />
+          </div>
         </div>
 
         {/* Duration Glass Chip Bottom Left */}
@@ -255,10 +259,19 @@ export function PendingMedia({ msg }) {
           />
         </div>
       ) : (
-        <div className={`msg-doc-ext-tile ${isPDF ? 'is-pdf' : 'is-other'}`} style={{ opacity: 0.85 }}>
-          <div className="msg-doc-ext-tile-flap" />
-          <span>{ext}</span>
-        </div>
+        (() => {
+          const docInfo = getDocIconInfo(ext);
+          const DocIcon = docInfo.icon;
+          return (
+            <div className={`msg-doc-ext-tile ${docInfo.className}`} style={{ opacity: 0.85 }}>
+              <div className="msg-doc-ext-tile-flap" />
+              <div className="msg-doc-ext-icon">
+                <DocIcon size={18} strokeWidth={2.2} />
+              </div>
+              <span>{docInfo.label}</span>
+            </div>
+          );
+        })()
       )}
 
       {/* Info text */}

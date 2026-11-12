@@ -23,6 +23,7 @@ const EventModal = ({
   updateEventApi,
   isPanel = false
 }) => {
+  const toast = useToast();
   const confirm = useConfirm();
   const currentUserId = localStorage.getItem('userid');
   const currentUsername = localStorage.getItem('username');
@@ -225,7 +226,7 @@ const EventModal = ({
         const cleanDate = typeof formData.date === "string" ? formData.date.split("T")[0] : new Date(formData.date).toISOString().split("T")[0];
         const startIso = new Date(`${cleanDate}T${formData.startTime}:00`).toISOString();
         const endIso = new Date(`${cleanDate}T${formData.endTime}:00`).toISOString();
-        const chatId = formData.chatId || event?.chatid || event?.chatId || '';
+        const chatId = formData.chatid || formData.chatId || event?.chatid || event?.chatId || '';
         const groupEventId = event?.groupEventId || '';
 
         const params = new URLSearchParams({
@@ -265,8 +266,7 @@ const EventModal = ({
       if (onDraftChange) onDraftChange(updated);
       return updated;
     });
-    if (setHasChanges) setHasChanges(true);
-  };
+      };
 
   const handleScopeChange = (newScope) => {
     handleChange('scope', newScope);
@@ -280,8 +280,7 @@ const EventModal = ({
       // If turned off, event becomes strictly personal
       chatid: newVis ? (event?.chatid || event?.chatId) : null
     }));
-    if (setHasChanges) setHasChanges(true);
-  };
+      };
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -350,11 +349,11 @@ const EventModal = ({
       } else {
         const errorText = await res.text();
         console.error("Failed to create event:", res.status, errorText);
-        toast.error("Failed to create event. Please try again.");
+        toast?.error?.("Failed to create event. Please try again.");
       }
     } catch (err) {
       console.error("Network error creating group event:", err);
-      toast.error("Network error creating group event.");
+      toast?.error?.("Network error creating group event.");
     } finally {
       setIsSubmitting(false);
     }
@@ -366,9 +365,7 @@ const EventModal = ({
     const endIso = toSafeIso(formData.date, formData.endTime, 11);
     const startMs = new Date(startIso).getTime();
     if (newIsAdded && (event?.groupEventId || event?.isGroup) && startMs > 0 && startMs < Date.now()) {
-      if (toast?.showToast) {
-        toast.showToast('Cannot add past or already started events to calendar', 'error');
-      }
+      toast?.error?.('Cannot add past or already started events to calendar');
       return;
     }
 
@@ -387,8 +384,13 @@ const EventModal = ({
       }
     }
 
+    const isReceiverAction = Boolean(formData.groupEventId || event?.groupEventId) && isReceivingPerson;
+    const effectiveGroupEventId = formData.groupEventId || event?.groupEventId || null;
+
     const payload = {
       ...formData,
+      scope: isReceiverAction ? 'PERSONAL' : (formData.scope || 'ALL'),
+      groupEventId: effectiveGroupEventId,
       isAdded: newIsAdded,
       isSync: true,
       startTime: startIso,
@@ -407,32 +409,31 @@ const EventModal = ({
     setFormData((prev) => ({ ...prev, isAdded: newIsAdded, isSync: true }));
 
     // Optimistically update IndexedDB and personal calendar immediately
+    const optimisticEv = {
+      id: formData.id || formData.eventId || formData.groupEventId || ('local_' + Date.now()),
+      title: formData.title,
+      date: startIso,
+      startTime: formData.startTime,
+      endTime: formData.endTime,
+      description: formData.description || '',
+      color: formData.color || '#3b82f6',
+      msgref: formData.msgref || '',
+      chatid: formData.chatid || '',
+      action: formData.action || 'scheduled',
+      isAdded: newIsAdded,
+      isSync: true,
+      meetingType: formData.meetingType,
+      meetingLink: formData.meetingLink,
+      location: formData.location,
+      groupEventId: formData.groupEventId,
+      creatorId: formData.creatorId,
+      creatorName: formData.creatorName
+    };
     try {
-      const evet = {
-        id: formData.id || formData.eventId || formData.groupEventId || ('local_' + Date.now()),
-        title: formData.title,
-        date: startIso,
-        startTime: formData.startTime,
-        endTime: formData.endTime,
-        description: formData.description || '',
-        color: formData.color || '#3b82f6',
-        msgref: formData.msgref || '',
-        chatid: formData.chatid || '',
-        action: formData.action || 'scheduled',
-        isAdded: newIsAdded,
-        isSync: true,
-        meetingType: formData.meetingType,
-        meetingLink: formData.meetingLink,
-        location: formData.location,
-        groupEventId: formData.groupEventId,
-        creatorId: formData.creatorId,
-        creatorName: formData.creatorName
-      };
-
       if (newIsAdded) {
-        await saveEventToDB(evet);
+        await saveEventToDB(optimisticEv);
       } else {
-        await deleteEventFromDB(evet.id);
+        await deleteEventFromDB(optimisticEv.id);
       }
       window.dispatchEvent(new CustomEvent('letschat_refresh_events'));
     } catch (dbErr) {
@@ -452,6 +453,18 @@ const EventModal = ({
           body: JSON.stringify(payload)
         });
         if (res.ok) {
+          const created = await res.json().catch(() => null);
+          if (created?.eventId) {
+            if (optimisticEv.id !== created.eventId) {
+              try { await deleteEventFromDB(optimisticEv.id); } catch {}
+            }
+            await saveEventToDB({
+              ...optimisticEv,
+              id: created.eventId,
+              groupEventId: created.groupEventId || optimisticEv.groupEventId
+            });
+            setFormData(prev => ({ ...prev, id: created.eventId }));
+          }
           window.dispatchEvent(new CustomEvent('letschat_refresh_events'));
           if (setHasChanges) setHasChanges(false);
           return;

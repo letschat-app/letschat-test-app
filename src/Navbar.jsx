@@ -1,5 +1,6 @@
 import useIsDesktop from './hooks/useIsDesktop';
 import useBackClose from './hooks/useBackClose';
+import { navigateFromNav, resetToChats } from './utils/navigation';
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getsocket } from './service/Websocket';
@@ -37,11 +38,11 @@ function Navbar() {
   const isMobile = !isDesktop;
   const myDisplayName = localStorage.getItem('username') || localStorage.getItem('userid');
   const navigate = useNavigate();
+  const location = useLocation();
   const handleMenuNavigate = (path) => {
     setIsSidebarOpen(false);
-    navigate(path);
+    navigateFromNav(navigate, path, location.pathname);
   };
-  const location = useLocation();
   const [bottomNavVisible, setBottomNavVisible] = useState(true);
   const lastScrollY = useRef(0);
 
@@ -356,7 +357,7 @@ function Navbar() {
         localStorage.setItem("chatsMap", JSON.stringify(chatsMap));
         syncChatsMapToDB(chatsMap);
         closeFullscreenForm();
-        navigate('/chats', { state: { showSpacesForChat: chatId } });
+        resetToChats(navigate, { chatId });
       } catch (err) {
         setMessage('Group created but failed to load chat list');
         setIsAdding(false);
@@ -423,7 +424,7 @@ function Navbar() {
         messageStore.setCount(data);
 
         closeFullscreenForm();
-        navigate('/chats', { state: { showSpacesForChat: data } });
+        resetToChats(navigate, { chatId: data });
       } else {
         const data = await response.text();
         setMessage(`Failed: ${data}`);
@@ -472,7 +473,7 @@ function Navbar() {
           messageStore.setCount(chatId);
 
           closeFullscreenForm();
-          navigate('/chats', { state: { showSpacesForChat: chatId } });
+          resetToChats(navigate, { chatId });
         }
       } else {
         const data = await response.text();
@@ -557,7 +558,7 @@ function Navbar() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {/* Search Icon Button */}
           <button
-            onClick={() => navigate('/search')}
+            onClick={() => navigateFromNav(navigate, '/search', location.pathname)}
             style={{
               ...menuButtonStyle,
               position: 'relative',
@@ -590,7 +591,7 @@ function Navbar() {
             <button
               key={page.path}
               onClick={() => {
-                navigate(page.path, { replace: true });
+                navigateFromNav(navigate, page.path, location.pathname);
               }}
               style={{
                 ...navLinkStyle,

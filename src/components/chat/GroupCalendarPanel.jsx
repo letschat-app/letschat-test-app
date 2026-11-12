@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Video, MapPin, Plus, Check, X, Bell, BellOff, Users, ExternalLink, ChevronRight, Edit2 } from 'lucide-react';
 import { useToast } from '../common/ToastProvider';
 import { API } from '../../service/UserAuth';
-import { saveEventToDB } from '../../service/db';
+import { saveEventToDB, deleteEventFromDB } from '../../service/db';
 
 export const parseEventDate = (val) => {
   if (!val) return null;
@@ -213,36 +213,36 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onO
     });
 
     // 2. Optimistic persist to personal calendar (IndexedDB)
+    const startDate = parseEventDate(event.startTime);
+    const endDate = parseEventDate(event.endTime);
+    const evet = {
+      id: event.eventId || event.groupEventId,
+      title: event.eventTitle,
+      date: startDate ? startDate.toISOString() : event.startTime,
+      startTime: startDate ? startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : '',
+      endTime: endDate ? endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : '',
+      description: event.eventDetails || '',
+      color: event.eventColor || '#3b82f6',
+      msgref: event.msgId || '',
+      chatid: chatId || event.chatId || '',
+      action: 'scheduled',
+      isAdded: true,
+      isSync: true,
+      meetingType: event.meetingType,
+      meetingLink: event.meetingLink,
+      location: event.location,
+      groupEventId: event.groupEventId,
+      creatorId: event.creatorId,
+      creatorName: event.creatorName
+    };
     try {
-      const startDate = parseEventDate(event.startTime);
-      const endDate = parseEventDate(event.endTime);
-      const evet = {
-        id: event.eventId || event.groupEventId,
-        title: event.eventTitle,
-        date: startDate ? startDate.toISOString() : event.startTime,
-        startTime: startDate ? startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : '',
-        endTime: endDate ? endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : '',
-        description: event.eventDetails || '',
-        color: event.eventColor || '#3b82f6',
-        msgref: event.msgId || '',
-        chatid: chatId || event.chatId || '',
-        action: 'scheduled',
-        isAdded: true,
-        isSync: true,
-        meetingType: event.meetingType,
-        meetingLink: event.meetingLink,
-        location: event.location,
-        groupEventId: event.groupEventId,
-        creatorId: event.creatorId,
-        creatorName: event.creatorName
-      };
       await saveEventToDB(evet);
       window.dispatchEvent(new CustomEvent('letschat_refresh_events'));
     } catch (e) {
       console.warn('Failed to optimistically save to local DB:', e);
     }
 
-    // 3. Network call in parallel
+    // 3. Network call
     try {
       const res = await fetch(`${API}/user/event/create`, {
         method: 'POST',
@@ -268,6 +268,17 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onO
         })
       });
       if (res.ok) {
+        const created = await res.json().catch(() => null);
+        if (created?.eventId) {
+          if (evet.id && evet.id !== created.eventId) {
+            try { await deleteEventFromDB(evet.id); } catch {}
+          }
+          await saveEventToDB({
+            ...evet,
+            id: created.eventId,
+            groupEventId: created.groupEventId || evet.groupEventId
+          });
+        }
         fetchGroupEvents();
         window.dispatchEvent(new CustomEvent('letschat_refresh_events'));
       }
@@ -533,6 +544,7 @@ const GroupCalendarPanel = ({ chatId, groupName, onClose, onOpenCreateEvent, onO
             const startMs = parseEventDate(ev.startTime)?.getTime() || 0;
             const endMs = parseEventDate(ev.endTime)?.getTime() || (startMs + 60 * 60 * 1000);
             const isPast = endMs < now;
+            const isPastStart = startMs < now;
             const isOngoing = startMs <= now && endMs >= now && !isCancelled;
             const currentUsername = localStorage.getItem('username');
             const isCreator = Boolean(

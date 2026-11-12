@@ -3,7 +3,7 @@ import { Download, Play, Pause, Loader2, RotateCcw } from 'lucide-react';
 import { API } from '../../service/UserAuth';
 import { downloadFile, getPdfThumbnail } from '../../service/MediaUploader';
 import { getMediaInfo, getMediaBlob, saveBlobToCache, memoryThumbCache, invalidateThumb, saveThumbToMemory } from '../../service/MediaCache';
-import { formatTime12Hour } from '../../service/ChatUtils';
+import { formatTime12Hour, getDocIconInfo } from '../../service/ChatUtils';
 import EyeIcon from './EyeIcon';
 import messageStore from '../../pages/MessageStore';
 import { PREVIEW_BLUR_PX } from '../../service/TinyPreview';
@@ -49,6 +49,16 @@ const getFileExtension = (name, type) => {
   return (type || 'DOC').toUpperCase();
 };
 
+// Cloudflare R2 public base URL for raw keys sent in real-time frames
+const R2_PUBLIC_URL = 'https://pub-91d12b8ece574bde8ccd1c26b5367b6d.r2.dev/';
+const resolveR2Url = (val) => {
+  if (!val || val === 'null' || val === 'undefined') return null;
+  const s = String(val).trim();
+  if (!s || s === 'null' || s === 'undefined') return null;
+  if (s.startsWith('http://') || s.startsWith('https://') || s.startsWith('blob:') || s.startsWith('data:')) return s;
+  return `${R2_PUBLIC_URL}${s.replace(/^\/+/, '')}`;
+};
+
 // Module-level audio tracker so only one audio plays at a time
 let activeAudioInstance = null;
 
@@ -79,6 +89,20 @@ export default function MediaMessage({
         noOfPages: msg?.noOfPages,
       };
     }
+    if (msg?.thumbKey || msg?.thumbnailKey || msg?.mainKey || msg?.fileName) {
+      return {
+        fileType: msg?.type,
+        fileName: msg?.fileName,
+        fileSize: msg?.fileSize,
+        fileKey: msg?.mainKey || null,
+        thumbnailKey: msg?.thumbKey || msg?.thumbnailKey || null,
+        mediaId: msg?.mediaId || msg?.content,
+        width: msg?.width,
+        height: msg?.height,
+        duration: msg?.duration,
+        noOfPages: msg?.noOfPages,
+      };
+    }
     if (msg?.pendingid && messageStore.pendingInfo?.has(msg.pendingid)) {
       const p = messageStore.pendingInfo.get(msg.pendingid);
       return {
@@ -94,7 +118,7 @@ export default function MediaMessage({
     }
     return null;
   });
-  const [loading, setLoading] = useState(!msg?.isOptimistic && !msg?.optimisticUrl && !msg?.optimisticThumbUrl && !(msg?.pendingid && messageStore.pendingInfo?.has(msg.pendingid)));
+  const [loading, setLoading] = useState(!msg?.isOptimistic && !msg?.optimisticUrl && !msg?.optimisticThumbUrl && !msg?.thumbKey && !msg?.thumbnailKey && !(msg?.pendingid && messageStore.pendingInfo?.has(msg.pendingid)));
   const [error, setError] = useState(null);
   const [thumbError, setThumbError] = useState(false);
   const [mainLoaded, setMainLoaded] = useState(false);
@@ -111,6 +135,8 @@ export default function MediaMessage({
       memoryThumbCache?.get(idbKey) ||
       (msg?.tempmsgid ? memoryThumbCache?.get(`${msg?.tempmsgid}_thumb`) : null) ||
       msg?.optimisticThumbUrl ||
+      resolveR2Url(msg?.thumbKey) ||
+      resolveR2Url(msg?.thumbnailKey) ||
       (msg?.pendingid && messageStore.pendingInfo?.get(msg.pendingid)?.thumb) ||
       null
     );
@@ -145,22 +171,14 @@ export default function MediaMessage({
   const duration = mediaInfo?.duration || msg.duration;
   const noOfPages = mediaInfo?.noOfPages || msg.noOfPages;
 
-  // Final fallback URLs
+  // Final fallback URLs (direct R2 public URL instead of removed /files/media/serve)
   const fileUrl =
     s(mediaInfo?.url) ||
     s(mediaInfo?.fileUrl) ||
-    (s(fileKey)
-      ? fileKey.startsWith('http') || fileKey.startsWith('blob:')
-        ? fileKey
-        : `${API}/files/media/serve/${fileKey}`
-      : null);
+    resolveR2Url(s(fileKey));
   const thumbnailUrl =
     s(mediaInfo?.thumbnailUrl) ||
-    (s(thumbnailKey)
-      ? thumbnailKey.startsWith('http') || thumbnailKey.startsWith('blob:')
-        ? thumbnailKey
-        : `${API}/files/media/serve/${thumbnailKey}`
-      : null);
+    resolveR2Url(s(thumbnailKey));
 
   // 1. Fetch Media Metadata
   useEffect(() => {
@@ -205,11 +223,7 @@ export default function MediaMessage({
     let isMounted = true;
     const resolveUrls = async () => {
       try {
-        const getFetchUrl = (key, fallback) => {
-          if (!key) return fallback;
-          if (key.startsWith('http') || key.startsWith('blob:')) return key;
-          return `${API}/files/media/serve/${key}`;
-        };
+        const getFetchUrl = (key, fallback) => resolveR2Url(key) || resolveR2Url(fallback) || fallback;
 
         // Thumbnail Resolution
         const isPDF = isPdfFile(fileName) || fileType === 'pdf' || fileType === 'application/pdf';
@@ -482,7 +496,9 @@ export default function MediaMessage({
   const renderImage = () => {
     const isUploading = status === 'uploading';
     const isFailed = status === 'failed';
-    const imageSrc = resolvedMain || resolvedThumb || thumbnailUrl || fileUrl || msg.optimisticThumbUrl || msg.optimisticUrl;
+    const imageSrc = !thumbError
+      ? (resolvedMain || resolvedThumb || thumbnailUrl || fileUrl || msg.optimisticThumbUrl || msg.optimisticUrl)
+      : (resolvedMain || fileUrl || msg.optimisticUrl);
 
     // Aspect ratio clamping between 3:4 (0.75) and 16:9 (1.777)
     let aspectRatioStyle = '4 / 3';
@@ -492,7 +508,8 @@ export default function MediaMessage({
       aspectRatioStyle = `${clamped}`;
     }
 
-    const isBlurry = !isOptimistic && !mainLoaded && Boolean(resolvedThumb || thumbnailUrl);
+    const isTinyPendingThumb = typeof imageSrc === 'string' && imageSrc.startsWith('data:');
+    const isBlurry = !isOptimistic && !mainLoaded && (isTinyPendingThumb || (!resolvedMain && !fileUrl && Boolean(resolvedThumb || thumbnailUrl)));
 
     return (
       <div
@@ -502,24 +519,33 @@ export default function MediaMessage({
             if (isSelectionMode) return;
             e.stopPropagation();
             if (isFailed) return;
-            if (!resolvedMain && !fileUrl) return; // Tap guard: do not open viewer until full media exists!
+            if (!resolvedMain && !fileUrl) return;
             onOpenViewer?.({ fileUrl: resolvedMain || fileUrl, fileName, fileType: 'image' });
           }}
         >
-          <img
-            src={imageSrc}
-            alt={fileName || 'Image'}
-            loading="lazy"
-            onLoad={() => {
-              if (resolvedMain) setMainLoaded(true);
-            }}
-            style={{
-              filter: isBlurry ? `blur(${PREVIEW_BLUR_PX}px)` : 'none',
-              transition: 'filter 0.6s ease',
-              transform: isBlurry ? 'scale(1.08)' : 'none',
-            }}
-            className={`msg-image-img ${isUploading ? 'msg-media-overlay-dim' : ''} ${isFailed ? 'msg-media-overlay-dim' : ''}`}
-          />
+          {imageSrc ? (
+            <img
+              src={imageSrc}
+              alt=""
+              loading="lazy"
+              onLoad={() => {
+                if (resolvedMain || (fileUrl && imageSrc === fileUrl) || !isTinyPendingThumb) {
+                  setMainLoaded(true);
+                }
+              }}
+              onError={() => {
+                if (!resolvedMain && !thumbError) setThumbError(true);
+              }}
+              style={{
+                filter: isBlurry ? `blur(${PREVIEW_BLUR_PX}px)` : 'none',
+                transition: 'filter 0.45s ease',
+                transform: isBlurry ? 'scale(1.08)' : 'none',
+              }}
+              className={`msg-image-img ${isUploading ? 'msg-media-overlay-dim' : ''} ${isFailed ? 'msg-media-overlay-dim' : ''}`}
+            />
+          ) : (
+            <div className="msg-skeleton-shimmer" style={{ width: '100%', height: '100%' }} />
+          )}
 
           {/* Bottom gradient overlay for glass chip legibility */}
           <div className="msg-image-gradient" />
@@ -582,9 +608,9 @@ export default function MediaMessage({
   const renderVideo = () => {
     const isUploading = status === 'uploading';
     const isFailed = status === 'failed';
-    const videoThumb = resolvedThumb || thumbnailUrl || msg.optimisticThumbUrl;
-
-    const isVideoBlurry = !isOptimistic && !resolvedMain && Boolean(videoThumb);
+    const videoThumb = !thumbError ? (resolvedThumb || thumbnailUrl || msg.optimisticThumbUrl) : null;
+    const isTinyPendingVideo = typeof videoThumb === 'string' && videoThumb.startsWith('data:');
+    const isVideoBlurry = !isOptimistic && isTinyPendingVideo;
 
     return (
       <div
@@ -593,18 +619,19 @@ export default function MediaMessage({
           if (isSelectionMode) return;
           e.stopPropagation();
           if (isFailed) return;
-          if (!resolvedMain && !fileUrl) return; // Tap guard
+          if (!resolvedMain && !fileUrl) return;
           onOpenViewer?.({ fileUrl: resolvedMain || fileUrl, fileName, fileType: 'video' });
         }}
       >
         {videoThumb ? (
           <img
             src={videoThumb}
-            alt="Video preview"
+            alt=""
             loading="lazy"
+            onError={() => setThumbError(true)}
             style={{
               filter: isVideoBlurry ? `blur(${PREVIEW_BLUR_PX}px)` : 'none',
-              transition: 'filter 0.6s ease',
+              transition: 'filter 0.45s ease',
               transform: isVideoBlurry ? 'scale(1.08)' : 'none',
             }}
             className={`msg-video-thumb ${isUploading || isFailed ? 'msg-media-overlay-dim' : ''}`}
@@ -859,13 +886,19 @@ export default function MediaMessage({
       );
     }
 
+    const docInfo = getDocIconInfo(ext);
+    const DocIcon = docInfo.icon;
+
     // B) Generic Row Tile (Without Thumbnail)
     return (
       <div className="msg-doc-row" onClick={handleCardOpen}>
-        {/* 40x48px Extension Tile */}
-        <div className={`msg-doc-ext-tile ${isPDF ? 'is-pdf' : 'is-other'}`}>
+        {/* Extension Tile with Icon & Label */}
+        <div className={`msg-doc-ext-tile ${docInfo.className}`}>
           <div className="msg-doc-ext-tile-flap" />
-          <span>{ext}</span>
+          <div className="msg-doc-ext-icon">
+            <DocIcon size={18} strokeWidth={2.2} />
+          </div>
+          <span>{docInfo.label}</span>
         </div>
 
         {/* Text Information */}

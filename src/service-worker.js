@@ -1,4 +1,4 @@
-import { formatPushNotification, resolveNotificationPath } from './sw/notificationFormat.js';
+import { formatPushNotification, resolveNotificationPath, matchesChatNotification } from './sw/notificationFormat.js';
 import { precacheAndRoute, createHandlerBoundToURL } from 'workbox-precaching';
 import { registerRoute, NavigationRoute } from 'workbox-routing';
 
@@ -98,6 +98,18 @@ self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') {
     console.log('[SW] Received SKIP_WAITING — activating now');
     self.skipWaiting();
+  } else if (event.data?.type === 'CLOSE_CHAT_NOTIFICATIONS' && event.data?.chatId) {
+    event.waitUntil(
+      self.registration.getNotifications()
+        .then((notifs) => {
+          for (const notif of notifs) {
+            if (matchesChatNotification(notif.data, notif.tag, event.data.chatId)) {
+              notif.close();
+            }
+          }
+        })
+        .catch((err) => console.warn('[SW] Failed closing chat notifications:', err))
+    );
   }
 });
 
@@ -250,6 +262,61 @@ onBackgroundMessage(messaging, async (payload) => {
 });
 
 // ─── Notification Click ───────────────────────────────────────────────────────
+async function focusOrOpenAppClient(baseUrl, urlToOpen, messagePayload) {
+  const normalizedBase = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
+  const baseNoSlash = normalizedBase.slice(0, -1);
+
+  try {
+    const windowClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const appClients = windowClients
+      .filter((c) => {
+        try {
+          return c.url === baseNoSlash || c.url.startsWith(normalizedBase) || c.url.startsWith(baseNoSlash + '#');
+        } catch {
+          return false;
+        }
+      })
+      .sort((a, b) => (b.visibilityState === 'visible' ? 1 : 0) - (a.visibilityState === 'visible' ? 1 : 0));
+
+    for (const client of appClients) {
+      try {
+        const wasVisible = client.visibilityState === 'visible' || client.focused;
+        const focusedClient = ('focus' in client) ? await client.focus().catch(() => null) : client;
+        const isNowForeground = Boolean(focusedClient && (focusedClient.focused || focusedClient.visibilityState === 'visible'));
+        // On Android PWAs, hidden/suspended tabs can resolve focus() without foregrounding the Activity;
+        // fall through to clients.openWindow unless the client is genuinely visible/focused.
+        if (isNowForeground || wasVisible) {
+          const activeClient = focusedClient || client;
+          if (messagePayload) {
+            activeClient.postMessage(messagePayload);
+          }
+          if (!wasVisible && urlToOpen && 'navigate' in activeClient && activeClient.url !== urlToOpen) {
+            try { await activeClient.navigate(urlToOpen); } catch { /* ignore */ }
+          }
+          return activeClient;
+        }
+      } catch (cErr) {
+        console.warn('[SW] Error focusing client:', cErr);
+      }
+    }
+  } catch (mErr) {
+    console.warn('[SW] Error matching clients:', mErr);
+  }
+
+  if (self.clients.openWindow) {
+    const targetUrl = urlToOpen || normalizedBase;
+    try {
+      return await self.clients.openWindow(targetUrl);
+    } catch (owErr) {
+      console.error('[SW] openWindow failed, retrying base scope:', owErr);
+      if (targetUrl !== normalizedBase) {
+        try { return await self.clients.openWindow(normalizedBase); } catch { /* ignore */ }
+      }
+    }
+  }
+  return null;
+}
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const data = event.notification.data || {};
@@ -262,55 +329,18 @@ self.addEventListener('notificationclick', (event) => {
     self.skipWaiting();
 
     event.waitUntil(
-      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (windowClients) => {
-        for (const client of windowClients) {
-          try {
-            const clientOrigin = new URL(client.url).origin;
-            if (clientOrigin === location.origin) {
-              if ('focus' in client) {
-                await client.focus();
-              }
-              client.postMessage({ type: 'APPLY_UPDATE' });
-              return;
-            }
-          } catch (e) {
-            console.error('[SW] Error focusing/navigating client on update:', e);
-          }
-        }
-        if (self.clients.openWindow) {
-          return self.clients.openWindow(baseUrl);
-        }
-      })
+      focusOrOpenAppClient(baseUrl, null, { type: 'APPLY_UPDATE' })
     );
     return;
   }
 
-    const targetPath = resolveNotificationPath(data);
+  const rawTarget = (typeof data.path === 'string' && data.path.trim()) ? data.path.trim() : resolveNotificationPath(data);
+  const cleanPath = rawTarget.replace(/^#?\/+/, '') || 'chats';
+  const targetPath = '/' + cleanPath;
+  const normalizedBase = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
+  const urlToOpen = new URL('#/' + cleanPath, normalizedBase).href;
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (windowClients) => {
-      const urlToOpen = new URL('#' + targetPath, baseUrl).href;
-      for (const client of windowClients) {
-        try {
-          const clientOrigin = new URL(client.url).origin;
-          if (clientOrigin === location.origin) {
-            if ('focus' in client) {
-              await client.focus();
-            }
-            client.postMessage({ type: 'NOTIFICATION_CLICK', path: targetPath });
-            return;
-          }
-        } catch (e) {
-          console.warn('[SW] Error focusing/messaging client:', e);
-          try {
-            client.postMessage({ type: 'NOTIFICATION_CLICK', path: targetPath });
-            return;
-          } catch (postErr) {}
-        }
-      }
-      if (self.clients.openWindow) {
-        return self.clients.openWindow(urlToOpen);
-      }
-    })
+    focusOrOpenAppClient(baseUrl, urlToOpen, { type: 'NOTIFICATION_CLICK', path: targetPath, url: urlToOpen })
   );
 });

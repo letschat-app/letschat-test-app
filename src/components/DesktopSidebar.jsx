@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { navigateFromNav } from '../utils/navigation';
 import { getsocket } from '../service/Websocket';
 import { MessageSquare, Users, Search, Calendar, LogOut, User, Star, FlaskConical } from 'lucide-react';
 import { removeFCMToken } from '../service/UserAuth';
@@ -101,7 +102,7 @@ const DesktopSidebar = () => {
                     return (
                         <div
                             key={id}
-                            onClick={() => navigate(path)}
+                            onClick={() => navigateFromNav(navigate, path, location.pathname)}
                             style={navItemStyle(active)}
                             title={label}
                         >
@@ -165,7 +166,7 @@ const DesktopSidebar = () => {
                     return (
                         <div
                             key={id}
-                            onClick={() => navigate(path)}
+                            onClick={() => navigateFromNav(navigate, path, location.pathname)}
                             style={navItemStyle(active)}
                             title={label}
                         >

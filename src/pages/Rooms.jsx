@@ -1,6 +1,7 @@
 import useBackClose from '../hooks/useBackClose';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { resetToChats } from '../utils/navigation';
 import {
   Search,
   Plus,
@@ -72,7 +73,9 @@ const safeJsonParse = (key, fallback) => {
 const getChatId = (r) => (r ? (r.ChatId || r.chatId || r.roomId || r.Id || r.id || '') : '');
 const getName = (r) => (r ? (r.ChatName || r.chatName || r.roomName || r.name || 'Unnamed room') : 'Unnamed room');
 const getMembers = (r) => (r ? Number(r.noOfMembers || r.NoOfMembers || r.noofmembers || r.membersCount || 0) : 0);
-const getMotto = (r) => (r ? (r.motto || r.Motto || r.status || r.Status || 'Explore topics and connect with others') : 'Explore topics and connect with others');
+const isStatusAllowed = (val) => typeof val === 'string' && val.trim().toLowerCase() === 'allowed';
+const pickMotto = (...vals) => vals.find(v => typeof v === 'string' && v.trim() && !isStatusAllowed(v)) || '';
+const getMotto = (r) => (r ? (pickMotto(r.motto, r.Motto, r.description, r.status, r.Status) || 'Explore topics and connect with others') : 'Explore topics and connect with others');
 
 // User rooms cache key (only caches pinned, created, and joined rooms)
 const USER_ROOMS_CACHE_KEY = 'letschat_user_rooms_cache';
@@ -442,14 +445,16 @@ export default function Rooms({ isSidebar = false }) {
           return;
         }
 
-        const finalChatId = room.ChatId || room.chatId || chatId;
+        const finalChatId = (typeof chatId === 'string' && chatId.trim()) ? chatId.trim() : (room.ChatId || room.chatId);
 
         // CRITICAL: Mark as volatile BEFORE loading messages to ensure 30-min TTL
         messageStore.markAsVolatile(finalChatId);
 
-        const isCreator = (room.creator && room.creator === userId) || room.Role === 'admin';
+        const isCreator = (room.creator && room.creator === userId) || room.Role === 'admin' || room.role === 'admin';
         const defaultMuted = !isCreator;
         const currentMuted = room.isMuted !== undefined && isCreator ? room.isMuted : defaultMuted;
+        const resolvedMembers = Math.max(1, getMembers(room));
+        const resolvedMotto = pickMotto(room.motto, room.Motto, room.description, room.status, room.Status);
 
         const chatsMap = safeJsonParse('chatsMap', {});
         chatsMap[finalChatId] = {
@@ -458,6 +463,9 @@ export default function Rooms({ isSidebar = false }) {
           chatName: getName(room),
           id: roomId,
           type: 'room',
+          motto: resolvedMotto,
+          noOfMembers: resolvedMembers,
+          memberCount: resolvedMembers,
           status: 'allowed',
           isMuted: currentMuted
         };
@@ -483,7 +491,7 @@ export default function Rooms({ isSidebar = false }) {
         getchat(finalChatId);
         messageStore.setCount(finalChatId);
 
-        navigate('/chats', { state: { showSpacesForChat: chatId }, replace: true });
+        resetToChats(navigate, { chatId });
       } else {
         const errText = await res.text();
         setFetchError(errText || 'Could not join room. Try again.');
@@ -507,16 +515,26 @@ export default function Rooms({ isSidebar = false }) {
 
   // Deduplicate master list of rooms
   const allUniqueRooms = useMemo(() => {
-    const seen = new Set();
-    const list = [];
-    for (const r of [...userRooms, ...allRooms]) {
+    const map = new Map();
+    for (const r of allRooms) {
       const id = getChatId(r);
-      if (id && !seen.has(id)) {
-        seen.add(id);
-        list.push(r);
+      if (id) map.set(id, { ...r });
+    }
+    for (const r of userRooms) {
+      const id = getChatId(r);
+      if (id) {
+        const existing = map.get(id) || {};
+        const bestMotto = pickMotto(r.motto, r.Motto, existing.motto, existing.Motto, r.status, r.Status, existing.status, existing.Status);
+        map.set(id, {
+          ...existing,
+          ...r,
+          noOfMembers: Math.max(1, Number(r.noOfMembers ?? existing.noOfMembers ?? existing.NoOfMembers ?? 1)),
+          status: bestMotto || r.status || r.Status || existing.status || existing.Status,
+          motto: bestMotto
+        });
       }
     }
-    return list;
+    return Array.from(map.values());
   }, [userRooms, allRooms]);
 
   // User joined room IDs set

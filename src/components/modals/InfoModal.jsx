@@ -1,8 +1,11 @@
 import { useToast } from '../common/ToastProvider';
 import { useConfirm } from '../common/ConfirmProvider';
 import useBackClose from '../../hooks/useBackClose';
+import { resetToChats } from '../../utils/navigation';
+import useIsDesktop from '../../hooks/useIsDesktop';
+import ModalCloseButton from '../common/ModalCloseButton';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { X, Edit2, Users, UserPlus, LogOut, Shield, Award, MessageCircle, UserMinus, Info, Camera, Loader2, Bell, BellOff, Zap } from 'lucide-react';
+import { Edit2, Users, UserPlus, LogOut, Shield, Award, MessageCircle, UserMinus, Info, Camera, Loader2, Bell, BellOff, Zap, ChevronDown } from 'lucide-react';
 import MemberActionsPopup from './MemberActionsPopup';
 import AddMemberModal from './AddMemberModal';
 import messageStore from '../../pages/MessageStore';
@@ -14,8 +17,35 @@ import { toggleMuteChat, isChatMuted, saveChatInfoToDB, getChatInfoFromDB, saveG
 import { DisplayNamePolicyModal } from '../common/DisplayNamePolicyModal';
 import { validateChatNickname } from '../../service/nameSimilarity';
 
+const extractPartnerUserId = (chatObj, currentUserId) => {
+  if (!chatObj) return null;
+  const ownId = currentUserId ? String(currentUserId) : null;
+  const threadId = chatObj.chatId ? String(chatObj.chatId) : '';
+  const directCandidates = [chatObj.otherUserId, chatObj.userId, chatObj.userid];
+  for (const candidate of directCandidates) {
+    if (candidate && String(candidate) !== threadId && String(candidate) !== ownId) {
+      return String(candidate);
+    }
+  }
+  if (Array.isArray(chatObj.userIds)) {
+    const peer = chatObj.userIds.find((uid) => uid && String(uid) !== ownId && String(uid) !== threadId);
+    if (peer) return String(peer);
+  }
+  if (chatObj.id && String(chatObj.id) !== threadId && String(chatObj.id) !== ownId) {
+    return String(chatObj.id);
+  }
+  return null;
+};
+
 const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) => {
   useBackClose(true, onClose);
+  const isDesktop = useIsDesktop();
+  const isMobileFullscreen = !isPanel && !isDesktop;
+  const infoTitle = chat?.type === 'group'
+    ? 'Group Info'
+    : chat?.type === 'classroom'
+      ? 'Classroom Info'
+      : 'Contact Info';
   const toast = useToast();
   const confirm = useConfirm();
   const currentUserId = localStorage.getItem('userid');
@@ -79,14 +109,49 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
   const [groupEditMode, setGroupEditMode] = useState(false);
   const [tempGroupName, setTempGroupName] = useState(chat.chatName || '');
   const [tempGroupProfile, setTempGroupProfile] = useState(chat.profile || '');
-  const [tempGroupMotto, setTempGroupMotto] = useState(chat.motto || chat.description || '');
+  const [roomMotto, setRoomMotto] = useState(cachedInfo.motto || chat.motto || chat.description || '');
+  const [tempGroupMotto, setTempGroupMotto] = useState(cachedInfo.motto || chat.motto || chat.description || '');
   const [viewingMedia, setViewingMedia] = useState(null);
   const [onlineStatuses, setOnlineStatuses] = useState({});
-  const [memberCount, setMemberCount] = useState(cachedInfo.memberCount || 0);
+  const [memberCount, setMemberCount] = useState(cachedInfo.memberCount || chat.noOfMembers || chat.memberCount || (chat.type === 'room' ? 1 : 0));
   const fileInputRef = useRef(null);
   const groupFileInputRef = useRef(null);
   const [muted, setMuted] = useState(false);
   const [commonGroups, setCommonGroups] = useState([]);
+  const [showCommonPeople, setShowCommonPeople] = useState(false);
+
+  const commonPeople = useMemo(() => {
+    if (chat.type !== 'group' && chat.type !== 'classroom') return [];
+    if (!sortedMembers || sortedMembers.length === 0) return [];
+    const ownId = currentUserId ? String(currentUserId) : '';
+    const privateChatByPartner = new Map();
+    try {
+      const chatsMap = JSON.parse(localStorage.getItem('chatsMap') || '{}');
+      for (const c of Object.values(chatsMap)) {
+        if (!c || c.type !== 'private') continue;
+        const partnerId = extractPartnerUserId(c, currentUserId);
+        if (partnerId && partnerId !== ownId && !privateChatByPartner.has(partnerId)) {
+          privateChatByPartner.set(partnerId, c);
+        }
+      }
+    } catch { /* ignore */ }
+
+    const matches = [];
+    for (const member of sortedMembers) {
+      const mId = member?.userId ? String(member.userId) : '';
+      if (!mId || mId === ownId) continue;
+      const privateChat = privateChatByPartner.get(mId);
+      if (privateChat && privateChat.chatId) {
+        matches.push({
+          member,
+          privateChat,
+          privateChatId: privateChat.chatId,
+          displayName: privateChat.chatName || member.userName || member.username || mId,
+        });
+      }
+    }
+    return matches;
+  }, [chat.type, sortedMembers, currentUserId]);
   const [pinned, setPinned] = useState(() => {
     try {
       const list = JSON.parse(localStorage.getItem('quick_access_chats') || '[]');
@@ -113,6 +178,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
 
   useEffect(() => {
     let isCurrent = true;
+    setShowCommonPeople(false);
 
     // 1. Immediate cache hydration from IndexedDB
     getChatInfoFromDB(chat.chatId).then(cached => {
@@ -123,6 +189,10 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
       }
       if (cached.profile) setMyProfile(cached.profile);
       if (cached.memberCount !== undefined) setMemberCount(cached.memberCount);
+      if (cached.motto !== undefined && cached.motto !== null) {
+        setRoomMotto(cached.motto);
+        setTempGroupMotto(prev => prev || cached.motto);
+      }
       setInfoLoading(false);
       try {
         localStorage.setItem(`chatInfo_${chat.chatId}`, JSON.stringify(cached));
@@ -146,7 +216,6 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
       fetchMembers();
     } else {
       setLoading(false);
-      fetchCommonGroups();
     }
     checkMuteStatus();
 
@@ -155,27 +224,71 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
     };
   }, [chat.chatId]);
 
-  const fetchCommonGroups = async () => {
-    const partnerId = String(chat.chatId || chat.userid || chat.id);
-    try {
-      const chatsMap = JSON.parse(localStorage.getItem('chatsMap') || '{}');
-      const groupList = Object.values(chatsMap).filter(c => c.type === 'group' || c.type === 'classroom');
-      
-      const checkPromises = groupList.map(async (g) => {
-        const cachedMembers = await getGroupMembersFromDB(g.chatId);
-        if (cachedMembers && cachedMembers.some(m => String(m.userId) === partnerId)) {
-          return g;
-        }
-        return null;
-      });
-
-      const results = await Promise.all(checkPromises);
-      const found = results.filter(Boolean);
-      setCommonGroups(found);
-    } catch (e) {
-      console.error("Error computing common groups:", e);
+  useEffect(() => {
+    if (chat.type === 'group' || chat.type === 'classroom' || chat.type === 'room') {
+      return;
     }
-  };
+    let isCurrent = true;
+
+    const resolvePartnerId = () => {
+      const direct = extractPartnerUserId(
+        {
+          chatId: chat.chatId,
+          id: chat.id,
+          userId: chat.userId,
+          userid: chat.userid,
+          otherUserId: chat.otherUserId,
+          userIds: chat.userIds
+        },
+        currentUserId
+      );
+      if (direct) return direct;
+      try {
+        const chatsMap = JSON.parse(localStorage.getItem('chatsMap') || '{}');
+        return extractPartnerUserId(chatsMap[chat.chatId], currentUserId);
+      } catch { /* ignore */ }
+      return null;
+    };
+
+    const loadCommonGroups = async () => {
+      const partnerId = resolvePartnerId();
+      if (!partnerId) {
+        if (isCurrent) setCommonGroups([]);
+        return;
+      }
+      try {
+        const chatsMap = JSON.parse(localStorage.getItem('chatsMap') || '{}');
+        const groupList = Object.values(chatsMap).filter(
+          (c) => c && (c.type === 'group' || c.type === 'classroom' || c.type === 'room' || c.isGroupChat || c.isSpace || c.isClassroom)
+        );
+
+        const checkPromises = groupList.map(async (g) => {
+          const cachedMembers = await getGroupMembersFromDB(g.chatId);
+          if (cachedMembers && cachedMembers.some(m => String(m.userId) === partnerId)) {
+            return g;
+          }
+          return null;
+        });
+
+        const results = await Promise.all(checkPromises);
+        if (!isCurrent) return;
+        const seen = new Set();
+        const found = results.filter((g) => {
+          if (!g || !g.chatId || seen.has(g.chatId)) return false;
+          seen.add(g.chatId);
+          return true;
+        });
+        setCommonGroups(found);
+      } catch (e) {
+        console.error("Error computing common groups:", e);
+      }
+    };
+
+    loadCommonGroups();
+    return () => {
+      isCurrent = false;
+    };
+  }, [chat.chatId, chat.id, chat.userId, chat.userid, chat.otherUserId, chat.userIds, chat.type, currentUserId]);
 
   const checkMuteStatus = async () => {
     const isMuted = await isChatMuted(chat.chatId);
@@ -208,6 +321,11 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
         setMyProfile(data.profile || '');
         if (data.memberCount !== undefined) {
            setMemberCount(data.memberCount);
+        }
+        if (data.motto !== undefined && data.motto !== null) {
+           setRoomMotto(data.motto);
+           setTempGroupMotto(data.motto);
+           chat.motto = data.motto;
         }
         const infoObj = { chatId: chat.chatId, ...data };
         saveChatInfoToDB(infoObj);
@@ -505,7 +623,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
         });
         if (res.ok) {
           onClose();
-          navigate('/chats', { replace: true });
+          resetToChats(navigate);
         }
       } catch (ex) {
         console.error("Failed to leave group:", ex);
@@ -556,36 +674,80 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
   const canAddMembers = isGroupAdmin || (chat.type === 'classroom' && currentMember?.role === 'admin');
 
   const content = (
-    <div className="info-panel-content" onClick={e => e.stopPropagation()} style={{
-      backgroundColor: isPanel ? 'transparent' : 'rgba(15, 23, 42, 0.95)',
-      width: '100%', 
-      maxWidth: isPanel ? 'none' : '480px',
-      maxHeight: isPanel ? 'none' : 'calc(100dvh - 32px)', 
-      overflowY: 'auto',
-      borderRadius: isPanel ? '0' : '24px', 
-      position: 'relative',
-      border: isPanel ? 'none' : '1px solid var(--border-color)',
-      boxShadow: isPanel ? 'none' : '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
-      scrollbarWidth: 'none',
-      height: isPanel ? '100%' : 'auto',
-      display: 'flex',
-      flexDirection: 'column'
-    }}>
+    <div
+      className={`info-panel-content${isMobileFullscreen ? ' lc-modal-card--mobile-full' : ''}`}
+      onClick={e => e.stopPropagation()}
+      style={{
+        backgroundColor: isPanel
+          ? 'transparent'
+          : isMobileFullscreen
+            ? '#0f172a'
+            : 'rgba(15, 23, 42, 0.95)',
+        width: '100%',
+        maxWidth: isPanel || isMobileFullscreen ? 'none' : '480px',
+        maxHeight: isPanel || isMobileFullscreen ? 'none' : 'calc(100dvh - 32px)',
+        overflowY: isMobileFullscreen ? 'hidden' : 'auto',
+        borderRadius: isPanel || isMobileFullscreen ? '0' : '24px',
+        position: 'relative',
+        border: isPanel || isMobileFullscreen ? 'none' : '1px solid var(--border-color)',
+        boxShadow: isPanel || isMobileFullscreen ? 'none' : '0 25px 50px -12px rgba(0, 0, 0, 0.7)',
+        scrollbarWidth: 'none',
+        height: isPanel || isMobileFullscreen ? '100%' : 'auto',
+        display: 'flex',
+        flexDirection: 'column'
+      }}
+    >
       {/* Header Sticky Area */}
-      <div style={{
-        position: 'sticky', top: 0, 
-        display: 'flex', justifyContent: isPanel ? 'space-between' : 'flex-end',
-        alignItems: 'center',
-        padding: '16px 24px', zIndex: 10,
-        background: isPanel ? 'rgba(15, 23, 42, 0.8)' : 'transparent',
-        backdropFilter: isPanel ? 'blur(10px)' : 'none',
-        borderBottom: isPanel ? '1px solid var(--border-color)' : 'none',
-        marginBottom: isPanel ? '20px' : '0'
-      }}>
-        {isPanel && <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '18px', fontWeight: '700' }}>Contact Info</h3>}
-        <div style={{ display: 'flex', gap: '8px' }}>
+      <div
+        className={isMobileFullscreen ? 'lc-modal-header--mobile-sticky' : undefined}
+        style={{
+          position: 'sticky',
+          top: 0,
+          display: 'flex',
+          justifyContent: isPanel || isMobileFullscreen ? 'space-between' : 'flex-end',
+          alignItems: 'center',
+          gap: '12px',
+          padding: isMobileFullscreen
+            ? 'max(12px, env(safe-area-inset-top, 0px)) 16px 12px'
+            : '16px 24px',
+          zIndex: 10,
+          background: isPanel
+            ? 'rgba(15, 23, 42, 0.8)'
+            : isMobileFullscreen
+              ? 'rgba(15, 23, 42, 0.94)'
+              : 'transparent',
+          backdropFilter: isPanel || isMobileFullscreen ? 'blur(10px)' : 'none',
+          borderBottom: isPanel || isMobileFullscreen ? '1px solid var(--border-color)' : 'none',
+          marginBottom: isPanel ? '20px' : '0'
+        }}
+      >
+        {(isPanel || isMobileFullscreen) && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+            <ModalCloseButton
+              slot="left"
+              isPanel={isPanel}
+              onClose={onClose}
+              backLabel="Back"
+              backStyle={{ color: '#f3f4f6' }}
+            />
+            <h3
+              style={{
+                margin: 0,
+                color: isPanel ? 'var(--text-primary)' : '#f3f4f6',
+                fontSize: '18px',
+                fontWeight: '700',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {isPanel ? 'Contact Info' : infoTitle}
+            </h3>
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
           {isGroupAdmin && !groupEditMode && (
-            <button 
+            <button
               onClick={() => {
                 if (isSleepMode) {
                   toast.info("cannot edit in sleep mode or offline");
@@ -604,18 +766,25 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
               <Edit2 size={18} />
             </button>
           )}
-          <button onClick={onClose} style={{
-            background: 'var(--bg-hover)', border: 'none',
-            borderRadius: '50%', width: '36px', height: '36px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', color: 'var(--text-secondary)', transition: 'all 0.2s'
-          }} onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--border-color)'}>
-            <span style={{ fontSize: '20px', fontWeight: '700' }}>X</span>
-          </button>
+          <ModalCloseButton
+            slot="right"
+            isPanel={isPanel}
+            onClose={onClose}
+            desktopIcon={<span style={{ fontSize: '20px', fontWeight: '700' }}>X</span>}
+          />
         </div>
       </div>
 
-      <div style={{ padding: isPanel ? '0 24px 32px' : '0 24px 32px', flex: 1 }}>
+      <div
+        className={isMobileFullscreen ? 'lc-modal-body--mobile-scroll' : undefined}
+        style={{
+          padding: isMobileFullscreen
+            ? '16px 20px calc(32px + env(safe-area-inset-bottom, 0px))'
+            : '0 24px 32px',
+          flex: 1,
+          scrollbarWidth: 'none'
+        }}
+      >
         {/* Header Section */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '32px' }}>
           <div style={{ position: 'relative', marginBottom: '16px' }}>
@@ -677,7 +846,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
                     setGroupEditMode(false);
                     setTempGroupName(chat.chatName);
                     setTempGroupProfile(chat.profile);
-                    setTempGroupMotto(chat.motto || chat.description || '');
+                    setTempGroupMotto(roomMotto || chat.motto || chat.description || '');
                   }} 
                   style={{ ...secondaryBtnStyle, flex: 1, padding: '8px 12px', fontSize: '13px' }}
                 >
@@ -723,7 +892,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
               </div>
 
               {(chat.type === 'group' || chat.type === 'classroom' || chat.type === 'room') && (
-                (chat.motto || chat.description) ? (
+                (roomMotto || chat.motto || chat.description) ? (
                   <p style={{
                     fontSize: '13px',
                     color: 'var(--text-secondary)',
@@ -733,7 +902,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
                     maxWidth: '340px',
                     lineHeight: '1.4'
                   }}>
-                    "{chat.motto || chat.description}"
+                    "{roomMotto || chat.motto || chat.description}"
                   </p>
                 ) : (
                   isGroupAdmin && (
@@ -1064,6 +1233,114 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
           </section>
         )}
 
+        {/* People You Know Section (For Groups & Classrooms) */}
+        {(chat.type === 'group' || chat.type === 'classroom') && (
+          <section style={{ marginBottom: '28px' }}>
+            <button
+              type="button"
+              onClick={() => setShowCommonPeople(prev => !prev)}
+              aria-expanded={showCommonPeople}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '14px 16px',
+                borderRadius: '16px',
+                backgroundColor: 'var(--bg-hover)',
+                border: '1px solid var(--border-color)',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Users size={16} color="var(--accent-color)" />
+                <h3 style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>
+                  People You Know ({commonPeople.length})
+                </h3>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}>
+                <span style={{
+                  padding: '2px 8px',
+                  borderRadius: '999px',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  backgroundColor: 'var(--accent-tint)',
+                  color: 'var(--accent-text)',
+                  border: '1px solid var(--accent-tint-border)'
+                }}>
+                  {commonPeople.length}
+                </span>
+                <ChevronDown
+                  size={16}
+                  style={{
+                    transform: showCommonPeople ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.2s ease'
+                  }}
+                />
+              </div>
+            </button>
+
+            {showCommonPeople && (
+              <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {commonPeople.length === 0 ? (
+                  <div style={{
+                    padding: '16px',
+                    borderRadius: '16px',
+                    backgroundColor: 'var(--bg-hover)',
+                    color: 'var(--text-secondary)',
+                    fontSize: '13px',
+                    textAlign: 'center',
+                    border: '1px solid var(--border-color)'
+                  }}>
+                    No people you know found
+                  </div>
+                ) : (
+                  commonPeople.map(({ member, privateChat, privateChatId, displayName }) => (
+                    <div
+                      key={member.userId}
+                      onClick={() => {
+                        onClose();
+                        navigate(`/chat/${privateChatId}`);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        padding: '12px',
+                        borderRadius: '16px',
+                        backgroundColor: 'var(--bg-hover)',
+                        border: '1px solid var(--border-color)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <Avatar
+                        chat={{ ...member, profile: member.profile || privateChat.profile, id: member.userId, type: 'private' }}
+                        size={40}
+                        showStatus={true}
+                        isOnline={!!onlineStatuses[member.userId]}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                            {displayName}
+                          </span>
+                          {getRoleBadge(member.role)}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                          @{member.username || member.userName || member.userId} · {member.userId}
+                        </div>
+                      </div>
+                      <MessageCircle size={16} color="var(--accent-color)" style={{ flexShrink: 0 }} />
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </section>
+        )}
+
         {/* Members Section */}
         {(chat.type === 'group' || chat.type === 'classroom' || chat.type === 'room') && (
           <section>
@@ -1202,14 +1479,21 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
   if (isPanel) return content;
 
   return (
-    <div className="modal-overlay" onClick={onClose} style={{
-      position: 'fixed', inset: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.8)',
-      backdropFilter: 'blur(12px)',
-      display: 'flex', justifyContent: 'center', alignItems: 'center',
-      zIndex: 100000, padding: '20px',
-      animation: 'fadeIn 0.3s ease-out'
-    }}>
+    <div
+      className={`modal-overlay${isMobileFullscreen ? ' lc-modal-overlay--mobile-full' : ''}`}
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0,
+        backgroundColor: isMobileFullscreen ? '#0f172a' : 'rgba(0, 0, 0, 0.8)',
+        backdropFilter: isMobileFullscreen ? 'none' : 'blur(12px)',
+        display: 'flex',
+        justifyContent: isMobileFullscreen ? 'stretch' : 'center',
+        alignItems: isMobileFullscreen ? 'stretch' : 'center',
+        zIndex: 100000,
+        padding: isMobileFullscreen ? 0 : '20px',
+        animation: isMobileFullscreen ? 'none' : 'fadeIn 0.3s ease-out'
+      }}
+    >
       {content}
 
       <style>{`

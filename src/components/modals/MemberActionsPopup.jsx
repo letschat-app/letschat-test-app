@@ -1,5 +1,5 @@
 import { useConfirm } from '../common/ConfirmProvider';
-import useBackClose from '../../hooks/useBackClose';
+import useBackClose, { dismissModalsAndRun } from '../../hooks/useBackClose';
 import React from 'react';
 import { X, MessageSquare, ShieldCheck, Award, UserMinus, ChevronRight, User } from 'lucide-react';
 import { syncChatsMapToDB } from '../../service/db';
@@ -18,7 +18,7 @@ const MemberActionsPopup = ({ member, chat, currentUserId, myDisplayName, API, o
   const handleViewProfile = () => {
     onClose();
     if (navigate) {
-      navigate(`/profile/${member.userId}`);
+      dismissModalsAndRun(() => navigate(`/profile/${member.userId}`));
     }
   };
 
@@ -46,7 +46,7 @@ const MemberActionsPopup = ({ member, chat, currentUserId, myDisplayName, API, o
         }
 
         onClose();
-        navigate(`/chat/${data}`, { replace: true });
+        dismissModalsAndRun(() => navigate(`/chat/${data}`, { replace: true }));
       }
     } catch (error) {
       console.error('Error while starting private chat', error);

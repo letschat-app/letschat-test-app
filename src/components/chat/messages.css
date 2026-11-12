@@ -209,7 +209,7 @@
 
 @media (max-width: 768px) {
   .msg-image-wrap {
-    width: 100%;
+    width: min(260px, 72vw);
     max-width: 280px;
   }
 }
@@ -396,7 +396,7 @@
 
 @media (max-width: 768px) {
   .msg-video-wrap {
-    width: 100%;
+    width: min(260px, 72vw);
     max-width: 280px;
   }
 }
@@ -593,40 +593,93 @@
 }
 
 .msg-doc-ext-tile {
-  width: 40px;
-  height: 48px;
-  border-radius: 6px;
+  width: 42px;
+  height: 50px;
+  border-radius: 7px;
   position: relative;
   display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  padding-bottom: 4px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding-bottom: 5px;
+  gap: 2px;
   flex-shrink: 0;
   overflow: hidden;
-  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
-  font-size: 10px;
+  clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 11px, 100% 100%, 0 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.msg-doc-ext-tile .msg-doc-ext-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 3px;
+  color: #ffffff;
+  opacity: 0.95;
+}
+
+.msg-doc-ext-tile span {
+  font-size: 8.5px;
   font-weight: 800;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.4px;
+  line-height: 1;
+  text-transform: uppercase;
 }
 
 .msg-doc-ext-tile.is-pdf {
-  background: var(--danger-color);
-  color: #ffffff;
+  background: #e11d48;
+}
+
+.msg-doc-ext-tile.is-word {
+  background: #2563eb;
+}
+
+.msg-doc-ext-tile.is-excel {
+  background: #16a34a;
+}
+
+.msg-doc-ext-tile.is-ppt {
+  background: #ea580c;
+}
+
+.msg-doc-ext-tile.is-archive {
+  background: #7c3aed;
+}
+
+.msg-doc-ext-tile.is-code {
+  background: #0d9488;
+}
+
+.msg-doc-ext-tile.is-audio {
+  background: #d97706;
+}
+
+.msg-doc-ext-tile.is-video {
+  background: #4f46e5;
+}
+
+.msg-doc-ext-tile.is-image {
+  background: #db2777;
+}
+
+.msg-doc-ext-tile.is-text {
+  background: #475569;
 }
 
 .msg-doc-ext-tile.is-other {
-  background: var(--accent-solid);
-  color: #ffffff;
+  background: var(--accent-solid, #6366f1);
 }
 
 .msg-doc-ext-tile-flap {
   position: absolute;
   top: 0;
   right: 0;
-  width: 12px;
-  height: 12px;
-  background: rgba(0, 0, 0, 0.25);
+  width: 11px;
+  height: 11px;
+  background: rgba(0, 0, 0, 0.28);
   border-bottom-left-radius: 3px;
+  pointer-events: none;
 }
 
 /* ─── 10. Accessibility & Focus Visible ─────────────────────────────────── */
@@ -660,12 +713,13 @@ a:focus-visible {
 }
 
 .msg-skeleton-shimmer {
-  background: linear-gradient(
+  background-color: color-mix(in srgb, var(--text-primary) 8%, var(--bg-secondary));
+  background-image: linear-gradient(
     115deg,
-    var(--bg-secondary) 0%,
-    color-mix(in srgb, var(--text-primary) 16%, var(--bg-secondary)) 50%,
-    var(--bg-secondary) 100%
+    transparent 15%,
+    color-mix(in srgb, var(--text-primary) 24%, transparent) 50%,
+    transparent 85%
   );
   background-size: 200% 100%;
-  animation: mediaShimmerSweep 2.2s infinite linear;
+  animation: mediaShimmerSweep 1.6s infinite linear;
 }

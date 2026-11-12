@@ -1,7 +1,8 @@
 import useBackClose from '../../hooks/useBackClose';
 import React, { useState, useEffect } from 'react';
-import { X, Send, FileText, Music, Trash2, Pencil, Download } from 'lucide-react';
-import { formatFileSize, getFileCategory, getPdfThumbnail, getVideoThumbnail } from '../../service/MediaUploader';
+import { createPortal } from 'react-dom';
+import { X, Send, FileText, Music, Trash2, Pencil, Download, Image as ImageIcon } from 'lucide-react';
+import { formatFileSize, getFileCategory, getPdfThumbnail, getVideoThumbnail, compressImageBlob } from '../../service/MediaUploader';
 
 const ImageEditor = React.lazy(() => import('../../editor/ImageEditor'));
 
@@ -10,12 +11,19 @@ export default function MediaPreviewModal({ file, onSend, onCancel, isUploading 
   const [currentFile, setCurrentFile] = useState(file);
   const [isEditing, setIsEditing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [previewError, setPreviewError] = useState(false);
+  const [usedDataFallback, setUsedDataFallback] = useState(false);
+  const [videoUrl, setVideoUrl] = useState(null);
+  const [videoPosterUrl, setVideoPosterUrl] = useState(null);
   const [loadingThumb, setLoadingThumb] = useState(false);
-  const [thumbBlob, setThumbBlob] = useState(null); // Store the actual Blob for reliable handoff
+  const [thumbBlob, setThumbBlob] = useState(null);
   const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
     setCurrentFile(file);
+    setIsSending(false);
+    setPreviewError(false);
+    setUsedDataFallback(false);
   }, [file]);
 
   const category = getFileCategory(currentFile?.type, currentFile?.name);
@@ -42,47 +50,77 @@ export default function MediaPreviewModal({ file, onSend, onCancel, isUploading 
     if (!currentFile) return;
     
     let url = null;
+    let extraUrl = null;
     let isActive = true;
 
+    setPreviewUrl(null);
+    setVideoUrl(null);
+    setVideoPosterUrl(null);
+    setThumbBlob(null);
+    setPreviewError(false);
+
     if (category === 'image') {
-      url = URL.createObjectURL(currentFile);
-      setPreviewUrl(url);
+      try {
+        url = URL.createObjectURL(currentFile);
+        setPreviewUrl(url);
+      } catch (e) {
+        setPreviewError(true);
+      }
+      setLoadingThumb(false);
+      // Pre-generate fast thumbnail asynchronously without blocking preview/send
+      compressImageBlob(currentFile, 320, 320, 0.4).then(tBlob => {
+        if (isActive && tBlob) setThumbBlob(tBlob);
+      }).catch(() => {});
     } else if (isVideoFile) {
-      url = URL.createObjectURL(currentFile);
-      setPreviewUrl(url);
+      try {
+        url = URL.createObjectURL(currentFile);
+        setVideoUrl(url);
+      } catch (e) {
+        setPreviewError(true);
+      }
       setLoadingThumb(true);
       getVideoThumbnail(currentFile).then(res => {
-         if (isActive && res.blob) {
+         if (isActive && res?.blob) {
+           extraUrl = URL.createObjectURL(res.blob);
            setThumbBlob(res.blob);
-           setPreviewUrl(URL.createObjectURL(res.blob));
+           setVideoPosterUrl(extraUrl);
          }
+      }).catch(err => {
+         console.warn("[MediaPreviewModal] Video thumb error:", err);
+      }).finally(() => {
          if (isActive) setLoadingThumb(false);
       });
     } else if (category === 'pdf' || isPdfFile) {
       setLoadingThumb(true);
       getPdfThumbnail(currentFile).then(res => {
          if (isActive && res?.blob) {
-            const tUrl = URL.createObjectURL(res.blob);
+            extraUrl = URL.createObjectURL(res.blob);
             setThumbBlob(res.blob);
-            setPreviewUrl(tUrl);
+            setPreviewUrl(extraUrl);
          }
+      }).catch(err => {
+         console.warn("[MediaPreviewModal] PDF thumb error:", err);
+      }).finally(() => {
          if (isActive) setLoadingThumb(false);
       });
+    } else {
+      setLoadingThumb(false);
     }
 
     return () => {
       isActive = false;
       if (url) URL.revokeObjectURL(url);
+      if (extraUrl) URL.revokeObjectURL(extraUrl);
     };
-  }, [currentFile, category]);
+  }, [currentFile, category, isVideoFile, isPdfFile]);
 
   if (!file) return null;
 
-  return (
+  const modalContent = (
     <div style={{
-      position: 'absolute', inset: 0,
+      position: 'fixed', inset: 0,
       backgroundColor: 'rgba(0,0,0,0.95)',
-      zIndex: 2000,
+      zIndex: 99990,
       display: 'flex', flexDirection: 'column',
       animation: 'previewFadeIn 0.2s ease-out',
       overflow: 'hidden'
@@ -167,39 +205,62 @@ export default function MediaPreviewModal({ file, onSend, onCancel, isUploading 
         flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', 
         padding: '20px', overflow: 'hidden' 
       }}>
-        {(category === 'image' || category === 'pdf') && previewUrl && (
-          <img 
-            src={previewUrl} 
-            alt="preview" 
-            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '8px' }} 
+        {(category === 'image' || category === 'pdf') && previewUrl && !previewError && (
+          <img
+            src={previewUrl}
+            alt=""
+            onError={() => {
+              if (category === 'image' && currentFile && !usedDataFallback) {
+                setUsedDataFallback(true);
+                try {
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    if (typeof reader.result === 'string') {
+                      setPreviewUrl(reader.result);
+                    } else {
+                      setPreviewError(true);
+                    }
+                  };
+                  reader.onerror = () => setPreviewError(true);
+                  reader.readAsDataURL(currentFile);
+                  return;
+                } catch {}
+              }
+              setPreviewError(true);
+            }}
+            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '8px' }}
           />
         )}
         
-        {category === 'video' && previewUrl && (
-          <video 
-            src={previewUrl} 
-            controls 
-            style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: '8px' }} 
+        {category === 'video' && (videoUrl || previewUrl) && !previewError && (
+          <video
+            src={videoUrl || previewUrl}
+            poster={videoPosterUrl || undefined}
+            preload="metadata"
+            playsInline
+            controls
+            onError={() => setPreviewError(true)}
+            style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: '8px' }}
           />
         )}
 
-        {(category === 'pdf' ? !previewUrl : (category === 'file' || category === 'audio')) && (
+        {((category === 'image' || category === 'video') && (previewError || (!previewUrl && !videoUrl && !loadingThumb))) || (category === 'pdf' ? !previewUrl : (category === 'file' || category === 'audio')) ? (
           <div style={{ 
             textAlign: 'center', background: '#202c33', padding: '40px', 
             borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)',
             width: '100%', maxWidth: '320px'
           }}>
-            <div style={{ color: '#00a884', marginBottom: '16px' }}>
-              {category === 'audio' ? <Music size={64} /> : <FileText size={64} />}
+            <div style={{ color: '#00a884', marginBottom: '16px', display: 'flex', justifyContent: 'center' }}>
+              {category === 'audio' ? <Music size={64} /> : category === 'image' ? <ImageIcon size={64} /> : <FileText size={64} />}
             </div>
             <div style={{ color: 'white', fontSize: '15px', fontWeight: '500', marginBottom: '4px', wordBreak: 'break-all' }}>
-              {file.name}
+              {currentFile?.name || file.name}
             </div>
             <div style={{ color: '#8696a0', fontSize: '13px' }}>
-              {formatFileSize(file.size)}
+              {formatFileSize(currentFile?.size ?? file.size)}
             </div>
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* Footer / Send Button */}
@@ -207,7 +268,7 @@ export default function MediaPreviewModal({ file, onSend, onCancel, isUploading 
         padding: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px',
         background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)'
       }}>
-        {isUploading || loadingThumb ? (
+        {isUploading || (loadingThumb && category === 'pdf') ? (
           <div style={{ textAlign: 'center', width: '100%', maxWidth: '300px' }}>
             <div style={{ 
               width: '40px', height: '40px', border: '3px solid rgba(255,255,255,0.1)', 
@@ -268,4 +329,6 @@ export default function MediaPreviewModal({ file, onSend, onCancel, isUploading 
       `}</style>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }

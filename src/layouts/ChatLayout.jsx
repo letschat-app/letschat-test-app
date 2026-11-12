@@ -1,6 +1,7 @@
 import useIsDesktop from '../hooks/useIsDesktop';
 import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { navigateFromNav } from '../utils/navigation';
 import ChatNames from '../pages/ChatNames';
 import Rooms from '../pages/Rooms';
 import DesktopSidebar from '../components/DesktopSidebar';
@@ -112,7 +113,7 @@ export default function ChatLayout() {
                 ].map((action, i) => (
                   <div
                     key={i}
-                    onClick={() => navigate(action.path)}
+                    onClick={() => navigateFromNav(navigate, action.path, location.pathname)}
                     style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
                   >
                     <div

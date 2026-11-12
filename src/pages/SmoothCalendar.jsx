@@ -34,6 +34,7 @@ import { getchat } from './ChatNames';
 import { getChatName } from '../service/ChatUtils';
 import { useEventMediator } from '../service/EventStorage';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { navigateBackOrChats } from '../utils/navigation';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { API } from '../service/UserAuth';
 import { badgeStore, useBadges } from '../service/BadgeStore';
@@ -397,7 +398,7 @@ const SmoothCalendar = () => {
         setShowEventDetails(true);
       }
 
-      window.history.replaceState({}, document.title);
+      window.history.replaceState(window.history.state, document.title);
     }
   }, [location.state, events, isMobile]);
 
@@ -798,7 +799,7 @@ const SmoothCalendar = () => {
             boxSizing: 'border-box'
           }}>
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => navigateBackOrChats(navigate, { isDetail: false })}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -922,7 +923,7 @@ const SmoothCalendar = () => {
             padding: '0'
           }}>
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => navigateBackOrChats(navigate, { isDetail: false })}
               style={{
                 display: 'flex',
                 alignItems: 'center',

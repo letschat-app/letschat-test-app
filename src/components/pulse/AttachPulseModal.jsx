@@ -20,7 +20,7 @@ const AttachPulseModal = ({
   chatType,
   currentActiveSpace = 0
 }) => {
-  if (!isOpen) return null;
+  useBackClose(isOpen, onClose);
 
   const currentUserId = localStorage.getItem('userid');
   const [pulses, setPulses] = useState([]);
@@ -43,6 +43,7 @@ const AttachPulseModal = ({
 
   // Load and filter eligible pulses
   useEffect(() => {
+    if (!isOpen) return;
     let isMounted = true;
     setIsLoading(true);
 
@@ -131,7 +132,9 @@ const AttachPulseModal = ({
 
     loadEligiblePulses();
     return () => { isMounted = false; };
-  }, [chatId, chatMembers, currentUserId]);
+  }, [isOpen, chatId, chatMembers, currentUserId]);
+
+  if (!isOpen) return null;
 
   const handleSelect = (pulse) => {
     onSelectPulse(pulse, selectedSpaceId);

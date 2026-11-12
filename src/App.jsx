@@ -17,6 +17,7 @@ import { PWAProvider } from "./context/PWAContext";
 import UpdateToast from "./components/chat/UpdateToast";
 import InAppToast from "./components/chat/InAppToast";
 import { useNotifications } from "./hooks/useNotifications";
+import { clearChatsAnchor } from "./utils/navigation";
 import { WifiOff } from "lucide-react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import PendingOtpModal from "./components/modals/PendingOtpModal";
@@ -164,6 +165,7 @@ function App() {
         navigate("/chats", { replace: true });
       }
     } else {
+      clearChatsAnchor();
       // If not logged in, allow landing, login, signup, and public booking page
       if (!isAuthPage && !isBookingPage) {
         navigate("/welcome", { replace: true });

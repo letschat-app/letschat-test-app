@@ -774,3 +774,39 @@ export function resolveNotificationPath(data) {
 
 }
 
+
+/**
+ * Checks whether an active system notification belongs to a given chatId.
+ */
+export function matchesChatNotification(notifData, notifTag, chatId) {
+  if (!chatId) return false;
+  const target = String(chatId);
+  const raw = notifData && typeof notifData === 'object' ? notifData : {};
+  const fcmData = raw.FCM_MSG?.data && typeof raw.FCM_MSG.data === 'object' ? raw.FCM_MSG.data : {};
+  const merged = { ...fcmData, ...raw };
+
+  const candidateIds = [merged.chatId, merged.chatid, merged.roomId, merged.roomid];
+  if (candidateIds.some((id) => id !== undefined && id !== null && String(id) === target)) {
+    return true;
+  }
+
+  if (merged.type === 'ASSIGNMENT_MISSING' && merged.assignmentsV2) {
+    try {
+      const items = typeof merged.assignmentsV2 === 'string'
+        ? JSON.parse(merged.assignmentsV2)
+        : merged.assignmentsV2;
+      if (Array.isArray(items) && items.length > 0 && items.every((item) => String(item?.chatId || '') === target)) {
+        return true;
+      }
+    } catch { /* ignore malformed assignmentsV2 JSON */ }
+  }
+
+  const tag = typeof notifTag === 'string' ? notifTag : '';
+  return (
+    tag === `chat-${target}` ||
+    tag === `room-${target}` ||
+    tag === target ||
+    tag.startsWith(`mention-${target}-`) ||
+    tag.startsWith(`reply-${target}-`)
+  );
+}

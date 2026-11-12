@@ -55,6 +55,7 @@ const messageStore = {
   pendingMedia: {}, // { [chatid]: { [pendingid]: frame } }
   pendingInfo: new Map(), // pendingid -> { thumb, kind, fileName, fileSize, duration, noOfPages, w, h }
   pendingTimers: {}, // { pendingid: timerId }
+  recentlyCompletedPendingIds: new Set(),
   indicatorTimeouts: {}, // To manage cleanup
   onlineStatuses: {}, // { userId: boolean }
   roomCounts: {}, // Separate store for Discovery Room unread counts (FCM driven)
@@ -398,6 +399,9 @@ const messageStore = {
     }
 
     if (msg.pendingid) {
+      const pidStr = String(msg.pendingid);
+      this.recentlyCompletedPendingIds.add(pidStr);
+      setTimeout(() => this.recentlyCompletedPendingIds.delete(pidStr), 30000);
       this.removePendingMedia(chatid, msg.pendingid, true);
     }
 
@@ -742,16 +746,77 @@ const messageStore = {
 
     if (msgIndex !== -1) {
       const existing = this.messages[targetChatId][msgIndex];
+      let curReadUsers = existing.read_users ? [...existing.read_users] : [];
+      if (Array.isArray(read_users)) {
+        const rSet = new Set(curReadUsers);
+        read_users.forEach(u => rSet.add(u));
+        curReadUsers = Array.from(rSet);
+      }
+      let curDeliveredUsers = existing.delivered_users ? [...existing.delivered_users] : [];
+      if (Array.isArray(delivered_users)) {
+        const dSet = new Set(curDeliveredUsers);
+        delivered_users.forEach(u => dSet.add(u));
+        curDeliveredUsers = Array.from(dSet).filter(u => !curReadUsers.includes(u));
+      } else {
+        curDeliveredUsers = curDeliveredUsers.filter(u => !curReadUsers.includes(u));
+      }
+      let curPendingUsers = existing.pending_users ? [...existing.pending_users] : [];
+      if (Array.isArray(pending_users)) {
+        const pSet = new Set(curPendingUsers);
+        pending_users.forEach(u => pSet.add(u));
+        curPendingUsers = Array.from(pSet).filter(u => !curReadUsers.includes(u) && !curDeliveredUsers.includes(u));
+      } else {
+        curPendingUsers = curPendingUsers.filter(u => !curReadUsers.includes(u) && !curDeliveredUsers.includes(u));
+      }
+
+      let isGroupChat = false;
+      let totalExpectedRecipients = 0;
+      try {
+        const chatsMap = JSON.parse(localStorage.getItem("chatsMap") || '{}');
+        const chatInfo = chatsMap[targetChatId];
+        if (chatInfo) {
+          const chatTypeLower = (chatInfo.type || '').toLowerCase();
+          if (chatTypeLower === 'group' || chatTypeLower === 'room' || chatTypeLower === 'classroom') {
+            isGroupChat = true;
+          }
+          if (Array.isArray(chatInfo.users) && chatInfo.users.length > 2) {
+            isGroupChat = true;
+            totalExpectedRecipients = Math.max(1, chatInfo.users.length - 1);
+          } else if (chatInfo.membersCount && chatInfo.membersCount > 2) {
+            isGroupChat = true;
+            totalExpectedRecipients = Math.max(1, chatInfo.membersCount - 1);
+          } else if (chatInfo.noOfMembers && chatInfo.noOfMembers > 2) {
+            isGroupChat = true;
+            totalExpectedRecipients = Math.max(1, chatInfo.noOfMembers - 1);
+          }
+        }
+      } catch (e) {}
+
+      const totalTracked = curReadUsers.length + curDeliveredUsers.length + curPendingUsers.length;
+      let finalStatus = getHigherStatus(existing.status, status);
+      if (totalTracked > 1 || isGroupChat) {
+        if (curPendingUsers.length > 0 || curDeliveredUsers.length > 0) {
+          finalStatus = (curReadUsers.length > 0 || curDeliveredUsers.length > 0) ? 'delivered' : 'pending';
+        } else if (isGroupChat && totalExpectedRecipients > 1 && curReadUsers.length < totalExpectedRecipients) {
+          finalStatus = 'delivered';
+        } else if (isGroupChat && curReadUsers.length <= 1 && totalTracked <= 1) {
+          finalStatus = 'delivered';
+        } else if (curReadUsers.length > 0) {
+          finalStatus = (status === 'media-opened' || existing.status === 'media-opened') ? 'media-opened' : 'read';
+        }
+      }
+
+      const isFinalRead = finalStatus === 'read' || finalStatus === 'media-opened';
       const updatedMsg = {
         ...existing,
         msgid: msgid || existing.msgid,
-        status: getHigherStatus(existing.status, status),
+        status: finalStatus,
         ...(timestamp && status === 'delivered' ? { delivertime: timestamp } : {}),
-        ...(timestamp && status === 'read' ? { readtime: timestamp } : {}),
+        ...(isFinalRead && timestamp && (status === 'read' || status === 'media-opened') ? { readtime: timestamp } : (!isFinalRead ? { readtime: null } : {})),
         ...(timestamp && status === 'media-opened' ? { mediaopenedtime: timestamp } : {}),
-        ...(Array.isArray(pending_users) ? { pending_users } : {}),
-        ...(Array.isArray(delivered_users) ? { delivered_users } : {}),
-        ...(Array.isArray(read_users) ? { read_users } : {})
+        read_users: curReadUsers,
+        delivered_users: curDeliveredUsers,
+        pending_users: curPendingUsers
       };
 
       this.messages[targetChatId][msgIndex] = updatedMsg;
@@ -803,11 +868,49 @@ const messageStore = {
           updatedPendingUsers = updatedPendingUsers.filter(u => !updatedReadUsers.includes(u) && !updatedDeliveredUsers.includes(u));
         }
 
+        let isGroupChat = false;
+        let totalExpectedRecipients = 0;
+        try {
+          const chatsMap = JSON.parse(localStorage.getItem("chatsMap") || '{}');
+          const chatInfo = chatsMap[targetChatId];
+          if (chatInfo) {
+            const chatTypeLower = (chatInfo.type || '').toLowerCase();
+            if (chatTypeLower === 'group' || chatTypeLower === 'room' || chatTypeLower === 'classroom') {
+              isGroupChat = true;
+            }
+            if (Array.isArray(chatInfo.users) && chatInfo.users.length > 2) {
+              isGroupChat = true;
+              totalExpectedRecipients = Math.max(1, chatInfo.users.length - 1);
+            } else if (chatInfo.membersCount && chatInfo.membersCount > 2) {
+              isGroupChat = true;
+              totalExpectedRecipients = Math.max(1, chatInfo.membersCount - 1);
+            } else if (chatInfo.noOfMembers && chatInfo.noOfMembers > 2) {
+              isGroupChat = true;
+              totalExpectedRecipients = Math.max(1, chatInfo.noOfMembers - 1);
+            }
+          }
+        } catch (e) {}
+
+        const totalTrackedRecipients = updatedReadUsers.length + updatedDeliveredUsers.length + updatedPendingUsers.length;
+        let computedStatus = getHigherStatus(existing.status, status);
+        if (totalTrackedRecipients > 1 || isGroupChat) {
+          if (updatedPendingUsers.length > 0 || updatedDeliveredUsers.length > 0) {
+            computedStatus = (updatedReadUsers.length > 0 || updatedDeliveredUsers.length > 0) ? 'delivered' : 'pending';
+          } else if (isGroupChat && totalExpectedRecipients > 1 && updatedReadUsers.length < totalExpectedRecipients) {
+            computedStatus = 'delivered';
+          } else if (isGroupChat && updatedReadUsers.length <= 1 && totalTrackedRecipients <= 1) {
+            computedStatus = 'delivered';
+          } else if (updatedReadUsers.length > 0) {
+            computedStatus = (status === 'media-opened' || existing.status === 'media-opened') ? 'media-opened' : 'read';
+          }
+        }
+
+        const isComputedRead = computedStatus === 'read' || computedStatus === 'media-opened';
         messages[idx] = {
           ...existing,
-          status: getHigherStatus(existing.status, status),
+          status: computedStatus,
           ...(timestamp && status === 'delivered' ? { delivertime: timestamp } : {}),
-          ...(timestamp && (status === 'read' || status === 'media-opened') ? { readtime: timestamp } : {}),
+          ...(isComputedRead && timestamp && (status === 'read' || status === 'media-opened') ? { readtime: timestamp } : (!isComputedRead ? { readtime: null } : {})),
           ...(timestamp && status === 'media-opened' ? { mediaopenedtime: timestamp } : {}),
           read_users: updatedReadUsers,
           delivered_users: updatedDeliveredUsers,
@@ -1096,6 +1199,7 @@ const messageStore = {
     if (!frame || !frame.chatid || !frame.pendingid) return;
     const cid = String(frame.chatid);
     const pid = String(frame.pendingid);
+    if (this.recentlyCompletedPendingIds?.has(pid)) return;
 
     if (!this.pendingMedia[cid]) this.pendingMedia[cid] = {};
 
@@ -1145,10 +1249,16 @@ const messageStore = {
   },
 
   removePendingMedia(chatid, pendingid, keepInfo = false, bySenderId = null) {
-    if (!chatid || !pendingid) return;
-    const cid = String(chatid);
+    if (!pendingid) return;
+    let cid = chatid ? String(chatid) : null;
     const pid = String(pendingid);
 
+    if (!cid || !this.pendingMedia[cid]?.[pid]) {
+      const foundCid = Object.keys(this.pendingMedia || {}).find(c => this.pendingMedia[c]?.[pid]);
+      if (foundCid) cid = foundCid;
+    }
+
+    if (!cid) return;
     const existing = this.pendingMedia[cid]?.[pid];
     if (!existing) return;
 

@@ -8,6 +8,7 @@ import React, { useEffect, useState, useRef, useMemo, useLayoutEffect, useCallba
 import { createPortal } from "react-dom";
 
 import { useParams, useLocation, useNavigate } from "react-router-dom";
+import { resetToChats } from "../utils/navigation";
 
 import { getchat } from "./ChatNames";
 
@@ -164,7 +165,7 @@ import QuickAccessWheel from '../components/chat/QuickAccessWheel';
 
 
 
-import { uploadMedia, formatFileSize, getFileCategory, getVideoThumbnail, getPdfThumbnail } from '../service/MediaUploader';
+import { uploadMedia, formatFileSize, getFileCategory, getVideoThumbnail, getPdfThumbnail, compressImageBlob } from '../service/MediaUploader';
 
 import { saveBlobToCache, getMediaInfo, getMediaBlob, renameCacheKey, memoryThumbCache } from '../service/MediaCache';
 
@@ -331,7 +332,17 @@ const PulseQuoteCard = ({ repliedtoStr, isReceived }) => {
 
 
 
+const R2_PUBLIC_URL = "https://pub-91d12b8ece574bde8ccd1c26b5367b6d.r2.dev/";
+const resolveChatMediaUrl = (val) => {
+  if (!val) return null;
+  const s = String(val).trim();
+  if (!s) return null;
+  if (s.startsWith('http://') || s.startsWith('https://') || s.startsWith('blob:') || s.startsWith('data:')) return s;
+  return `${R2_PUBLIC_URL}${s.replace(/^\/+/, '')}`;
+};
+
 const CachedMediaImage = ({ mediaId, optimisticUrl = null, alt = "", style = {} }) => {
+  const [imgError, setImgError] = useState(false);
   const [src, setSrc] = useState(() => {
     if (optimisticUrl) return optimisticUrl;
     if (mediaId && memoryThumbCache.has(`${mediaId}_thumb`)) {
@@ -342,32 +353,48 @@ const CachedMediaImage = ({ mediaId, optimisticUrl = null, alt = "", style = {} 
 
   useEffect(() => {
     let isMounted = true;
+    setImgError(false);
     if (optimisticUrl) {
       setSrc(optimisticUrl);
       return;
     }
-    if (!mediaId) return;
+    if (!mediaId) {
+      setImgError(true);
+      return;
+    }
 
     getMediaInfo(mediaId).then((info) => {
-      if (!isMounted) return;
-      const fetchUrl = (info && (info.thumbnailKey || info.fileKey)) ? (info.thumbnailKey || info.fileKey) : `${API}/files/media/serve/${mediaId}`;
-      const cacheKey = (info && info.thumbnailKey) ? `${mediaId}_thumb` : `${mediaId}_full`;
-      const storeName = (info && info.thumbnailKey) ? 'thumbCache' : 'mainCache';
+      if (!isMounted) return null;
+      const rawKey = info?.thumbnailKey || info?.fileKey;
+      const fetchUrl = resolveChatMediaUrl(rawKey);
+      if (!fetchUrl) {
+        if (isMounted) setImgError(true);
+        return null;
+      }
+      const cacheKey = info?.thumbnailKey ? `${mediaId}_thumb` : `${mediaId}_full`;
+      const storeName = info?.thumbnailKey ? 'thumbCache' : 'mainCache';
       return getMediaBlob(cacheKey, fetchUrl, storeName);
     }).then((blobUrl) => {
-      if (isMounted && blobUrl) {
-        setSrc(blobUrl);
+      if (isMounted) {
+        if (blobUrl) setSrc(blobUrl);
+        else if (!optimisticUrl) setImgError(true);
       }
     }).catch((err) => {
       console.warn("CachedMediaImage failed to load blob:", err);
-      if (isMounted) setSrc(`${API}/files/media/serve/${mediaId}`);
+      if (isMounted) setImgError(true);
     });
 
     return () => { isMounted = false; };
   }, [mediaId, optimisticUrl]);
 
-  if (!src) return <div style={{ width: '100%', height: '100%', background: 'var(--border-color)', ...style }} />;
-  return <img src={src} alt={alt} style={style} />;
+  if (!src || imgError) {
+    return (
+      <div style={{ width: '100%', height: '100%', minHeight: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--border-color)', color: 'var(--text-secondary)', fontSize: '13px', borderRadius: '8px', ...style }}>
+        <span>Preview unavailable</span>
+      </div>
+    );
+  }
+  return <img src={src} alt={alt} onError={() => setImgError(true)} style={style} />;
 };
 
 const isEmojiReaction = (str) => {
@@ -876,16 +903,27 @@ const ChatBox = () => {
   const { isInputFocused = false, isIOS = (typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))) } = useVisualViewport?.() || {};
 
   useEffect(() => {
-    if (chatid) {
-      clearChatNotifications(chatid);
-      const onVisible = () => {
-        if (document.visibilityState === 'visible') {
-          clearChatNotifications(chatid);
-        }
-      };
-      document.addEventListener('visibilitychange', onVisible);
-      return () => document.removeEventListener('visibilitychange', onVisible);
-    }
+    if (!chatid) return;
+    clearChatNotifications(chatid);
+    const recheckTimer = setTimeout(() => {
+      if (document.visibilityState === 'visible') {
+        clearChatNotifications(chatid);
+      }
+    }, 1500);
+    const onActive = () => {
+      if (document.visibilityState !== 'hidden') {
+        clearChatNotifications(chatid);
+      }
+    };
+    document.addEventListener('visibilitychange', onActive);
+    window.addEventListener('focus', onActive);
+    window.addEventListener('pageshow', onActive);
+    return () => {
+      clearTimeout(recheckTimer);
+      document.removeEventListener('visibilitychange', onActive);
+      window.removeEventListener('focus', onActive);
+      window.removeEventListener('pageshow', onActive);
+    };
   }, [chatid]);
 
   const navigate = useNavigate();
@@ -1508,6 +1546,7 @@ const ChatBox = () => {
   const [pendingMediaItems, setPendingMediaItems] = useState(() => messageStore.getPendingMedia(chatid));
   const pendingAnnounceTimers = useRef(new Map());
   const pendingAnnouncedSet = useRef(new Set());
+  const abortedPendingIds = useRef(new Set());
 
 
 
@@ -1580,7 +1619,7 @@ const ChatBox = () => {
     let list = allVisibleMessages.filter(msg => msg.spaceid === activeSpace);
 
     const pendingForSpace = (pendingMediaItems || []).filter(
-      p => (p.spaceid ?? 0) === (activeSpace ?? 0) && String(p.senderid) !== String(currentUserId)
+      p => Number(p.spaceid ?? 0) === Number(activeSpace ?? 0) && String(p.senderid) !== String(currentUserId)
     );
     if (pendingForSpace.length > 0) {
       list = [...list, ...pendingForSpace].sort((a, b) => {
@@ -2039,11 +2078,7 @@ const ChatBox = () => {
 
             console.log(`[Share] Cache miss, fetching from network for ${mediaId}`);
 
-            const url = (info.fileKey && info.fileKey.startsWith('http'))
-
-              ? info.fileKey
-
-              : `${API}/files/media/serve/${info.fileKey}`;
+            const url = resolveChatMediaUrl(info.fileKey);
 
 
 
@@ -2825,7 +2860,7 @@ const ChatBox = () => {
 
     if (!chatid) {
 
-      navigate("/chats");
+      resetToChats(navigate);
 
       return;
 
@@ -2972,6 +3007,10 @@ const ChatBox = () => {
 
         }
 
+        if (msg.type !== 'indicator' && msg.type !== 'onlineStatusUpdate' && document.visibilityState !== 'hidden') {
+          clearChatNotifications(chatid);
+        }
+
 
 
         // --- NEW: Scroll behavior on new message ---
@@ -3028,42 +3067,47 @@ const ChatBox = () => {
 
     messageStore.addListener(handleNewMessage);
 
-    return () => {
-
-      messageStore.removeListener(handleNewMessage);
-
-      messageStore.removeListener(handleIndicatorUpdate);
-
-      // localStorage.removeItem(chatid);
-
-      messageStore.setActivechatbox(null);
-
-      messageStore.setActiveSpace(null);
-
-      const json = {
-
-        purpose: "check-out",
-
-        userchatId: chatid,
-
-        usermsgId: activeSpace
-
-      }
-
+    const sendCheckOutForSpace = () => {
+      if (!chatid) return;
       stopIndicators();
-
       updateV();
+      sendSafe({
+        purpose: "check-out",
+        userchatId: chatid,
+        chatid: chatid,
+        chatId: chatid,
+        usermsgId: activeSpace
+      });
+    };
 
+    const handleVisibilityOrHide = () => {
+      if (document.visibilityState === 'hidden') {
+        sendCheckOutForSpace();
+      } else if (document.visibilityState === 'visible' && chatid) {
+        messageStore.setActivechatbox(chatid);
+        messageStore.setActiveSpace(activeSpace);
+        sendSafe({
+          purpose: "check-in",
+          userchatId: chatid,
+          chatid: chatid,
+          chatId: chatid,
+          usermsgId: activeSpace
+        });
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityOrHide);
+    window.addEventListener('pagehide', sendCheckOutForSpace);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityOrHide);
+      window.removeEventListener('pagehide', sendCheckOutForSpace);
+      messageStore.removeListener(handleNewMessage);
+      messageStore.removeListener(handleIndicatorUpdate);
+      messageStore.setActivechatbox(null);
+      messageStore.setActiveSpace(null);
       console.log("leaving");
-
-      sendSafe(json);
-
-      //messageStore.setCount(chatid)
-
-      //navigate("/chats");
-
+      sendCheckOutForSpace();
     }
-
   }, [chatid, activeSpace]);
 
 
@@ -3990,20 +4034,19 @@ const ChatBox = () => {
 
     const { mainKey, thumbKey, mimeType, fileName, mediaId } = result;
 
-    const category = mimeType?.split('/')[0];
+    const category = getFileCategory(mimeType || originalMeta?.mimeType || '', fileName || originalMeta?.fileName || '');
 
     let msgType = 'file';
 
-    if (category === 'image') msgType = 'image';
+    if (category === 'image' || originalMeta?.type === 'image') msgType = 'image';
 
-    else if (category === 'video') msgType = 'video';
+    else if (category === 'video' || originalMeta?.type === 'video') msgType = 'video';
 
-    else if (category === 'audio') msgType = 'audio';
-
-
+    else if (category === 'audio' || originalMeta?.type === 'audio') msgType = 'audio';
 
     if (originalMeta?.tempmsgid) {
       const pid = originalMeta.tempmsgid;
+      abortedPendingIds.current.add(pid);
       const timer = pendingAnnounceTimers.current.get(pid);
       if (timer) {
         clearTimeout(timer);
@@ -4014,15 +4057,19 @@ const ChatBox = () => {
 
     // Merge upload results into the original metadata to preserve ALL fields
 
+    const { optimisticFile: _omitFile, _thumbBlob: _omitThumbBlob, ...cleanOriginalMeta } = originalMeta || {};
+
     const finalMsg = {
 
-      ...originalMeta,
+      ...cleanOriginalMeta,
 
       pendingid: originalMeta.tempmsgid || null,
 
       type: msgType,
 
       content: mediaId || mainKey,
+
+      mainKey: mainKey ?? originalMeta.mainKey ?? null,
 
       thumbKey: thumbKey ?? originalMeta.thumbKey ?? null,
 
@@ -4098,7 +4145,7 @@ const ChatBox = () => {
 
         messageStore.updateMessage(chatid, originalMeta.tempmsgid, { uploadProgress: p });
 
-      }, controller.signal);
+      }, controller.signal, originalMeta._thumbBlob);
 
 
 
@@ -4130,6 +4177,7 @@ const ChatBox = () => {
 
       if (originalMeta?.tempmsgid) {
         const pid = originalMeta.tempmsgid;
+        abortedPendingIds.current.add(pid);
         const timer = pendingAnnounceTimers.current.get(pid);
         if (timer) {
           clearTimeout(timer);
@@ -4175,9 +4223,12 @@ const ChatBox = () => {
 
 
   const schedulePendingAnnouncement = (pid, fileObj, cat, meta, thumbBlob) => {
+    abortedPendingIds.current.delete(pid);
     const timer = setTimeout(async () => {
       try {
+        if (abortedPendingIds.current.has(pid)) return;
         const px = await createPackedPreview(fileObj, cat, thumbBlob, chat?.type);
+        if (abortedPendingIds.current.has(pid)) return;
         const pendingFrame = {
           type: 'media_pending',
           chatid,
@@ -4260,6 +4311,14 @@ const ChatBox = () => {
 
           if (result?.blob) thumbBlobForCache = result.blob;
 
+        } else if (category === 'image') {
+
+          try {
+            thumbBlobForCache = await compressImageBlob(file, 320, 320, 0.4);
+          } catch (e) {
+            thumbBlobForCache = file;
+          }
+
         }
 
       } catch (err) {
@@ -4313,6 +4372,8 @@ const ChatBox = () => {
       optimisticUrl,
 
       optimisticThumbUrl, // Injected for real-time flawless preview
+
+      _thumbBlob: thumbBlobForCache,
 
       optimisticFile: file, // Stored in memory/IDB via messageStore
 
@@ -6019,16 +6080,20 @@ const ChatBox = () => {
 
           d = new Date(str);
 
+        } else if (trimmed.includes(',') && /^\[?\d{4},/.test(trimmed)) {
+          const parts = trimmed.replace(/^\[|\]$/g, '').split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n));
+          if (parts.length >= 3) {
+            const utcMs = Date.UTC(parts[0], (parts[1] || 1) - 1, parts[2] || 1, parts[3] || 0, parts[4] || 0, parts[5] || 0);
+            d = new Date(utcMs - 19800000);
+          }
         } else {
-
           d = new Date(timestamp);
-
         }
-
+      } else if (Array.isArray(timestamp) && timestamp.length >= 3) {
+        const utcMs = Date.UTC(timestamp[0], (timestamp[1] || 1) - 1, timestamp[2] || 1, timestamp[3] || 0, timestamp[4] || 0, timestamp[5] || 0);
+        d = new Date(utcMs - 19800000);
       } else {
-
         d = new Date(timestamp);
-
       }
 
 
@@ -9139,7 +9204,7 @@ const ChatBox = () => {
 
               <button
 
-                onClick={(e) => { e.stopPropagation(); updateV(); messageStore.setCount(chatid); if (window.history.length > 1) { navigate(-1); } else { navigate("/chats", { replace: true }); } }}
+                onClick={(e) => { e.stopPropagation(); updateV(); messageStore.setCount(chatid); resetToChats(navigate, { chatId: chatid }); }}
 
                 style={{
 
@@ -15244,10 +15309,16 @@ const ChatBox = () => {
 
                             type="button"
 
-                            onClick={() => {
-
-                              setEditingViewerSrc(`${API}/files/media/serve/${showmedia.content}`);
-
+                            onClick={async () => {
+                              let editUrl = showmedia.optimisticUrl || resolveChatMediaUrl(showmedia.fileKey);
+                              if (!editUrl && showmedia.content) {
+                                try {
+                                  const info = await getMediaInfo(showmedia.content);
+                                  editUrl = resolveChatMediaUrl(info?.fileKey);
+                                } catch {}
+                              }
+                              if (editUrl) setEditingViewerSrc(editUrl);
+                              else toast?.error?.('Image URL unavailable for editing');
                             }}
 
                             style={{
@@ -15327,41 +15398,28 @@ const ChatBox = () => {
                         //href={`${API}/files/media/serve/${showmedia.content}`}
 
                         onClick={async () => {
-
+                          let downloadUrl = showmedia.optimisticUrl || resolveChatMediaUrl(showmedia.fileKey);
                           try {
-
-                            const response = await fetch(`${API}/files/media/serve/${showmedia.content}`);
-
+                            if (!downloadUrl && showmedia.content) {
+                              const info = await getMediaInfo(showmedia.content);
+                              downloadUrl = resolveChatMediaUrl(info?.fileKey);
+                            }
+                            if (!downloadUrl) throw new Error('Missing file URL');
+                            const response = await fetch(downloadUrl);
                             const blob = await response.blob();
-
                             const url = window.URL.createObjectURL(blob);
-
                             const a = document.createElement('a');
-
                             a.style.display = 'none';
-
                             a.href = url;
-
-                            a.download = showmedia.content || 'download';
-
+                            a.download = showmedia.fileName || showmedia.content || 'download';
                             document.body.appendChild(a);
-
                             a.click();
-
                             window.URL.revokeObjectURL(url);
-
                             document.body.removeChild(a);
-
                           } catch (error) {
-
                             console.error('Download failed:', error);
-
-                            // Fallback: open in new tab if fetch fails
-
-                            window.open(`${API}/files/media/serve/${showmedia.content}`, '_blank');
-
+                            if (downloadUrl) window.open(downloadUrl, '_blank');
                           }
-
                         }}
 
                         download
@@ -15514,13 +15572,12 @@ const ChatBox = () => {
                 }}
 
                 onOpenEvent={(ev) => {
-
+                  setEventRecived(false);
+                  setHasChanges(false);
+                  setShowSaveDialog(false);
                   setSelectedEvent({ ...ev, chatid, isGroup: true });
-
                   setShowGroupCalendar(false);
-
                   setShowEventModal(true);
-
                 }}
 
               />
@@ -15556,23 +15613,12 @@ const ChatBox = () => {
                 isReceived={EventRecived}
 
                 onClose={() => {
-
-                  if (hasChanges) {
-
-                    setShowSaveDialog(true);
-
-                  } else {
-
-                    setShowEventModal(false);
-
-                    if (SelectedEvent?.isGroup) {
-
-                      setShowGroupCalendar(true);
-
-                    }
-
+                  setShowEventModal(false);
+                  setHasChanges(false);
+                  setShowSaveDialog(false);
+                  if (SelectedEvent?.isGroup) {
+                    setShowGroupCalendar(true);
                   }
-
                 }}
 
                 onEventCreated={() => {
@@ -15685,32 +15731,6 @@ const ChatBox = () => {
 
         {/* Dialogs for Event Changes */}
 
-        {showSaveDialog && (
-
-          <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001 }}>
-
-            <div style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', padding: '24px', width: '90%', maxWidth: '400px', border: '1px solid var(--border-color)' }}>
-
-              <h3 style={{ margin: '0 0 12px 0', color: 'var(--text-primary)', fontSize: '18px' }}>Save Changes?</h3>
-
-              <p style={{ margin: '0 0 20px 0', color: 'var(--text-secondary)', fontSize: '14px' }}>You have unsaved changes. Do you want to save them before closing?</p>
-
-              <div style={{ display: 'flex', gap: '12px' }}>
-
-                <button onClick={() => { setShowSaveDialog(false); setShowEventModal(false); setHasChanges(false); saveChanges(); }} style={{ flex: 1, padding: '12px', backgroundColor: 'var(--accent-color)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Save</button>
-
-                <button onClick={() => { setShowSaveDialog(false); setShowEventModal(false); setHasChanges(false); if (SelectedEvent?.isGroup) setShowGroupCalendar(true); }} style={{ flex: 1, padding: '12px', backgroundColor: 'var(--danger-color)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Discard</button>
-
-                <button onClick={() => setShowSaveDialog(false)} style={{ flex: 1, padding: '12px', backgroundColor: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
-
-              </div>
-
-            </div>
-
-          </div>
-
-        )}
-
 
 
         {showCancelDialog && (
@@ -15766,23 +15786,12 @@ const ChatBox = () => {
             isReceived={EventRecived}
 
             onClose={() => {
-
-              if (hasChanges) {
-
-                setShowSaveDialog(true);
-
-              } else {
-
-                setShowEventModal(false);
-
-                if (SelectedEvent?.isGroup) {
-
-                  setShowGroupCalendar(true);
-
-                }
-
+              setShowEventModal(false);
+              setHasChanges(false);
+              setShowSaveDialog(false);
+              if (SelectedEvent?.isGroup) {
+                setShowGroupCalendar(true);
               }
-
             }}
 
             onEventCreated={() => {
@@ -15851,13 +15860,12 @@ const ChatBox = () => {
               }}
 
               onOpenEvent={(ev) => {
-
+                setEventRecived(false);
+                setHasChanges(false);
+                setShowSaveDialog(false);
                 setSelectedEvent({ ...ev, chatid, isGroup: true });
-
                 setShowGroupCalendar(false);
-
                 setShowEventModal(true);
-
               }}
 
             />

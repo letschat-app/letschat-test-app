@@ -1,20 +1,17 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
+import { navigateBackOrChats } from '../../utils/navigation';
 
 /**
  * Slim sticky top row with 44x44 back button touch target and "Profile" title.
- * Gracefully falls back to /chats when window history has no previous entry.
+ * Own profile returns to /chats at history idx 0; target user profile pops back to caller.
  */
-const ProfileBackRow = ({ title = 'Profile' }) => {
+const ProfileBackRow = ({ title = 'Profile', isDetail = false }) => {
   const navigate = useNavigate();
 
   const handleBack = () => {
-    if (window.history.state && window.history.state.idx > 0) {
-      navigate(-1);
-    } else {
-      navigate('/chats');
-    }
+    navigateBackOrChats(navigate, { isDetail });
   };
 
   return (

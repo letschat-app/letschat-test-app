@@ -9,7 +9,7 @@
 
 export const PREVIEW_BUDGET = 750;
 export const PREVIEW_BLUR_PX = 4;
-export const PREVIEW_PX_CHAT_TYPES = ['private', 'group', 'classroom'];
+export const PREVIEW_PX_CHAT_TYPES = ['private', 'group', 'classroom', undefined, null];
 
 export function previewDims(budget, ratio) {
   const px = Math.floor((Math.floor(budget * 3 / 4) - 2) / 2);
@@ -50,7 +50,7 @@ export function previewToDataURL(str) {
  * Returns null if chat type is public room, media has no thumbnail, or packing fails.
  */
 export async function createPackedPreview(file, kind, existingThumbBlob, chatType) {
-  if (!PREVIEW_PX_CHAT_TYPES.includes(chatType)) return null;
+  if (chatType === 'room') return null;
   if (!['image', 'video', 'pdf'].includes(kind)) return null;
 
   try {

@@ -168,13 +168,18 @@ export const getMediaBlob = async (cacheKey, fetchUrl, storeName) => {
     }
     
     // 3. Fetch from Network
-    if (!fetchUrl || (typeof fetchUrl === 'string' && (fetchUrl.endsWith('/null') || fetchUrl.endsWith('=null')))) return null;
+    if (!fetchUrl || (typeof fetchUrl === 'string' && (fetchUrl.endsWith('/null') || fetchUrl.endsWith('=null') || fetchUrl.includes('/files/media/serve/')))) return null;
     console.log(`[MediaCache] MISS: ${storeName}/${cacheKey}. Fetching...`);
 
+    let httpFailed = false;
     try {
       const res = await fetch(fetchUrl, { headers: { 'ngrok-skip-browser-warning': 'true' } });
-      if (!res.ok) throw new Error(`Blob fetch failed: ${res.status}`);
+      if (!res.ok) {
+        httpFailed = true;
+        throw new Error(`Blob fetch failed: ${res.status}`);
+      }
       const blob = await res.blob();
+      if (!blob || blob.size === 0) throw new Error('Empty media blob');
       
       // 4. Save to Cache (IDB)
       await saveBlobToCache(cacheKey, blob, storeName);
@@ -186,8 +191,8 @@ export const getMediaBlob = async (cacheKey, fetchUrl, storeName) => {
       return blobUrl;
     } catch (err) {
       console.warn('[MediaCache] Network fetch failed:', err);
-      if (fetchUrl && typeof fetchUrl === 'string' && !fetchUrl.endsWith('/null') && !fetchUrl.endsWith('=null') && !fetchUrl.includes('/null?')) {
-        return fetchUrl; // Return original URL as fallback only if not null
+      if (!httpFailed && fetchUrl && typeof fetchUrl === 'string' && !fetchUrl.endsWith('/null') && !fetchUrl.endsWith('=null') && !fetchUrl.includes('/null?')) {
+        return fetchUrl;
       }
       return null;
     }

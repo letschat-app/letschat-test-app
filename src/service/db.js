@@ -531,27 +531,107 @@ export const clearMessagesForChat = async (chatid) => {
   await tx.done;
 };
 
+const resolveAggregateStatusInDB = (msg, incomingStatus, targetChatId) => {
+  const rUsers = Array.isArray(msg.read_users) ? msg.read_users : [];
+  const dUsers = Array.isArray(msg.delivered_users) ? msg.delivered_users : [];
+  const pUsers = Array.isArray(msg.pending_users) ? msg.pending_users : [];
+  const totalTracked = rUsers.length + dUsers.length + pUsers.length;
+
+  let isGroupChat = false;
+  let totalExpected = 0;
+  try {
+    const chatsMap = JSON.parse(localStorage.getItem('chatsMap') || '{}');
+    const chatInfo = chatsMap[targetChatId || msg.chatid];
+    if (chatInfo) {
+      const ct = (chatInfo.type || '').toLowerCase();
+      if (ct === 'group' || ct === 'room' || ct === 'classroom') isGroupChat = true;
+      if (Array.isArray(chatInfo.users) && chatInfo.users.length > 2) {
+        isGroupChat = true;
+        totalExpected = Math.max(1, chatInfo.users.length - 1);
+      } else if (chatInfo.membersCount && chatInfo.membersCount > 2) {
+        isGroupChat = true;
+        totalExpected = Math.max(1, chatInfo.membersCount - 1);
+      } else if (chatInfo.noOfMembers && chatInfo.noOfMembers > 2) {
+        isGroupChat = true;
+        totalExpected = Math.max(1, chatInfo.noOfMembers - 1);
+      }
+    }
+  } catch (e) {}
+
+  if (totalTracked > 1 || isGroupChat) {
+    if (pUsers.length > 0 || dUsers.length > 0) {
+      return (rUsers.length > 0 || dUsers.length > 0) ? 'delivered' : 'pending';
+    }
+    if (isGroupChat && totalExpected > 1 && rUsers.length < totalExpected) {
+      return (rUsers.length > 0 || dUsers.length > 0) ? 'delivered' : 'pending';
+    }
+    if (isGroupChat && rUsers.length <= 1 && totalTracked <= 1) {
+      return 'delivered';
+    }
+    if (rUsers.length > 0) {
+      return (incomingStatus === 'media-opened' || msg.status === 'media-opened') ? 'media-opened' : 'read';
+    }
+  }
+  return getHigherStatus(msg.status, incomingStatus);
+};
+
+const mergeUserStatusSets = (msg, read_users, delivered_users, pending_users) => {
+  const hasAuthoritativePartition = Array.isArray(read_users) && Array.isArray(delivered_users) && Array.isArray(pending_users);
+  if (hasAuthoritativePartition) {
+    msg.read_users = Array.from(new Set(read_users));
+    const rSet = new Set(msg.read_users);
+    msg.delivered_users = Array.from(new Set(delivered_users)).filter(u => !rSet.has(u));
+    const dSet = new Set(msg.delivered_users);
+    msg.pending_users = Array.from(new Set(pending_users)).filter(u => !rSet.has(u) && !dSet.has(u));
+    return;
+  }
+  if (Array.isArray(read_users)) {
+    const rSet = new Set(msg.read_users || []);
+    read_users.forEach(u => rSet.add(u));
+    msg.read_users = Array.from(rSet);
+    if (Array.isArray(msg.delivered_users)) {
+      msg.delivered_users = msg.delivered_users.filter(u => !rSet.has(u));
+    }
+    if (Array.isArray(msg.pending_users)) {
+      msg.pending_users = msg.pending_users.filter(u => !rSet.has(u));
+    }
+  }
+  if (Array.isArray(delivered_users)) {
+    const rSet = new Set(msg.read_users || []);
+    const dSet = new Set(msg.delivered_users || []);
+    delivered_users.forEach(u => { if (!rSet.has(u)) dSet.add(u); });
+    msg.delivered_users = Array.from(dSet);
+    if (Array.isArray(msg.pending_users)) {
+      msg.pending_users = msg.pending_users.filter(u => !dSet.has(u) && !rSet.has(u));
+    }
+  }
+  if (Array.isArray(pending_users)) {
+    const rSet = new Set(msg.read_users || []);
+    const dSet = new Set(msg.delivered_users || []);
+    const pSet = new Set(msg.pending_users || []);
+    pending_users.forEach(u => { if (!rSet.has(u) && !dSet.has(u)) pSet.add(u); });
+    msg.pending_users = Array.from(pSet);
+  }
+};
+
 export const updateMessageStatusInDB = async (ack) => {
   const db = await initDB();
-  const { tempmsgid, msgid, status, timestamp, pending_users, delivered_users, read_users } = ack;
+  const { tempmsgid, msgid, status, timestamp, delivertime, readtime, mediaopenedtime, authoritative, pending_users, delivered_users, read_users } = ack;
 
   try {
     let existingMsg = null;
     let oldId = null;
 
-    // Try finding by tempmsgid first
     if (tempmsgid) {
       existingMsg = await db.get('messages', tempmsgid);
       oldId = tempmsgid;
     }
-    // Fallback to msgid
     if (!existingMsg && msgid) {
       existingMsg = await db.get('messages', msgid);
       oldId = msgid;
     }
 
     if (existingMsg) {
-      // If the ID is upgrading from tempmsgid to msgid, delete the old temp record
       if (tempmsgid && msgid && oldId === tempmsgid && tempmsgid !== msgid) {
         await db.delete('messages', tempmsgid);
       }
@@ -563,25 +643,32 @@ export const updateMessageStatusInDB = async (ack) => {
         existingMsg.revived = true;
       } else {
         if (msgid) existingMsg.msgid = msgid;
-        if (status) existingMsg.status = getHigherStatus(existingMsg.status, status);
+        mergeUserStatusSets(existingMsg, read_users, delivered_users, pending_users);
+        if (authoritative && status) {
+          existingMsg.status = status;
+        } else if (status) {
+          existingMsg.status = resolveAggregateStatusInDB(existingMsg, status, existingMsg.chatid);
+        }
       }
 
-      // Tracking timestamps
+      if (delivertime !== undefined) existingMsg.delivertime = delivertime;
+      if (mediaopenedtime !== undefined) existingMsg.mediaopenedtime = mediaopenedtime;
+      if (readtime !== undefined) existingMsg.readtime = readtime;
       if (timestamp) {
         existingMsg.timestamp = existingMsg.timestamp || timestamp;
         if (status === 'delivered') existingMsg.delivertime = timestamp;
-        if (status === 'read') existingMsg.readtime = timestamp;
+        if (existingMsg.status === 'read' || existingMsg.status === 'media-opened') {
+          if (status === 'read' || status === 'media-opened') existingMsg.readtime = timestamp;
+        } else {
+          existingMsg.readtime = null;
+        }
         if (status === 'media-opened') existingMsg.mediaopenedtime = timestamp;
+      } else if (existingMsg.status !== 'read' && existingMsg.status !== 'media-opened') {
+        existingMsg.readtime = null;
       }
-
-      // Group Chat Categorized User Lists
-      if (Array.isArray(pending_users)) existingMsg.pending_users = pending_users;
-      if (Array.isArray(delivered_users)) existingMsg.delivered_users = delivered_users;
-      if (Array.isArray(read_users)) existingMsg.read_users = read_users;
 
       existingMsg.idToCheck = existingMsg.msgid || existingMsg.tempmsgid || existingMsg.timestamp;
       await db.put('messages', existingMsg);
-      // console.log("[DB] Message status updated successfully:", existingMsg);
     } else {
       console.warn("[DB] Could not find message to update status:", ack);
     }
@@ -605,7 +692,6 @@ export const bulkUpdateMessageStatusInDB = async (batchAck) => {
     for (const id of msgids) {
       let msg = await store.get(id);
 
-      // Fallback: lookup by index or tempmsgid if direct key lookup misses
       if (!msg && chatid) {
         const index = store.index('chatid');
         const chatMsgs = await index.getAll(IDBKeyRange.only(chatid));
@@ -613,47 +699,22 @@ export const bulkUpdateMessageStatusInDB = async (batchAck) => {
       }
 
       if (msg) {
-        if (status) msg.status = getHigherStatus(msg.status, status);
+        mergeUserStatusSets(msg, read_users, delivered_users, pending_users);
+        if (status) {
+          msg.status = resolveAggregateStatusInDB(msg, status, chatid || msg.chatid);
+        }
         if (timestamp) {
           if (status === 'delivered') msg.delivertime = timestamp;
-          if (status === 'read') msg.readtime = timestamp;
+          if ((msg.status === 'read' || msg.status === 'media-opened') && (status === 'read' || status === 'media-opened')) {
+            msg.readtime = timestamp;
+          } else if (msg.status !== 'read' && msg.status !== 'media-opened') {
+            msg.readtime = null;
+          }
           if (status === 'media-opened') msg.mediaopenedtime = timestamp;
+        } else if (msg.status !== 'read' && msg.status !== 'media-opened') {
+          msg.readtime = null;
         }
 
-        // Categorized recipient lists
-        if (Array.isArray(read_users)) {
-          const rSet = new Set(msg.read_users || []);
-          read_users.forEach(u => rSet.add(u));
-          msg.read_users = Array.from(rSet);
-          if (Array.isArray(msg.delivered_users)) {
-            msg.delivered_users = msg.delivered_users.filter(u => !rSet.has(u));
-          }
-          if (Array.isArray(msg.pending_users)) {
-            msg.pending_users = msg.pending_users.filter(u => !rSet.has(u));
-          }
-        }
-        if (Array.isArray(delivered_users)) {
-          const rSet = new Set(msg.read_users || []);
-          const dSet = new Set(msg.delivered_users || []);
-          delivered_users.forEach(u => {
-            if (!rSet.has(u)) dSet.add(u);
-          });
-          msg.delivered_users = Array.from(dSet);
-          if (Array.isArray(msg.pending_users)) {
-            msg.pending_users = msg.pending_users.filter(u => !dSet.has(u) && !rSet.has(u));
-          }
-        }
-        if (Array.isArray(pending_users)) {
-          const rSet = new Set(msg.read_users || []);
-          const dSet = new Set(msg.delivered_users || []);
-          const pSet = new Set(msg.pending_users || []);
-          pending_users.forEach(u => {
-            if (!rSet.has(u) && !dSet.has(u)) pSet.add(u);
-          });
-          msg.pending_users = Array.from(pSet);
-        }
-
-        const idToCheck = msg.msgid || msg.tempmsgid || msg.timestamp;
         await store.put(msg);
       }
     }

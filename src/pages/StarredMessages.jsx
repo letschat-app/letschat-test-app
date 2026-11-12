@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { navigateBackOrChats } from '../utils/navigation';
 import { getStarredMessages } from '../service/db';
 import messageStore from './MessageStore';
 import Avatar from '../components/chat/Avatar';
@@ -80,7 +81,7 @@ const StarredMessages = () => {
                 zIndex: 10
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <button onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', padding: '4px' }}>
+                    <button onClick={() => navigateBackOrChats(navigate, { isDetail: Boolean(chatid) })} style={{ background: 'none', border: 'none', color: 'var(--text-primary)', cursor: 'pointer', padding: '4px' }}>
                         <ArrowLeft size={24} />
                     </button>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

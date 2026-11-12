@@ -1,8 +1,9 @@
 import { useToast } from '../components/common/ToastProvider';
 import { usePrompt } from '../components/common/PromptProvider';
-import useBackClose from '../hooks/useBackClose';
+import useBackClose, { dismissModalsAndRun } from '../hooks/useBackClose';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { markChatsAnchor, navigateFromNav, consumeForceShowSpacesForChat } from "../utils/navigation";
 import { getsocket, isSocketOpen, sendSafe } from "../service/Websocket";
 import { API } from "../service/UserAuth";
 import messageStore from "./MessageStore";
@@ -536,7 +537,14 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
     return JSON.parse(localStorage.getItem("visited") || "{}");
   });
   const [selectedChatForSpaces, setSelectedChatForSpaces] = useState(null);
-  useBackClose(Boolean(selectedChatForSpaces), () => setSelectedChatForSpaces(null));
+  const closeSpaceList = useCallback(() => {
+    setSelectedChatForSpaces(prev => {
+      if (prev) userClosedSpacesRef.current = String(prev.chatId);
+      return null;
+    });
+    try { sessionStorage.removeItem('mobileSpaceListChatId'); } catch {}
+  }, []);
+  useBackClose(Boolean(selectedChatForSpaces), closeSpaceList);
   const [infoModalChat, setInfoModalChat] = useState(null);
   const [spaceGroupEvents, setSpaceGroupEvents] = useState([]);
   const { events: allEvents } = useEventMediator();
@@ -1616,8 +1624,22 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
   }, [spacesCache, isDesktop, navigate]);
 
   useEffect(() => {
+    if (location.pathname === '/chats' || location.pathname === '/') {
+      markChatsAnchor();
+    }
+  }, [location.pathname]);
+
+  useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
-    let targetChatId = location.state?.showSpacesForChat || searchParams.get('showSpacesForChat');
+    const forcedChatId = consumeForceShowSpacesForChat();
+    if (forcedChatId) {
+      userClosedSpacesRef.current = null;
+    }
+    let targetChatId = location.state?.showSpacesForChat || searchParams.get('showSpacesForChat') || forcedChatId;
+    if (targetChatId) {
+      userClosedSpacesRef.current = null;
+      try { sessionStorage.setItem('mobileSpaceListChatId', String(targetChatId)); } catch {}
+    }
     
     // Extract targetChatId from active route when on a chat route
     if (!targetChatId && activeChatRoute?.startsWith('/chat/')) {
@@ -1625,6 +1647,15 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
       if (parts) {
         targetChatId = parts.split('?')[0]; // Strip any query params
       }
+    }
+
+    if (!targetChatId && !isDesktop && !activeChatRoute?.startsWith('/chat/')) {
+      try {
+        const savedSpaceChatId = sessionStorage.getItem('mobileSpaceListChatId');
+        if (savedSpaceChatId && userClosedSpacesRef.current !== String(savedSpaceChatId)) {
+          targetChatId = savedSpaceChatId;
+        }
+      } catch {}
     }
 
     if (targetChatId) {
@@ -1644,6 +1675,12 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
               profile: `${import.meta.env.BASE_URL}icon.png`
             };
           }
+          if (!chat) {
+            try {
+              const chatsMap = JSON.parse(localStorage.getItem('chatsMap') || '{}');
+              chat = chatsMap[targetChatId] || null;
+            } catch {}
+          }
           if (chat) {
             handleChatClick(chat, false);
           }
@@ -1657,9 +1694,13 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
         navigate(location.pathname, { replace: true });
       }
     } else if (prevRouteRef.current?.startsWith('/chat/') && !activeChatRoute?.startsWith('/chat/')) {
-      // Only clear space selection when route actually transitioned away from a chat route
-      setSelectedChatForSpaces(null);
-      userClosedSpacesRef.current = null;
+      // If transitioning from chat route to /chats on mobile without explicit close, keep saved space list open
+      let savedSpaceChatId = null;
+      try { savedSpaceChatId = sessionStorage.getItem('mobileSpaceListChatId'); } catch {}
+      if (!savedSpaceChatId) {
+        setSelectedChatForSpaces(null);
+        userClosedSpacesRef.current = null;
+      }
     }
     
     // Update ref for next render
@@ -1737,15 +1778,26 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
   };
 
   const handleSpaceClick = useCallback((chat, space) => {
-    navigate(`/chat/${chat.chatId}?space=${space.id}`);
-    update(chat.chatId);
-    messageStore.setActivechatbox(chat.chatId);
-    messageStore.setActiveSpace(space.id);
-    localStorage.setItem(chat.chatId, JSON.stringify(chat));
-    // Zero only the specific space count
-    messageStore.setCount(chat.chatId, space.id);
-    setCount(messageStore.getCount());
-  }, [navigate, update]);
+    const openTargetSpace = () => {
+      navigate(`/chat/${chat.chatId}?space=${space.id}`);
+      update(chat.chatId);
+      messageStore.setActivechatbox(chat.chatId);
+      messageStore.setActiveSpace(space.id);
+      localStorage.setItem(chat.chatId, JSON.stringify(chat));
+      // Zero only the specific space count
+      messageStore.setCount(chat.chatId, space.id);
+      setCount(messageStore.getCount());
+    };
+
+    if (!isDesktop) {
+      dismissModalsAndRun(() => {
+        try { sessionStorage.setItem('mobileSpaceListChatId', String(chat.chatId)); } catch { /* ignore storage unavailability */ }
+        openTargetSpace();
+      });
+    } else {
+      openTargetSpace();
+    }
+  }, [navigate, update, isDesktop]);
 
   // ProfileAvatar is defined outside this component (see top of file) — handleAvatarClick is stable via useCallback
 
@@ -1787,7 +1839,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
           }}>LetsChat</h3>
           <div style={{ display: 'flex', gap: '8px', color: 'var(--text-secondary)' }}>
             <button
-              onClick={() => navigate('/batch-message')}
+              onClick={() => navigateFromNav(navigate, '/batch-message', location.pathname)}
               style={{
                 background: 'none',
                 border: 'none',
@@ -1990,12 +2042,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
               marginBottom: '8px'
             }}>
               <button
-                onClick={() => {
-                  if (selectedChatForSpaces) {
-                    userClosedSpacesRef.current = String(selectedChatForSpaces.chatId);
-                  }
-                  setSelectedChatForSpaces(null);
-                }}
+                onClick={closeSpaceList}
                 style={{
                   background: 'none',
                   border: 'none',
@@ -2660,7 +2707,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
                 borderTop: "1px solid var(--bg-card)"
               }}>
                 <button
-                  onClick={() => navigate('/search')}
+                  onClick={() => navigateFromNav(navigate, '/search', location.pathname)}
                   style={{
                     padding: "12px 32px",
                     fontSize: "15px",
@@ -2714,7 +2761,7 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
       {(location.pathname === '/chats' || location.pathname === '/') && (
         <button
           type="button"
-          onClick={() => navigate('/batch-message')}
+          onClick={() => navigateFromNav(navigate, '/batch-message', location.pathname)}
           aria-label="Batch Message"
           title="Batch Message"
           style={{

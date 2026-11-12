@@ -137,15 +137,54 @@ export default function MediaUploadButton({
     };
   }, [menuOpen]);
 
-  const handleFileSelect = (file) => {
-    if (!file) return;
-    Object.values(inputRefs.current).forEach(r => { if (r) r.value = ''; });
-    
-    if (file.size > 50 * 1024 * 1024) {
+  const inferMimeFromName = (mime, name = '') => {
+    if (mime && mime !== 'application/octet-stream') return mime;
+    const ext = name.split('.').pop()?.toLowerCase() || '';
+    const map = {
+      jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
+      gif: 'image/gif', heic: 'image/heic', heif: 'image/heif', bmp: 'image/bmp',
+      mp4: 'video/mp4', m4v: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime',
+      mkv: 'video/x-matroska', '3gp': 'video/3gpp', pdf: 'application/pdf',
+      mp3: 'audio/mpeg', m4a: 'audio/mp4', wav: 'audio/wav', ogg: 'audio/ogg'
+    };
+    return map[ext] || mime || 'application/octet-stream';
+  };
+
+  const handleFileSelect = async (rawFile, optionId = null) => {
+    if (!rawFile) return;
+
+    if (rawFile.size > 50 * 1024 * 1024) {
       toast.error("This file exceeds the 50MB size limit and cannot be attached.");
-      // Clear inputs to allow re-selection
-      Object.values(inputRefs.current).forEach(r => { if (r) r.value = ''; });
       return;
+    }
+
+    let resolvedMime = inferMimeFromName(rawFile.type, rawFile.name);
+    if ((!resolvedMime || resolvedMime === 'application/octet-stream') && optionId === 'gallery') {
+      resolvedMime = 'image/jpeg';
+    }
+
+    let file = rawFile;
+    // Eagerly materialize Android Photo Picker / content:// handles into RAM
+    // before temporary URI permissions expire between preview and upload.
+    try {
+      const buf = await rawFile.arrayBuffer();
+      if (!buf || buf.byteLength === 0) {
+        toast.error("Could not read selected file. Please pick it again.");
+        return;
+      }
+      const fallbackName = rawFile.name || (resolvedMime.startsWith('video/') ? `video_${Date.now()}.mp4` : `image_${Date.now()}.jpg`);
+      file = new File([buf], fallbackName, { type: resolvedMime, lastModified: rawFile.lastModified || Date.now() });
+    } catch (readErr) {
+      console.warn('[MediaUploadButton] Eager file read failed:', readErr);
+      if (!rawFile.size) {
+        toast.error("Selected photo/video could not be accessed. Please choose again or send via Document.");
+        return;
+      }
+      if (resolvedMime !== rawFile.type) {
+        try {
+          file = new File([rawFile], rawFile.name || `media_${Date.now()}`, { type: resolvedMime, lastModified: rawFile.lastModified || Date.now() });
+        } catch {}
+      }
     }
 
     setMenuOpen(false);
@@ -194,7 +233,7 @@ export default function MediaUploadButton({
           accept={opt.accept}
           {...(opt.capture ? { capture: opt.capture } : {})}
           style={{ display: 'none' }}
-          onChange={e => handleFileSelect(e.target.files?.[0])}
+          onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; handleFileSelect(f, opt.id); }}
         />
       ))}
 
@@ -231,7 +270,11 @@ export default function MediaUploadButton({
                 } else if (opt.id === 'pulse' && onPulseClick) {
                   onPulseClick();
                 } else {
-                  inputRefs.current[opt.id]?.click();
+                  const input = inputRefs.current[opt.id];
+                  if (input) {
+                    input.value = '';
+                    input.click();
+                  }
                 }
               }}
               style={{

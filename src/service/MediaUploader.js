@@ -17,10 +17,17 @@ export const STAGE_LABELS = {
 
 /** Calculate SHA-256 hash of a file for integrity/deduplication. */
 const calculateFileHash = async (file) => {
-  const arrayBuffer = await file.arrayBuffer();
-  const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  try {
+    if (typeof crypto !== 'undefined' && crypto?.subtle?.digest) {
+      const arrayBuffer = await file.arrayBuffer();
+      const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+  } catch (e) {
+    console.warn('[MediaUploader] crypto.subtle digest failed, using fallback hash:', e);
+  }
+  return `${file.name || 'file'}_${file.size || 0}_${file.lastModified || Date.now()}_${Math.random().toString(36).slice(2)}`;
 };
 
 /** Get duration of audio file in seconds. */
@@ -41,61 +48,160 @@ const getAudioDuration = (file) =>
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-/** Compress an image File/Blob via canvas. Returns a Blob (image/jpeg). */
+const inferMimeFromName = (mime = '', fileName = '') => {
+  if (mime && mime !== 'application/octet-stream') return mime;
+  const ext = (fileName || '').split('.').pop()?.toLowerCase() || '';
+  const map = {
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
+    gif: 'image/gif', heic: 'image/heic', heif: 'image/heif', bmp: 'image/bmp',
+    mp4: 'video/mp4', m4v: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime',
+    mkv: 'video/x-matroska', '3gp': 'video/3gpp', pdf: 'application/pdf',
+    mp3: 'audio/mpeg', m4a: 'audio/mp4', wav: 'audio/wav', ogg: 'audio/ogg'
+  };
+  return map[ext] || mime || 'application/octet-stream';
+};
+
+/** Compress an image File/Blob via canvas with WebP->JPEG fallback and DataURL decode retry. */
 export const compressImageBlob = (file, maxW, maxH, quality) =>
-  new Promise((resolve, reject) => {
+  new Promise((resolve) => {
+    let settled = false;
+    let objectUrl = null;
+    let triedDataUrl = false;
+    const finish = (res) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (objectUrl) {
+        try { URL.revokeObjectURL(objectUrl); } catch {}
+      }
+      resolve(res);
+    };
+    const timer = setTimeout(() => finish(file), 6000);
+
     const img = new Image();
-    const url = URL.createObjectURL(file);
     img.onload = () => {
-      URL.revokeObjectURL(url);
       let { naturalWidth: w, naturalHeight: h } = img;
-      const ratio = Math.min(maxW / w, maxH / h, 1); // never upscale
-      w = Math.round(w * ratio);
-      h = Math.round(h * ratio);
+      if (!w || !h) return finish(file);
+      const ratio = Math.min(maxW / w, maxH / h, 1);
+      w = Math.max(1, Math.round(w * ratio));
+      h = Math.max(1, Math.round(h * ratio));
       const canvas = document.createElement('canvas');
       canvas.width = w;
       canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      canvas.toBlob(blob => (blob ? resolve(blob) : reject(new Error('Canvas toBlob failed'))), 'image/webp', quality);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return finish(file);
+      ctx.drawImage(img, 0, 0, w, h);
+      canvas.toBlob(blob => {
+        if (blob && blob.size > 0) {
+          finish(blob);
+        } else {
+          canvas.toBlob(jpegBlob => {
+            finish((jpegBlob && jpegBlob.size > 0) ? jpegBlob : file);
+          }, 'image/jpeg', quality);
+        }
+      }, 'image/webp', quality);
     };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image load failed')); };
-    img.src = url;
+    img.onerror = () => {
+      if (!triedDataUrl && file instanceof Blob) {
+        triedDataUrl = true;
+        try {
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (typeof reader.result === 'string') img.src = reader.result;
+            else finish(file);
+          };
+          reader.onerror = () => finish(file);
+          reader.readAsDataURL(file);
+          return;
+        } catch {}
+      }
+      console.warn('[MediaUploader] Image decode failed for compression, using original file');
+      finish(file);
+    };
+    try {
+      objectUrl = URL.createObjectURL(file);
+      img.src = objectUrl;
+    } catch {
+      img.onerror();
+    }
   });
 
-/** Extract first meaningful frame from a video as a JPEG Blob. */
+/** Extract a frame from a video as a WebP (or JPEG fallback) Blob. */
 export const getVideoThumbnail = (file) =>
   new Promise((resolve) => {
-    const video = document.createElement('video');
-    video.muted = true;
-    video.playsInline = true;
-    video.preload = 'metadata';
-    const url = URL.createObjectURL(file);
-
-    const capture = () => {
-      const vw = video.videoWidth || 320;
-      const vh = video.videoHeight || 180;
-      const scale = Math.min(320 / vw, 1);
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(vw * scale);
-      canvas.height = Math.round(vh * scale);
-      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
-      canvas.toBlob(blob => resolve(blob ?? null), 'image/webp', 0.3);
+    let resolved = false;
+    let url = null;
+    const finish = (result) => {
+      if (resolved) return;
+      resolved = true;
+      clearTimeout(timer);
+      if (url) {
+        try { URL.revokeObjectURL(url); } catch (e) {}
+      }
+      resolve(result);
     };
 
-    video.onseeked = capture;
-    video.onloadedmetadata = () => {
-      video.currentTime = Math.min(1, video.duration * 0.1);
-    };
-    video.onerror = () => { URL.revokeObjectURL(url); resolve({ blob: null, duration: 0 }); };
+    const timer = setTimeout(() => {
+      finish({ blob: null, duration: 0 });
+    }, 7000);
 
-    const metaPromise = new Promise(r => {
-      video.addEventListener('loadedmetadata', () => r(Math.round(video.duration) || 0), { once: true });
-    });
+    try {
+      const video = document.createElement('video');
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = 'auto';
+      url = URL.createObjectURL(file);
 
-    video.src = url;
-    const originalResolve = resolve;
-    resolve = (blob) => metaPromise.then(duration => originalResolve({ blob, duration }));
+      const captureFrame = (duration) => {
+        try {
+          const vw = video.videoWidth || 320;
+          const vh = video.videoHeight || 180;
+          if (!video.videoWidth || !video.videoHeight) return false;
+          const scale = Math.min(320 / vw, 1);
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(vw * scale));
+          canvas.height = Math.max(1, Math.round(vh * scale));
+          canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob(blob => {
+            if (blob && blob.size > 0) {
+              finish({ blob, duration });
+            } else {
+              canvas.toBlob(jpegBlob => finish({ blob: jpegBlob && jpegBlob.size > 0 ? jpegBlob : null, duration }), 'image/jpeg', 0.65);
+            }
+          }, 'image/webp', 0.45);
+          return true;
+        } catch {
+          return false;
+        }
+      };
+
+      video.onerror = () => {
+        finish({ blob: null, duration: 0 });
+      };
+
+      video.onloadedmetadata = () => {
+        const rawDur = Number.isFinite(video.duration) ? video.duration : 0;
+        const duration = Math.round(rawDur) || 0;
+        const targetTime = rawDur > 0.2 ? Math.min(1, rawDur * 0.1) : 0.05;
+        video.onseeked = () => {
+          if (!captureFrame(duration)) finish({ blob: null, duration });
+        };
+        video.onloadeddata = () => {
+          if (video.currentTime === 0 && !captureFrame(duration)) {
+            try { video.currentTime = targetTime; } catch {}
+          }
+        };
+        try {
+          video.currentTime = targetTime;
+        } catch {
+          if (!captureFrame(duration)) finish({ blob: null, duration });
+        }
+      };
+
+      video.src = url;
+    } catch (e) {
+      finish({ blob: null, duration: 0 });
+    }
   });
 
 let pdfjsLibPromise = null;
@@ -200,43 +306,85 @@ const putToUrl = async (url, blob, mimeType, signal) => {
 };
 
 /** Main Media Upload Flow */
-export const uploadMedia = async (file, onProgress = () => { }, signal) => {
+export const uploadMedia = async (file, onProgress = () => { }, signal, precomputedThumbBlob = null) => {
   if (file.size > 50 * 1024 * 1024) {
     throw new Error('File exceeds the 50MB size limit.');
   }
-  const originalMime = file.type || 'application/octet-stream';
+  const originalMime = inferMimeFromName(file.type, file.name);
   const category = getFileCategory(originalMime, file.name);
   const userId = localStorage.getItem('userid');
 
   let mainBlob = file;
   let mainMime = originalMime;
 
-  // Universal Image Compression entry point: every image is compressed to WebP before upload
+  // Compress image before upload and derive MIME from actual output blob
   if (category === 'image') {
     onProgress({ stage: 'compressing_image', progress: 10 });
     try {
       mainBlob = await compressImageBlob(file, 1920, 1080, 0.75);
-      mainMime = 'image/webp';
+      mainMime = inferMimeFromName(mainBlob?.type, file.name);
     } catch (err) {
       console.warn('[MediaUploader] Image compression failed, using original file:', err);
     }
   }
 
-  onProgress({ stage: 'preparing_metadata', progress: 12 });
+  let thumbBlob = (precomputedThumbBlob instanceof Blob && precomputedThumbBlob.size > 0) ? precomputedThumbBlob : null;
+  let noOfPages = 0;
+  let finalDuration = 0;
+  const supportsThumbnail = ['image', 'video', 'pdf'].includes(category);
+
+  if (category === 'image') {
+    if (!thumbBlob) {
+      onProgress({ stage: 'creating_thumbnail', progress: 18 });
+      try {
+        thumbBlob = await compressImageBlob(file, 320, 320, 0.4);
+      } catch {}
+    }
+    if ((!thumbBlob || thumbBlob.size === 0) && mainBlob && mainBlob.size > 0) {
+      thumbBlob = mainBlob;
+    }
+  } else if (category === 'video') {
+    if (!thumbBlob) {
+      onProgress({ stage: 'extracting_frame', progress: 18 });
+      try {
+        const videoResult = await getVideoThumbnail(file);
+        thumbBlob = videoResult?.blob || null;
+        finalDuration = videoResult?.duration || 0;
+      } catch {}
+    }
+  } else if (category === 'pdf') {
+    if (!thumbBlob) {
+      onProgress({ stage: 'rendering_pdf', progress: 18 });
+      try {
+        const pdfResult = await getPdfThumbnail(file);
+        thumbBlob = pdfResult?.blob || null;
+        noOfPages = pdfResult?.noOfPages || 0;
+      } catch {}
+    }
+  }
+
+  const thumbMime = (thumbBlob?.type && thumbBlob.type.startsWith('image/')) ? thumbBlob.type : 'image/webp';
+
+  onProgress({ stage: 'preparing_metadata', progress: 25 });
   const [fileHash, fileDuration] = await Promise.all([
     calculateFileHash(mainBlob),
     (category === 'audio') ? getAudioDuration(file) : Promise.resolve(0)
   ]);
+  if (!finalDuration) finalDuration = fileDuration;
 
-  onProgress({ stage: 'requesting_urls', progress: 15 });
+  onProgress({ stage: 'requesting_urls', progress: 30 });
   const urlRes = await fetch(`${API}/files/put-url`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'ngrok-skip-browser-warning': 'true',
     },
-    body: JSON.stringify({ mime: mainMime, hash: fileHash }),
-    signal // Pass through the abort signal
+    body: JSON.stringify({
+      mime: mainMime,
+      thumbMime: (supportsThumbnail && thumbBlob) ? thumbMime : null,
+      hash: fileHash
+    }),
+    signal
   });
   if (!urlRes.ok) throw new Error(`Server error: ${urlRes.status}`);
   const { mainKey, thumbKey, mainPutUrl, thumbPutUrl, exist, mediaId: existingMediaId } = await urlRes.json();
@@ -245,38 +393,6 @@ export const uploadMedia = async (file, onProgress = () => { }, signal) => {
     console.log("[MediaUploader] File already exists (deduplicated). Reusing mediaId:", existingMediaId);
     onProgress({ stage: 'done', progress: 100 });
     return { mainKey, thumbKey, mediaId: existingMediaId };
-  }
-
-  let thumbBlob = null;
-  let thumbMime = 'image/webp';
-  let noOfPages = 0;
-  let finalDuration = fileDuration;
-
-  const supportsThumbnail = ['image', 'video', 'pdf'].includes(category);
-
-  if (category === 'image') {
-    onProgress({ stage: 'creating_thumbnail', progress: 25 });
-    try { 
-      thumbBlob = await compressImageBlob(file, 320, 320, 0.3); 
-    } catch { }
-    // Fallback: if creating small thumbnail fails, use mainBlob so thumbnail is never null
-    if (!thumbBlob && mainBlob) {
-      thumbBlob = mainBlob;
-    }
-  } else if (category === 'video') {
-    onProgress({ stage: 'extracting_frame', progress: 25 });
-    try {
-      const videoResult = await getVideoThumbnail(file);
-      thumbBlob = videoResult?.blob || null;
-      finalDuration = videoResult?.duration || fileDuration;
-    } catch { }
-  } else if (category === 'pdf') {
-    onProgress({ stage: 'rendering_pdf', progress: 25 });
-    try {
-      const pdfResult = await getPdfThumbnail(file);
-      thumbBlob = pdfResult?.blob || null;
-      noOfPages = pdfResult?.noOfPages || 0;
-    } catch { }
   }
   onProgress({ stage: 'uploading_main', progress: 45 });
   await putToUrl(mainPutUrl, mainBlob, mainMime, signal);
@@ -326,6 +442,14 @@ export const uploadMedia = async (file, onProgress = () => { }, signal) => {
 export const getFileCategory = (mimeType = '', fileName = '') => {
   if (!mimeType && !fileName) return 'file';
   
+  const m = (mimeType || '').toLowerCase();
+  const f = (fileName || '').toLowerCase();
+
+  if (m.startsWith('image/') || f.startsWith('image:') || f.startsWith('photo:')) return 'image';
+  if (m.startsWith('video/') || f.startsWith('video:')) return 'video';
+  if (m.startsWith('audio/') || f.startsWith('audio:')) return 'audio';
+  if (m.includes('pdf') || f.endsWith('.pdf')) return 'pdf';
+
   const [type, sub] = mimeType?.split('/') || ['', ''];
   if (type === 'image') return 'image';
   if (type === 'video') return 'video';
@@ -335,9 +459,9 @@ export const getFileCategory = (mimeType = '', fileName = '') => {
   // Extension fallback
   if (fileName) {
     const ext = fileName.split('.').pop().toLowerCase();
-    if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic'].includes(ext)) return 'image';
-    if (['mp4', 'webm', 'mov', 'm4v', '3gp'].includes(ext)) return 'video';
-    if (['mp3', 'wav', 'ogg', 'm4a', 'aac', 'opus'].includes(ext)) return 'audio';
+    if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif', 'bmp', 'svg'].includes(ext)) return 'image';
+    if (['mp4', 'webm', 'mov', 'm4v', '3gp', 'mkv', 'avi'].includes(ext)) return 'video';
+    if (['mp3', 'wav', 'ogg', 'm4a', 'aac', 'opus', 'flac'].includes(ext)) return 'audio';
     if (ext === 'pdf') return 'pdf';
   }
 
