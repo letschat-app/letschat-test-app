@@ -1,11 +1,6 @@
-import useIsDesktop from '../hooks/useIsDesktop';
-import { useToast } from '../components/common/ToastProvider';
-import { usePrompt } from '../components/common/PromptProvider';
 import useVisualViewport from '../hooks/useVisualViewport';
 import { clearChatNotifications } from '../hooks/useNotifications';
-import React, { useEffect, useState, useRef, useMemo, useLayoutEffect, useCallback } from "react";
-
-import { createPortal } from "react-dom";
+import React, { useEffect, useState, useRef, useMemo, useLayoutEffect, useCallback, Suspense } from "react";
 
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { resetToChats } from "../utils/navigation";
@@ -16,146 +11,73 @@ import { v4 as uuidv4 } from "uuid";
 
 import { API } from "../service/UserAuth";
 
-import { getsocket, initWebsocket, sendSafe, sendMediaOpenedEvent } from "../service/Websocket";
+import { getsocket, sendSafe, sendMediaOpenedEvent } from "../service/Websocket";
 
 import messageStore from "./MessageStore";
 
-import StreakBadge from "../components/pulse/StreakBadge";
+import ChatHeader from "../components/chat/ChatHeader";
 
-import { getPulseFromStore, pulsePreviewCache } from '../service/PulseMediaCache';
+import ChatMessageList from "../components/chat/ChatMessageList";
 
-import { initDB, saveUsersBatchToDB, saveGroupMembersToDB, markMessagesAsOldInDB, markSpaceMessagesAsOldInDB, getGroupMembersFromDB, isChatMuted, toggleMuteChat } from '../service/db';
+import ChatInputBar from "../components/chat/ChatInputBar";
+
+import {
+  resolveChatMediaUrl,
+  getCurrentLocalDateTimeString,
+  stripMentionEncoding,
+  renderFormattedText as renderFormattedChatText,
+  isWithin24Hours,
+  formatBannerText,
+  isEventPassed as checkIsEventPassed,
+  isEventBannerPin,
+} from "../utils/chatFormatting";
+
+import { initDB, saveUsersBatchToDB, saveGroupMembersToDB, markSpaceMessagesAsOldInDB, getGroupMembersFromDB, isChatMuted, toggleMuteChat } from '../service/db';
 
 import { useNotifications } from '../hooks/useNotifications';
 
 import { useTheme } from '../context/ThemeContext';
 
 import {
-
-  Bell,
-
-  BellOff,
-
-  ArrowUp,
-
-  Plus,
-
-  Smile,
-
-  Paperclip,
-
-  Image as ImageIcon,
-
-  Mic,
-
   X,
-
-  ArrowDown,
-
   Check,
-
-  CheckCheck,
-
   Clock,
-
   Copy,
-
   Forward,
-
   Reply,
-
-  Search as SearchIcon,
-
-  Info,
-
   Calendar,
-
-  UserPlus,
-
-  Trash2,
-
-  MoreVertical,
-
-  Star,
-
-  Pin,
-
-  PinOff,
-
   Bird,
-
-  Download,
-
-  ChevronDown,
-
-  Share2,
-
-  Loader2,
-
-  XCircle,
-
-  Zap,
-
-  Pencil,
-
-  Lock,
-
-  Filter,
-
   User,
-
-  BarChart3,
-
   Send
-
 } from "lucide-react";
 
 import { useEventMediator } from "../service/EventStorage";
 
 import AssignmentMessage from "./AssignmentMessage";
 
-import EyeIcon from "../components/chat/EyeIcon";
-
-import EventModal from "../components/modals/EventModal";
-
-import GroupCalendarPanel from "../components/chat/GroupCalendarPanel";
-
-import InfoModal from "../components/modals/InfoModal";
-
-import MessageStatusInfoModal from "../components/modals/MessageStatusInfoModal";
-
-import AssignmentPostModal from "../components/modals/AssignmentPostModal";
-
-import ClassroomMatrixModal from "../components/modals/ClassroomMatrixModal";
-
-import ClassroomReportModal from "../components/modals/ClassroomReportModal";
-
-import MediaUploadButton from '../components/MediaUploadButton';
-
-import EmojiPicker from 'emoji-picker-react';
-
-import CameraCaptureModal from '../components/modals/CameraCaptureModal';
-
 import MediaMessage from '../components/chat/MediaMessage';
-import PendingMediaBubble from '../components/chat/PendingMediaBubble';
 import { createPackedPreview } from '../service/TinyPreview';
 import '../components/chat/messages.css';
+import { lazyModal } from '../utils/lazyModal';
 
-import MediaViewer from '../components/chat/MediaViewer';
-
-import MediaPreviewModal from '../components/chat/MediaPreviewModal';
-
-import Avatar from '../components/chat/Avatar';
-
-import ScheduleMessageModal from '../components/modals/ScheduleMessageModal';
-
-import ScheduledListModal from '../components/modals/ScheduledListModal';
-
-import CreatePollModal from '../components/modals/CreatePollModal';
-
-import PollWidget from '../components/chat/PollWidget';
-
-import AttachPulseModal from '../components/pulse/AttachPulseModal';
+const EventModal = lazyModal(() => import("../components/modals/EventModal"));
+const GroupCalendarPanel = lazyModal(() => import("../components/chat/GroupCalendarPanel"));
+const InfoModal = lazyModal(() => import("../components/modals/InfoModal"));
+const AddMemberModal = lazyModal(() => import("../components/modals/AddMemberModal"));
+const MessageStatusInfoModal = lazyModal(() => import("../components/modals/MessageStatusInfoModal"));
+const AssignmentPostModal = lazyModal(() => import("../components/modals/AssignmentPostModal"));
+const ClassroomMatrixModal = lazyModal(() => import("../components/modals/ClassroomMatrixModal"));
+const ClassroomReportModal = lazyModal(() => import("../components/modals/ClassroomReportModal"));
+const CameraCaptureModal = lazyModal(() => import('../components/modals/CameraCaptureModal'));
+const MediaViewer = lazyModal(() => import('../components/chat/MediaViewer'));
+const MediaPreviewModal = lazyModal(() => import('../components/chat/MediaPreviewModal'));
+const ScheduleMessageModal = lazyModal(() => import('../components/modals/ScheduleMessageModal'));
+const ScheduledListModal = lazyModal(() => import('../components/modals/ScheduledListModal'));
+const CreatePollModal = lazyModal(() => import('../components/modals/CreatePollModal'));
+const AttachPulseModal = lazyModal(() => import('../components/pulse/AttachPulseModal'));
+const ReactorsModal = lazyModal(() => import('../components/chat/ReactorsModal'));
+const ChatLegacyMediaOverlay = lazyModal(() => import('../components/chat/ChatLegacyMediaOverlay'));
+const ChatActionModals = lazyModal(() => import('../components/chat/ChatActionModals'));
 
 import simulationService from "../service/SimulationService";
 
@@ -163,731 +85,13 @@ import { SIMULATION_ID } from "../service/SimulationScript";
 
 import QuickAccessWheel from '../components/chat/QuickAccessWheel';
 
+import { uploadMedia, getFileCategory, getVideoThumbnail, getPdfThumbnail, compressImageBlob } from '../service/MediaUploader';
 
-
-import { uploadMedia, formatFileSize, getFileCategory, getVideoThumbnail, getPdfThumbnail, compressImageBlob } from '../service/MediaUploader';
-
-import { saveBlobToCache, getMediaInfo, getMediaBlob, renameCacheKey, memoryThumbCache } from '../service/MediaCache';
+import { saveBlobToCache, getMediaInfo, renameCacheKey } from '../service/MediaCache';
 
 import spaceStore from "../service/SpaceStore";
 
-import { Edit2 } from "lucide-react";
-
-const ImageEditor = React.lazy(() => import('../editor/ImageEditor'));
-
-
-
-const MARBLE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="48"><filter id="m" x="0" y="0" width="100%" height="100%"><feTurbulence type="turbulence" baseFrequency="0.018 0.06" numOctaves="2" seed="11"/><feColorMatrix values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 -1.6 0 0 0 0.42"/></filter><rect width="96" height="48" filter="url(#m)"/></svg>';
-
-const MARBLE_URL = `url("data:image/svg+xml,${encodeURIComponent(MARBLE_SVG)}")`;
-
-
-
-function getCurrentLocalDateTimeString() {
-
-  const now = new Date();
-
-
-
-  const year = now.getFullYear();
-
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-
-  const day = String(now.getDate()).padStart(2, '0');
-
-  const hours = String(now.getHours()).padStart(2, '0');
-
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-
-  const seconds = String(now.getSeconds()).padStart(2, '0');
-
-
-
-  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
-
-}
-
-
-
-
-
-const PulseQuoteCard = ({ repliedtoStr, isReceived }) => {
-
-  const isPulseReply = repliedtoStr.startsWith("PULSE_REPLY:");
-
-  const pulseId = repliedtoStr.split(":")[1];
-
-  const headerTitle = isPulseReply ? "Replied to Pulse" : "Tagged a Pulse";
-
-
-
-  const [pulseData, setPulseData] = useState(() => pulsePreviewCache.get(String(pulseId)) || null);
-
-
-
-  useEffect(() => {
-
-    if (!pulseData && pulseId) {
-
-      let isMounted = true;
-
-      getPulseFromStore(pulseId).then((res) => {
-
-        if (isMounted && res) {
-
-          setPulseData(res);
-
-        }
-
-      });
-
-      return () => { isMounted = false; };
-
-    }
-
-  }, [pulseId, pulseData]);
-
-
-
-  const mediaUrl = pulseData?.imageUrl || pulseData?.mediaUrl || (pulseData?.type !== 'text' ? pulseData?.content : null);
-
-  const isImageOrVideo = pulseData?.type === 'image' || pulseData?.type === 'video' || pulseData?.type === 'image_audio';
-
-
-
-  return (
-
-    <div
-
-      style={{
-
-        backgroundColor: isReceived ? "rgba(0,0,0,0.12)" : "var(--border-color)",
-
-        borderLeft: "3px solid var(--accent-color)",
-
-        padding: '6px 10px',
-
-        borderRadius: "6px",
-
-        marginBottom: "8px",
-
-        fontSize: '12px',
-
-        display: 'flex',
-
-        alignItems: 'center',
-
-        justify: 'space-between',
-
-        gap: '8px'
-
-      }}
-
-    >
-
-      <div style={{ flex: 1, minWidth: 0 }}>
-
-        <div style={{ fontWeight: "700", color: 'var(--accent-color)', marginBottom: "2px", display: 'flex', alignItems: 'center', gap: '4px' }}>
-
-          <span>{isPulseReply ? '💬 ' : '🏷️ '}{headerTitle}</span>
-
-        </div>
-
-        <div style={{ opacity: 0.9, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-
-          {pulseData ? (
-
-            pulseData.type === 'text'
-
-              ? (pulseData.content || 'Text Pulse')
-
-              : (pulseData.content || `${pulseData.type?.toUpperCase() || 'PULSE'} Story`)
-
-          ) : (
-
-            `Pulse #${pulseId}`
-
-          )}
-
-        </div>
-
-      </div>
-
-      {pulseData && isImageOrVideo && mediaUrl && (
-
-        <div style={{ width: '36px', height: '36px', borderRadius: '4px', overflow: 'hidden', flexShrink: 0, backgroundColor: '#000' }}>
-
-          <img src={mediaUrl} alt="Pulse Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-
-        </div>
-
-      )}
-
-    </div>
-
-  );
-
-};
-
-
-
-
-const R2_PUBLIC_URL = "https://pub-91d12b8ece574bde8ccd1c26b5367b6d.r2.dev/";
-const resolveChatMediaUrl = (val) => {
-  if (!val) return null;
-  const s = String(val).trim();
-  if (!s) return null;
-  if (s.startsWith('http://') || s.startsWith('https://') || s.startsWith('blob:') || s.startsWith('data:')) return s;
-  return `${R2_PUBLIC_URL}${s.replace(/^\/+/, '')}`;
-};
-
-const CachedMediaImage = ({ mediaId, optimisticUrl = null, alt = "", style = {} }) => {
-  const [imgError, setImgError] = useState(false);
-  const [src, setSrc] = useState(() => {
-    if (optimisticUrl) return optimisticUrl;
-    if (mediaId && memoryThumbCache.has(`${mediaId}_thumb`)) {
-      return memoryThumbCache.get(`${mediaId}_thumb`);
-    }
-    return null;
-  });
-
-  useEffect(() => {
-    let isMounted = true;
-    setImgError(false);
-    if (optimisticUrl) {
-      setSrc(optimisticUrl);
-      return;
-    }
-    if (!mediaId) {
-      setImgError(true);
-      return;
-    }
-
-    getMediaInfo(mediaId).then((info) => {
-      if (!isMounted) return null;
-      const rawKey = info?.thumbnailKey || info?.fileKey;
-      const fetchUrl = resolveChatMediaUrl(rawKey);
-      if (!fetchUrl) {
-        if (isMounted) setImgError(true);
-        return null;
-      }
-      const cacheKey = info?.thumbnailKey ? `${mediaId}_thumb` : `${mediaId}_full`;
-      const storeName = info?.thumbnailKey ? 'thumbCache' : 'mainCache';
-      return getMediaBlob(cacheKey, fetchUrl, storeName);
-    }).then((blobUrl) => {
-      if (isMounted) {
-        if (blobUrl) setSrc(blobUrl);
-        else if (!optimisticUrl) setImgError(true);
-      }
-    }).catch((err) => {
-      console.warn("CachedMediaImage failed to load blob:", err);
-      if (isMounted) setImgError(true);
-    });
-
-    return () => { isMounted = false; };
-  }, [mediaId, optimisticUrl]);
-
-  if (!src || imgError) {
-    return (
-      <div style={{ width: '100%', height: '100%', minHeight: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--border-color)', color: 'var(--text-secondary)', fontSize: '13px', borderRadius: '8px', ...style }}>
-        <span>Preview unavailable</span>
-      </div>
-    );
-  }
-  return <img src={src} alt={alt} onError={() => setImgError(true)} style={style} />;
-};
-
-const isEmojiReaction = (str) => {
-
-  if (!str || typeof str !== 'string') return false;
-
-  const trimmed = str.trim();
-
-  if (!trimmed) return false;
-
-  const emojiRegex = /^(?:[\p{Extended_Pictographic}\p{Emoji_Presentation}\u{1F1E6}-\u{1F1FF}](?:\uFE0F|\p{Emoji_Modifier})?(?:\u200D[\p{Extended_Pictographic}\p{Emoji_Presentation}\u{1F1E6}-\u{1F1FF}](?:\uFE0F|\p{Emoji_Modifier})?)*|[0-9#*]\uFE0F?\u20E3)+$/u;
-
-  return emojiRegex.test(trimmed);
-
-};
-
-
-
-const ReactorsModal = ({ reactionInfo, onClose, onSendReaction, isMobile }) => {
-
-  const [activeTab, setActiveTab] = useState('all');
-
-  const currentUserId = localStorage.getItem('userid');
-
-
-
-  useEffect(() => {
-
-    const handleKeyDown = (e) => {
-
-      if (e.key === 'Escape') onClose();
-
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-
-    return () => window.removeEventListener('keydown', handleKeyDown);
-
-  }, [onClose]);
-
-
-
-  if (!reactionInfo) return null;
-
-
-
-  const reactionsObj = reactionInfo.reactions || {};
-
-  const msgObj = reactionInfo.msg || {};
-
-
-
-  const validEntries = Object.entries(reactionsObj)
-
-    .filter(([_, reactors]) => Array.isArray(reactors) && reactors.length > 0)
-
-    .sort((a, b) => b[1].length - a[1].length);
-
-
-
-  const emojiEntries = validEntries.filter(([key]) => isEmojiReaction(key));
-
-  const textEntries = validEntries.filter(([key]) => !isEmojiReaction(key));
-
-  const textReactionsCount = textEntries.reduce((sum, [_, reactors]) => sum + reactors.length, 0);
-
-
-
-  const totalCount = validEntries.reduce((sum, [_, reactors]) => sum + reactors.length, 0);
-
-
-
-  let allItems = [];
-
-  validEntries.forEach(([emoji, reactors]) => {
-
-    const isEmoji = isEmojiReaction(emoji);
-
-    reactors.forEach(reactor => {
-
-      allItems.push({
-
-        emoji,
-
-        isEmoji,
-
-        userId: reactor.userId,
-
-        username: reactor.username,
-
-        profile: reactor.profile,
-
-        pulseStreak: reactor.pulseStreak
-
-      });
-
-    });
-
-  });
-
-
-
-  allItems.sort((a, b) => {
-
-    const isAMine = String(a.userId) === String(currentUserId);
-
-    const isBMine = String(b.userId) === String(currentUserId);
-
-    if (isAMine && !isBMine) return -1;
-
-    if (!isAMine && isBMine) return 1;
-
-    return 0;
-
-  });
-
-
-
-  const displayedItems = activeTab === 'all'
-
-    ? allItems
-
-    : activeTab === '__text_abc__'
-
-      ? allItems.filter(item => !item.isEmoji)
-
-      : allItems.filter(item => item.emoji === activeTab);
-
-
-
-  const handleRowClick = (item) => {
-
-    if (String(item.userId) === String(currentUserId) && msgObj) {
-
-      onSendReaction(msgObj, item.emoji);
-
-      onClose();
-
-    }
-
-  };
-
-
-
-  return (
-
-    <div
-
-      role="dialog"
-
-      aria-modal="true"
-
-      aria-label="Reactions"
-
-      style={{
-
-        position: 'fixed', inset: 0, zIndex: 99999,
-
-        display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center',
-
-        backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)'
-
-      }}
-
-      onClick={onClose}
-
-    >
-
-      <div
-
-        style={{
-
-          backgroundColor: 'var(--bg-card)',
-
-          border: '1px solid var(--border-color)',
-
-          borderTopLeftRadius: '20px',
-
-          borderTopRightRadius: '20px',
-
-          borderBottomLeftRadius: isMobile ? '0' : '20px',
-
-          borderBottomRightRadius: isMobile ? '0' : '20px',
-
-          padding: '16px',
-
-          width: '100%',
-
-          maxWidth: isMobile ? '100%' : '420px',
-
-          maxHeight: '75vh',
-
-          display: 'flex',
-
-          flexDirection: 'column',
-
-          gap: '12px',
-
-          boxShadow: '0 20px 50px rgba(0,0,0,0.5)'
-
-        }}
-
-        onClick={e => e.stopPropagation()}
-
-      >
-
-        <div style={{
-
-          width: '36px', height: '4px', borderRadius: '2px',
-
-          backgroundColor: 'var(--text-secondary)', opacity: 0.4,
-
-          margin: '0 auto 4px'
-
-        }} />
-
-
-
-        <div
-
-          role="tablist"
-
-          style={{
-
-            display: 'flex', gap: '8px', overflowX: 'auto',
-
-            paddingBottom: '4px', scrollbarWidth: 'none'
-
-          }}
-
-        >
-
-          <button
-
-            type="button"
-
-            role="tab"
-
-            aria-selected={activeTab === 'all'}
-
-            onClick={() => setActiveTab('all')}
-
-            style={{
-
-              padding: '6px 14px', borderRadius: '16px', fontSize: '12px', fontWeight: '700',
-
-              cursor: 'pointer', border: 'none', whiteSpace: 'nowrap',
-
-              background: activeTab === 'all' ? 'var(--accent-gradient)' : 'var(--bg-secondary)',
-
-              color: activeTab === 'all' ? '#ffffff' : 'var(--text-primary)'
-
-            }}
-
-          >
-
-            All {totalCount}
-
-          </button>
-
-          {emojiEntries.map(([emoji, reactors]) => (
-
-            <button
-
-              key={emoji}
-
-              type="button"
-
-              role="tab"
-
-              aria-selected={activeTab === emoji}
-
-              onClick={() => setActiveTab(emoji)}
-
-              style={{
-
-                padding: '6px 14px', borderRadius: '16px', fontSize: '12px', fontWeight: '700',
-
-                cursor: 'pointer', border: 'none', whiteSpace: 'nowrap',
-
-                background: activeTab === emoji ? 'var(--accent-gradient)' : 'var(--bg-secondary)',
-
-                color: activeTab === emoji ? '#ffffff' : 'var(--text-primary)'
-
-              }}
-
-            >
-
-              {emoji} {reactors.length}
-
-            </button>
-
-          ))}
-
-          {textReactionsCount > 0 && (
-
-            <button
-
-              type="button"
-
-              role="tab"
-
-              aria-selected={activeTab === '__text_abc__'}
-
-              onClick={() => setActiveTab('__text_abc__')}
-
-              style={{
-
-                padding: '6px 14px', borderRadius: '16px', fontSize: '12px', fontWeight: '700',
-
-                cursor: 'pointer', border: 'none', whiteSpace: 'nowrap',
-
-                background: activeTab === '__text_abc__' ? 'var(--accent-gradient)' : 'var(--bg-secondary)',
-
-                color: activeTab === '__text_abc__' ? '#ffffff' : 'var(--text-primary)'
-
-              }}
-
-            >
-
-              abc {textReactionsCount}
-
-            </button>
-
-          )}
-
-        </div>
-
-
-
-        <div style={{
-
-          flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px',
-
-          maxHeight: '340px', paddingRight: '2px'
-
-        }}>
-
-          {displayedItems.length === 0 ? (
-
-            <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-secondary)', fontSize: '13px' }}>
-
-              No reactions found.
-
-            </div>
-
-          ) : (
-
-            displayedItems.map((item, idx) => {
-
-              const isMine = String(item.userId) === String(currentUserId);
-
-              return (
-
-                <div
-
-                  key={`${item.userId}_${item.emoji}_${idx}`}
-
-                  onClick={() => handleRowClick(item)}
-
-                  style={{
-
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-
-                    padding: '8px 12px', borderRadius: '14px',
-
-                    backgroundColor: isMine ? 'var(--accent-tint)' : 'transparent',
-
-                    border: isMine ? '1px solid var(--accent-tint)' : '1px solid transparent',
-
-                    cursor: isMine ? 'pointer' : 'default',
-
-                    transition: 'background 0.15s ease'
-
-                  }}
-
-                  title={isMine ? 'Tap to remove your reaction' : undefined}
-
-                >
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
-
-                    <Avatar
-
-                      chat={{
-
-                        userId: item.userId,
-
-                        userName: item.username,
-
-                        profile: item.profile,
-
-                        pulseStreak: item.pulseStreak
-
-                      }}
-
-                      size={36}
-
-                      showStreak={true}
-
-                    />
-
-                    <div style={{ minWidth: 0 }}>
-
-                      <div style={{
-
-                        fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)',
-
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-
-                      }}>
-
-                        {isMine ? 'You' : (item.username || item.userId)}
-
-                      </div>
-
-                      {isMine && (
-
-                        <div style={{ fontSize: '10px', color: 'var(--danger-color)', fontWeight: '600', marginTop: '1px' }}>
-
-                          Tap to remove your reaction
-
-                        </div>
-
-                      )}
-
-                    </div>
-
-                  </div>
-
-
-
-                  {item.isEmoji ? (
-
-                    <span style={{ fontSize: '18px', flexShrink: 0 }}>
-
-                      {item.emoji}
-
-                    </span>
-
-                  ) : (
-
-                    <span style={{
-
-                      fontSize: '12px',
-
-                      fontWeight: '700',
-
-                      padding: '4px 10px',
-
-                      borderRadius: '999px',
-
-                      backgroundColor: 'var(--bg-secondary)',
-
-                      border: '1px solid var(--border-color)',
-
-                      color: 'var(--text-primary)',
-
-                      flexShrink: 0,
-
-                      maxWidth: '150px',
-
-                      overflow: 'hidden',
-
-                      textOverflow: 'ellipsis',
-
-                      whiteSpace: 'nowrap'
-
-                    }}>
-
-                      {String(item.emoji).slice(0, 15)}
-
-                    </span>
-
-                  )}
-
-                </div>
-
-              );
-
-            })
-
-          )}
-
-        </div>
-
-      </div>
-
-    </div>
-
-  );
-
-};
+const ImageEditor = lazyModal(() => import('../editor/ImageEditor'));
 
 
 
@@ -1022,25 +226,29 @@ const ChatBox = () => {
 
   }, [chatid]);
 
+  useEffect(() => {
+    const handleChatUpdated = (e) => {
+      const detail = e?.detail;
+      if (!detail || String(detail.chatId) !== String(chatid)) return;
+      setChat((prev) => (prev ? { ...prev, ...detail } : detail));
+    };
+    window.addEventListener('letschat_chat_updated', handleChatUpdated);
+    return () => window.removeEventListener('letschat_chat_updated', handleChatUpdated);
+  }, [chatid]);
+
   const { requestPermissionAndGetToken } = useNotifications();
 
   const currentUserId = localStorage.getItem('userid');
 
   const myDisplayName = localStorage.getItem('username') || currentUserId;
 
-  const [input, setInput] = useState("");
+  const composerRef = useRef(null);
 
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const inputDraftRef = useRef("");
 
   const [cameraOpen, setCameraOpen] = useState(false);
 
   const [isOnline, setIsOnline] = useState(false);
-
-  const emojiPickerRef = useRef(null);
-
-  const emojiButtonRef = useRef(null);
-
-  const [emojiPickerPos, setEmojiPickerPos] = useState({ bottom: 0, left: 0 });
 
   const location = useLocation();
 
@@ -1054,21 +262,9 @@ const ChatBox = () => {
 
 
 
-  // Mentions State
+  // Chat members for @mentions
 
   const [chatMembers, setChatMembers] = useState([]);
-
-  const [showMentions, setShowMentions] = useState(false);
-
-  const [mentionQuery, setMentionQuery] = useState("");
-
-  const [filteredMembers, setFilteredMembers] = useState([]);
-
-  const [mentionStartIndex, setMentionStartIndex] = useState(null);
-
-  const [mentionsPos, setMentionsPos] = useState({ bottom: 0, left: 0 });
-
-  const [activeMentions, setActiveMentions] = useState([]);
 
   const [spaceNames, setSpaceNames] = useState({});
 
@@ -1205,6 +401,8 @@ const ChatBox = () => {
     if (location.state?.openGroupCalendar || location.state?.selectedEvent) {
 
       if (location.state?.selectedEvent) {
+
+        setHasChanges(false);
 
         setSelectedEvent({ ...location.state.selectedEvent, chatid, isGroup: true });
 
@@ -1449,8 +647,6 @@ const ChatBox = () => {
   const [reactionPickerTarget, setReactionPickerTarget] = useState(null);
 
   const [reactionInfo, setReactionInfo] = useState(null);
-
-  const [customReactionText, setCustomReactionText] = useState('');
 
   const isMounted = useRef(true);
 
@@ -1792,177 +988,10 @@ const ChatBox = () => {
 
 
 
-  const URL_REGEX = /(https?:\/\/[^\s]+)/g;
-
-  const MENTION_REGEX = /(?:<|&lt;)@[^:]+:(?:.*?)(?:>|&gt;)/g;
-
-  const COMBINED_REGEX = /(https?:\/\/[^\s]+|(?:<|&lt;)@[^:]+:(?:.*?)(?:>|&gt;))/g;
-
-
-
-  const stripMentionEncoding = (text) => {
-
-    if (!text) return text;
-
-    return text.replace(/(?:<|&lt;)@[^:]+:(.*?)(?:>|&gt;)/g, '@$1');
-
-  };
-
-
-
-  const formatLanguageName = (raw) => {
-    if (!raw) return 'Code';
-    const low = raw.trim().toLowerCase();
-    const map = {
-      js: 'JavaScript',
-      javascript: 'JavaScript',
-      ts: 'TypeScript',
-      typescript: 'TypeScript',
-      jsx: 'JSX',
-      tsx: 'TSX',
-      html: 'HTML',
-      css: 'CSS',
-      json: 'JSON',
-      py: 'Python',
-      python: 'Python',
-      java: 'Java',
-      cpp: 'C++',
-      'c++': 'C++',
-      c: 'C',
-      cs: 'C#',
-      csharp: 'C#',
-      rb: 'Ruby',
-      ruby: 'Ruby',
-      go: 'Go',
-      rs: 'Rust',
-      rust: 'Rust',
-      php: 'PHP',
-      sql: 'SQL',
-      sh: 'Bash',
-      bash: 'Bash',
-      xml: 'XML',
-      yaml: 'YAML',
-      yml: 'YAML',
-      md: 'Markdown',
-    };
-    if (map[low]) return map[low];
-    return low.charAt(0).toUpperCase() + low.slice(1);
-  };
-
-  const renderInlineStyles = (rawText, keyPrefix = '') => {
-    if (!rawText) return null;
-    const tokens = rawText.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g);
-    return tokens.map((token, idx) => {
-      if (!token) return null;
-      if (token.startsWith('`') && token.endsWith('`') && token.length > 2) {
-        return <code key={`${keyPrefix}-code-${idx}`} className="msg-inline-code">{token.slice(1, -1)}</code>;
-      }
-      if (token.startsWith('**') && token.endsWith('**') && token.length > 4) {
-        return <strong key={`${keyPrefix}-b-${idx}`}>{token.slice(2, -2)}</strong>;
-      }
-      if (token.startsWith('*') && token.endsWith('*') && token.length > 2) {
-        return <em key={`${keyPrefix}-i-${idx}`}>{token.slice(1, -1)}</em>;
-      }
-      return token;
-    });
-  };
-
-  const renderFormattedText = (text) => {
-    if (!text) return null;
-
-    if (text.includes('```')) {
-      const codeBlockParts = text.split('```');
-      return codeBlockParts.map((part, index) => {
-        if (index % 2 === 1) {
-          const lines = part.split('\n');
-          let lang = 'Code';
-          let codeContent = part;
-          if (lines.length > 1 && lines[0].trim().length > 0 && !lines[0].includes(' ')) {
-            lang = formatLanguageName(lines[0].trim());
-            codeContent = lines.slice(1).join('\n');
-          }
-          return (
-            <div key={index} className="msg-code-block">
-              <div className="msg-code-header">
-                <span>{lang}</span>
-                <button
-                  type="button"
-                  className="msg-code-copy-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigator.clipboard.writeText(codeContent.trim());
-                    const btn = e.currentTarget;
-                    btn.innerText = 'Copied';
-                    setTimeout(() => { if (btn) btn.innerText = 'Copy'; }, 1500);
-                  }}
-                  aria-label={`Copy ${lang} code`}
-                >
-                  Copy
-                </button>
-              </div>
-              <pre className="msg-code-pre">
-                {codeContent.trim()}
-              </pre>
-            </div>
-          );
-        }
-        return renderLinkifiedText(part);
-      });
-    }
-
-    return renderLinkifiedText(text);
-  };
-
-  const renderLinkifiedText = (text) => {
-    if (!text) return null;
-    const parts = text.split(COMBINED_REGEX);
-    return parts.map((part, i) => {
-      if (!part) return null;
-      if (part.match(URL_REGEX)) {
-        const displayUrl = part.replace(/^https?:\/\//i, '');
-        return (
-          <span
-            key={i}
-            className="msg-link"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setActiveLinkMenu({
-                url: part,
-                x: e.clientX,
-                y: e.clientY
-              });
-            }}
-          >
-            {displayUrl}
-          </span>
-        );
-      } else if (part.match(MENTION_REGEX)) {
-        const match = part.match(/(?:<|&lt;)@([^:]+):(.*?)(?:>|&gt;)/);
-        if (match) {
-          const uid = match[1];
-          const name = match[2];
-          const isMe = uid === localStorage.getItem('userid');
-          return (
-            <span
-              key={i}
-              style={{
-                color: isMe ? 'var(--warning-color)' : 'var(--accent-text)',
-                fontWeight: isMe ? 'bold' : '600',
-                backgroundColor: isMe ? 'rgba(245, 158, 11, 0.15)' : 'var(--accent-tint)',
-                padding: '2px 6px',
-                borderRadius: '6px',
-                margin: '0 2px'
-              }}
-            >
-              @{name}
-            </span>
-          );
-        }
-      }
-      return renderInlineStyles(part, `txt-${i}`);
-    });
-  };
+  const renderFormattedText = useCallback(
+    (text) => renderFormattedChatText(text, { onLinkClick: setActiveLinkMenu }),
+    []
+  );
 
   const handleCopySelected = () => {
 
@@ -2468,44 +1497,6 @@ const ChatBox = () => {
 
 
 
-  // Close emoji picker on outside click
-
-  useEffect(() => {
-
-    if (!showEmojiPicker) return;
-
-    const close = (e) => {
-
-      if (
-
-        !emojiButtonRef.current?.contains(e.target) &&
-
-        !emojiPickerRef.current?.contains(e.target)
-
-      ) {
-
-        setShowEmojiPicker(false);
-
-      }
-
-    };
-
-    document.addEventListener('mousedown', close);
-
-    document.addEventListener('touchstart', close);
-
-    return () => {
-
-      document.removeEventListener('mousedown', close);
-
-      document.removeEventListener('touchstart', close);
-
-    };
-
-  }, [showEmojiPicker]);
-
-
-
   const sendReaction = (msg, text) => {
 
     const cleanText = typeof text === 'string' ? text.trim().slice(0, 15) : '';
@@ -2557,8 +1548,6 @@ const ChatBox = () => {
 
 
     setReactionPickerTarget(null);
-
-    setCustomReactionText('');
 
   };
 
@@ -3356,7 +2345,7 @@ const ChatBox = () => {
 
     idleTimerRef.current = setTimeout(() => {
 
-      if (!isRecording && input.trim().length === 0) {
+      if (!isRecording && inputDraftRef.current.trim().length === 0) {
 
         startPulsing('in-chat');
 
@@ -3626,163 +2615,14 @@ const ChatBox = () => {
 
 
 
-  function getCurrentLocalDateTimeString() {
-
-    const now = new Date();
-
-
-
-    const year = now.getFullYear();
-
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-
-    const day = String(now.getDate()).padStart(2, '0');
-
-    const hours = String(now.getHours()).padStart(2, '0');
-
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-
-    const seconds = String(now.getSeconds()).padStart(2, '0');
-
-
-
-    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
-
-  }
-
-
-
-  // --- Mentions Logic ---
-
-  const handleInputChange = (e) => {
-
-    const val = e.target.value;
-
-    setInput(val);
-
-    notifyActivity('typing');
-
-
-
-    // Mentions detection
-
-    if (chat?.type === 'group' || chat?.type === 'classroom' || chat?.type === 'room') {
-
-      const cursorPosition = e.target.selectionStart;
-
-      const textBeforeCursor = val.substring(0, cursorPosition);
-
-      
-
-      // Look for "@" preceded by space or start of string, followed by up to 30 characters
-
-      const match = textBeforeCursor.match(/(?:^|\s)@([A-Za-z0-9_ \-.]{0,30})$/);
-
-      if (match) {
-
-        setMentionStartIndex(cursorPosition - match[1].length - 1);
-
-        const query = match[1].toLowerCase();
-
-        setMentionQuery(query);
-
-        
-
-        // Filter members
-
-        const filtered = chatMembers.filter(m => 
-
-          (m.chatName || m.userName || m.username || '').toLowerCase().includes(query)
-
-        );
-
-        setFilteredMembers(filtered);
-
-        
-
-        if (inputRef.current) {
-
-          const rect = inputRef.current.getBoundingClientRect();
-
-          setMentionsPos({
-
-            bottom: window.innerHeight - rect.top + 16,
-
-            left: Math.max(8, rect.left - 4),
-
-          });
-
-        }
-
-        setShowMentions(true);
-
-      } else {
-
-        setShowMentions(false);
-
-      }
-
-    }
-
-  };
-
-
-
-  const handleSelectMention = (member) => {
-
-    if (mentionStartIndex !== null) {
-
-      const beforeMention = input.substring(0, mentionStartIndex);
-
-      const afterMention = input.substring(mentionStartIndex + mentionQuery.length + 1);
-
-
-
-      // Use plain text for the input box so the user sees a clean @Name
-
-      const name = member.chatName || member.userName || member.username;
-
-      const mentionText = `@${name}`;
-
-      
-
-      const newVal = beforeMention + mentionText + ' ' + afterMention;
-
-      setInput(newVal);
-
-      
-
-      // Store the active mention mapping for encoding when the message is sent
-
-      const userId = member.userId || member.userid || member.id;
-
-      setActiveMentions(prev => [...prev, { id: userId, name: name }]);
-
-      
-
-      // Set cursor pos
-
-      setTimeout(() => {
-
-        if (inputRef.current) {
-
-          const newPos = mentionStartIndex + mentionText.length + 1;
-
-          inputRef.current.setSelectionRange(newPos, newPos);
-
-          inputRef.current.focus();
-
-        }
-
-      }, 0);
-
-    }
-
-    setShowMentions(false);
-
-  };
-
-  // ----------------------
+  const handleDraftChange = useCallback((val) => {
+    inputDraftRef.current = val;
+  }, []);
+
+  const clearComposer = useCallback(() => {
+    composerRef.current?.clearDraft?.();
+    inputDraftRef.current = '';
+  }, []);
 
 
 
@@ -3858,47 +2698,78 @@ const ChatBox = () => {
 
 
 
-  const handleSendMessageClick = () => {
-
-    if (!input.trim() && !attachedPulse) return;
-
-
-
-    const isMediaUploading = activeUploads.current.size > 0;
-
-    if (isMediaUploading) {
-
-      setPendingTextMessage({
-
-        text: input,
-
-        mentions: [...activeMentions],
-
-        repliedto: repliedto
-
-      });
-
-      setShowMediaWaitModal(true);
-
+  const handleWaitForMedia = () => {
+    if (!pendingTextMessage) return;
+    const isStillUploading = activeUploads.current.size > 0;
+    if (!isStillUploading) {
+      const msgToSend = pendingTextMessage;
+      setShowMediaWaitModal(false);
+      setPendingTextMessage(null);
+      clearComposer();
+      sendMessage(msgToSend.text, msgToSend.mentions, msgToSend.repliedto, false);
     } else {
-
-      sendMessage();
-
+      const tempmsgid = uuidv4().toString();
+      const queuedMsg = {
+        tempmsgid,
+        chatid,
+        userid: localStorage.getItem('userid'),
+        sendername: myDisplayName,
+        type: 'text',
+        content: pendingTextMessage.text,
+        timestamp: getCurrentLocalDateTimeString(),
+        repliedto: pendingTextMessage.repliedto ? (pendingTextMessage.repliedto.msgid || pendingTextMessage.repliedto) : null,
+        forwardedfrom: null,
+        spaceid: activeSpace,
+        isQueuedForMedia: true,
+        status: 'waiting_for_upload',
+        rawMentions: pendingTextMessage.mentions,
+        text: pendingTextMessage.text,
+        mentions: pendingTextMessage.mentions,
+      };
+      messageStore.addMessage(queuedMsg);
+      queuedTextMessagesRef.current.push(queuedMsg);
+      setQueuedCount(queuedTextMessagesRef.current.length);
+      clearComposer();
+      setrepliedto(null);
+      setshowreplytomsg(false);
+      setShowMediaWaitModal(false);
+      setPendingTextMessage(null);
     }
-
   };
 
+  const handleSendAnywayMedia = () => {
+    if (!pendingTextMessage) return;
+    const msgToSend = pendingTextMessage;
+    setShowMediaWaitModal(false);
+    setPendingTextMessage(null);
+    clearComposer();
+    sendMessage(msgToSend.text, msgToSend.mentions, msgToSend.repliedto, false);
+  };
 
+  const handleSendMessageClick = (draftText, draftMentions = []) => {
+    const textValue = typeof draftText === 'string' ? draftText : inputDraftRef.current;
+    if (!textValue.trim() && !attachedPulse) return;
 
-  const sendMessage = async (overrideText = null, overrideMentions = null, overrideRepliedTo = null) => {
+    const isMediaUploading = activeUploads.current.size > 0;
+    if (isMediaUploading) {
+      setPendingTextMessage({
+        text: textValue,
+        mentions: Array.isArray(draftMentions) ? [...draftMentions] : [],
+        repliedto,
+      });
+      setShowMediaWaitModal(true);
+    } else {
+      const fallbackText = textValue.trim() ? textValue : (attachedPulse ? 'Check out this pulse!' : '');
+      sendMessage(fallbackText, draftMentions, undefined, true);
+    }
+  };
 
+  const sendMessage = async (overrideText = null, overrideMentions = null, overrideRepliedTo = null, shouldClearInput = false) => {
     const textToSend = typeof overrideText === 'string'
-
       ? overrideText
+      : (attachedPulse ? 'Check out this pulse!' : '');
 
-      : (input.trim() ? input : (attachedPulse ? "Check out this pulse!" : ""));
-
-    const mentionsToSend = Array.isArray(overrideMentions) ? overrideMentions : activeMentions;
+    const mentionsToSend = Array.isArray(overrideMentions) ? overrideMentions : [];
 
     const repliedtoToSend = overrideRepliedTo !== undefined && overrideRepliedTo !== null
 
@@ -4010,11 +2881,7 @@ const ChatBox = () => {
 
       setshowreplytomsg(false);
 
-      setShowEmojiPicker(false);
-
-      if (!overrideText) setInput("");
-
-      setActiveMentions([]);
+      if (shouldClearInput || !overrideText) clearComposer();
 
       sendIndicator('stop');
 
@@ -4450,20 +3317,6 @@ const ChatBox = () => {
 
   const timerIntervalRef = useRef(null);
 
-
-
-  const formatRecordingTime = (seconds) => {
-
-    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
-
-    const s = (seconds % 60).toString().padStart(2, '0');
-
-    return `${m}:${s}`;
-
-  };
-
-
-
   const startRecording = async () => {
 
     try {
@@ -4588,1362 +3441,6 @@ const ChatBox = () => {
 
 
 
-  // ── Shared input bar (emoji left, attach left, inside input box) ───────────
-
-  const toggleEmojiPicker = (e) => {
-
-    e?.stopPropagation();
-
-    if (!showEmojiPicker && emojiButtonRef.current) {
-
-      const rect = emojiButtonRef.current.getBoundingClientRect();
-
-      setEmojiPickerPos({
-
-        bottom: window.innerHeight - rect.top + 8,
-
-        left: Math.max(8, rect.left - 20),
-
-      });
-
-      setShowEmojiPicker(true);
-
-    } else {
-
-      setShowEmojiPicker(false);
-
-    }
-
-  };
-
-
-
-  const renderInputBar = () => (
-
-    <div style={{
-
-      display: 'flex',
-
-      flexDirection: 'column',
-
-      background: 'var(--bg-secondary)',
-
-      borderTop: '1px solid var(--border-color)',
-
-      position: 'sticky', bottom: 0,
-
-      width: '100%', boxSizing: 'border-box',
-
-      zIndex: 100,
-
-      overflow: 'visible'
-
-    }}>
-
-      {/* Reply Notify Banner (compact banner above input box) */}
-
-      {showReplyNotifyBanner && (
-
-        <div style={{
-
-          padding: isMobile ? '6px 8px 2px 8px' : '8px 20px 2px 20px',
-
-          width: '100%',
-
-          boxSizing: 'border-box'
-
-        }}>
-
-          <div style={{
-
-            display: 'flex',
-
-            alignItems: 'center',
-
-            justifyContent: 'space-between',
-
-            gap: '10px',
-
-            background: 'var(--bg-card)',
-
-            border: '1px solid var(--border-color)',
-
-            borderRadius: '16px',
-
-            padding: isMobile ? '4px 10px 4px 14px' : '5px 14px 5px 18px',
-
-            minHeight: '34px',
-
-            boxSizing: 'border-box',
-
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-
-            animation: 'muFadeIn 0.2s ease-out'
-
-          }}>
-
-            <span style={{
-
-              fontSize: isMobile ? '12px' : '13px',
-
-              fontWeight: '500',
-
-              color: 'var(--text-primary)',
-
-              whiteSpace: 'nowrap',
-
-              overflow: 'hidden',
-
-              textOverflow: 'ellipsis'
-
-            }}>
-
-              Want to be notified when you get a reply?
-
-            </span>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-
-              <button
-
-                type="button"
-
-                onClick={handleEnableReplyNotify}
-
-                style={{
-
-                  background: 'var(--border-color)',
-
-                  color: 'var(--text-primary)',
-
-                  border: '1px solid var(--border-color))',
-
-                  borderRadius: '8px',
-
-                  padding: '4px 12px',
-
-                  fontSize: '12.5px',
-
-                  fontWeight: '600',
-
-                  cursor: 'pointer',
-
-                  display: 'flex',
-
-                  alignItems: 'center',
-
-                  justifyContent: 'center',
-
-                  transition: 'background 0.15s ease',
-
-                  lineHeight: '1.2'
-
-                }}
-
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--border-color)'}
-
-                onMouseLeave={e => e.currentTarget.style.background = 'var(--border-color)'}
-
-              >
-
-                Notify
-
-              </button>
-
-              <button
-
-                type="button"
-
-                onClick={handleDismissReplyNotifyBanner}
-
-                style={{
-
-                  background: 'transparent',
-
-                  border: 'none',
-
-                  color: 'var(--danger-color)',
-
-                  cursor: 'pointer',
-
-                  padding: '4px',
-
-                  display: 'flex',
-
-                  alignItems: 'center',
-
-                  justifyContent: 'center',
-
-                  borderRadius: '6px',
-
-                  lineHeight: 1,
-
-                  transition: 'background 0.15s ease'
-
-                }}
-
-                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--danger-tint)'}
-
-                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-
-                title="Dismiss"
-
-                aria-label="Close"
-
-              >
-
-                <X size={16} color="var(--danger-color)" strokeWidth={2.5} />
-
-              </button>
-
-            </div>
-
-          </div>
-
-        </div>
-
-      )}
-
-
-
-      {/* Main Input Controls Row */}
-
-      <div style={{
-
-        display: 'flex',
-
-        alignItems: 'center',
-
-        gap: isMobile ? '6px' : '10px',
-
-        padding: isMobile ? '6px 10px 8px 8px' : '8px 20px 12px 20px',
-
-        paddingTop: showReplyNotifyBanner ? '2px' : (isMobile ? '8px' : '12px'),
-
-        paddingBottom: isMobile ? 'max(8px, env(safe-area-inset-bottom))' : '12px',
-
-        width: '100%',
-
-        boxSizing: 'border-box'
-
-      }}>
-
-      {/* Emoji picker — PORTAL position to escape stacking contexts and backdrop filters completely */}
-
-      {showEmojiPicker && createPortal(
-
-        <div
-
-          ref={emojiPickerRef}
-
-          onClick={(e) => e.stopPropagation()}
-
-          style={{
-
-            position: 'fixed',
-
-            bottom: `${emojiPickerPos.bottom}px`,
-
-            left: `${emojiPickerPos.left}px`,
-
-            zIndex: 999999,
-
-          }}
-
-        >
-
-          <style>{`
-
-            .epr-main { background: var(--bg-card) !important; border: 1px solid var(--border-color) !important; border-radius:16px !important; box-shadow: 0 16px 48px rgba(0,0,0,0.3) !important; }
-
-            .epr-category-nav { background: transparent !important; border-bottom: 1px solid var(--border-color) !important; }
-
-            .epr-search-container input { background: var(--bg-secondary) !important; border: 1px solid var(--border-color) !important; border-radius: 10px !important; color: var(--text-primary) !important; }
-
-            .epr-emoji-category-label { background: var(--bg-card) !important; color: var(--text-secondary) !important; font-size: 11px !important; }
-
-            .epr-btn:hover { background: var(--bg-hover) !important; }
-
-            .epr-skin-tones { display: none !important; }
-
-          `}</style>
-
-          <EmojiPicker
-
-            theme={theme === 'light' ? 'light' : 'dark'}
-
-            onEmojiClick={(d) => {
-
-              setInput(p => p + d.emoji);
-
-              inputRef.current?.focus();
-
-              notifyActivity('typing');
-
-            }}
-
-            height={360} width={310}
-
-            skinTonesDisabled
-
-            previewConfig={{ showPreview: false }}
-
-          />
-
-        </div>,
-
-        document.body
-
-      )}
-
-
-
-      {/* Dynamic Input Bar (Recording UI or Text UI) */}
-
-      {isRecording ? (
-
-        <div style={{
-
-          flex: 1,
-
-          minWidth: 0,
-
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-
-          background: 'var(--danger-tint)',
-
-          border: '1px solid var(--danger-tint-border)',
-
-          borderRadius: '24px',
-
-          padding: '2px 14px',
-
-          minHeight: '44px',
-
-          animation: 'muFadeIn 0.2s ease-out'
-
-        }}>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-
-            <div style={{
-
-              width: '10px', height: '10px', backgroundColor: 'var(--danger-color)',
-
-              borderRadius: '50%', animation: 'recordBlink 1s infinite'
-
-            }} />
-
-            <span style={{ color: 'var(--danger-color)', fontSize: '14.5px', fontWeight: '600', fontFamily: 'monospace' }}>
-
-              {formatRecordingTime(recordingTime)}
-
-            </span>
-
-          </div>
-
-
-
-          <button
-
-            onClick={() => stopRecording(true)}
-
-            style={{
-
-              background: 'transparent', border: 'none', color: 'var(--danger-color)',
-
-              cursor: 'pointer', display: 'flex', alignItems: 'center',
-
-              padding: '6px'
-
-            }}
-
-            title="Cancel Recording"
-
-          >
-
-            <Trash2 size={18} />
-
-          </button>
-
-        </div>
-
-      ) : (
-
-        <div style={{
-
-          flex: 1,
-
-          minWidth: 0,
-
-          display: 'flex', alignItems: 'center',
-
-          background: 'var(--bg-card)',
-
-          border: '1px solid var(--border-color)',
-
-          borderRadius: '24px',
-
-          padding: isMobile ? '2px 6px 2px 4px' : '2px 8px 2px 6px',
-
-          minHeight: '44px',
-
-          transition: 'all 0.2s ease',
-
-        }}>
-
-          {/* Emoji button */}
-
-          <div
-
-            ref={emojiButtonRef}
-
-            onClick={toggleEmojiPicker}
-
-            title="Emoji"
-
-            style={{
-
-              cursor: 'pointer', flexShrink: 0,
-
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-
-              minWidth: '44px', minHeight: '44px', width: isMobile ? '36px' : '40px', height: isMobile ? '36px' : '40px', borderRadius: '50%',
-
-              color: showEmojiPicker ? 'var(--accent-color)' : 'var(--text-secondary)',
-
-              transition: 'all 0.2s ease',
-
-            }}
-
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
-
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-
-          >
-
-            <Smile size={isMobile ? 18 : 20} strokeWidth={2.5} />
-
-          </div>
-
-
-
-          {/* Attach button */}
-
-          <MediaUploadButton
-
-            onUploadComplete={sendMediaMessage}
-
-            onFileSelect={setPendingMediaFile}
-
-            onError={err => toast.error('Upload failed: ' + err.message)}
-
-            onCameraClick={handleCameraClick}
-
-            onPollClick={() => setShowPollModal(true)}
-
-            onPulseClick={() => setShowAttachPulseModal(true)}
-
-            onScheduleClick={() => {
-
-              setScheduleEditData(null);
-
-              setShowScheduleModal(true);
-
-            }}
-
-            style={{
-
-              flexShrink: 0,
-
-              color: 'var(--text-secondary)',
-
-              width: isMobile ? '32px' : '36px', height: isMobile ? '32px' : '36px',
-
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-
-              borderRadius: '50%',
-
-              transition: 'all 0.2s ease'
-
-            }}
-
-          />
-
-
-
-          {/* Mentions Dropdown - PORTAL position to completely escape stacking contexts and overflow clipping */}
-
-          {showMentions && filteredMembers.length > 0 && createPortal(
-
-            <div style={{
-
-              position: 'fixed',
-
-              bottom: `${mentionsPos.bottom}px`,
-
-              left: `${mentionsPos.left}px`,
-
-              background: 'var(--bg-card)',
-
-              border: '1px solid var(--border-color)',
-
-              borderRadius: '16px',
-
-              padding: '8px',
-
-              width: '240px',
-
-              maxHeight: '260px',
-
-              overflowY: 'auto',
-
-              boxShadow: '0 16px 48px rgba(0,0,0,0.7)',
-
-              zIndex: 999999,
-
-              display: 'flex',
-
-              flexDirection: 'column',
-
-              animation: 'slideInRight 0.2s ease-out'
-
-            }}>
-
-              {filteredMembers.map((member, i) => (
-
-                <button
-
-                  key={member.id || member.userId || member.userid}
-
-                  onClick={() => handleSelectMention(member)}
-
-                  style={{
-
-                    display: 'flex', alignItems: 'center', gap: '14px',
-
-                    width: '100%', padding: '10px 14px',
-
-                    background: 'transparent', border: 'none',
-
-                    borderRadius: '10px', cursor: 'pointer',
-
-                    color: 'var(--text-primary)', fontSize: '14px', fontWeight: '500',
-
-                    textAlign: 'left',
-
-                    marginBottom: i < filteredMembers.length - 1 ? '2px' : 0,
-
-                  }}
-
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-hover)'}
-
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-
-                >
-
-                  <div style={{
-
-                    width: '38px', height: '38px', borderRadius: '50%',
-
-                    background: 'var(--accent-tint)',
-
-                    border: '1.5px solid var(--accent-tint)',
-
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-
-                    color: 'var(--accent-text)', flexShrink: 0, fontSize: '14px', fontWeight: 'bold'
-
-                  }}>
-
-                    {(member.chatName || member.userName || member.username || '?').charAt(0).toUpperCase()}
-
-                  </div>
-
-                  <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-
-                    {member.chatName || member.userName || member.username}
-
-                  </div>
-
-                </button>
-
-              ))}
-
-            </div>,
-
-            document.body
-
-          )}
-
-
-
-          {/* Text input */}
-
-          <input
-
-            ref={inputRef}
-
-            value={input}
-
-            onChange={handleInputChange}
-
-            placeholder="Type a message..."
-
-            onKeyDown={(e) => {
-
-              if (e.key === 'Enter' && input.trim()) handleSendMessageClick();
-
-              if (e.key === 'Escape') setShowEmojiPicker(false);
-
-            }}
-
-            style={{
-
-              flex: 1, background: 'transparent', border: 'none', outline: 'none',
-
-              fontSize: '16px', color: 'var(--text-primary)',
-
-              padding: isMobile ? '8px 8px 8px 4px' : '10px 10px 10px 6px', minWidth: 0,
-
-            }}
-
-          />
-
-        </div>
-
-      )}
-
-
-
-      {/* Send or Mic button */}
-
-      <button
-
-        onClick={isRecording ? () => stopRecording(false) : (input.trim() ? handleSendMessageClick : startRecording)}
-
-        style={{
-
-          background: isRecording ? 'var(--success-color)' : (input.trim() ? 'var(--accent-text)' : 'var(--success-color)'),
-
-          color: 'white',
-
-          border: 'none',
-
-          padding: 0,
-
-          borderRadius: '50%',
-
-          width: isMobile ? '40px' : '44px',
-
-          height: isMobile ? '40px' : '44px',
-
-          flexShrink: 0,
-
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-
-          cursor: 'pointer',
-
-          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-
-          transform: isRecording ? 'scale(1.08)' : 'scale(1)',
-
-          transformOrigin: 'center center',
-
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-
-          marginRight: isMobile ? '2px' : '0',
-
-        }}
-
-        onMouseEnter={e => e.currentTarget.style.transform = isRecording ? 'scale(1.12)' : 'scale(1.04)'}
-
-        onMouseLeave={e => e.currentTarget.style.transform = isRecording ? 'scale(1.08)' : 'scale(1)'}
-
-        title={isRecording ? "Send Voice Note" : (input.trim() ? "Send Message" : "Record Voice Note")}
-
-      >
-
-        {isRecording ? <ArrowUp size={isMobile ? 22 : 24} /> : (input.trim() ? <ArrowUp size={isMobile ? 22 : 24} /> : <Mic size={isMobile ? 18 : 20} />)}
-
-      </button>
-
-      </div>
-
-
-
-      {/* Queued Messages Status Pill */}
-
-      {queuedCount > 0 && (
-
-        <div style={{
-
-          position: 'absolute', bottom: '100%', left: '16px', right: '16px', marginBottom: '8px',
-
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-
-          padding: '8px 14px',
-
-          backgroundColor: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)',
-
-          borderRadius: '14px', fontSize: '13px', color: 'var(--warning-color)', backdropFilter: 'blur(8px)',
-
-          boxShadow: '0 4px 14px rgba(0,0,0,0.3)', zIndex: 101
-
-        }}>
-
-          <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '600' }}>
-
-            <Clock size={15} /> {queuedCount} message{queuedCount > 1 ? 's' : ''} waiting for media upload...
-
-          </span>
-
-          <button
-
-            type="button"
-
-            onClick={flushQueuedTextMessages}
-
-            style={{
-
-              background: 'var(--warning-color)', border: 'none', borderRadius: '8px', color: '#000',
-
-              padding: '4px 12px', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
-
-              boxShadow: '0 2px 8px rgba(245, 158, 11, 0.3)'
-
-            }}
-
-          >
-
-            Send Now
-
-          </button>
-
-        </div>
-
-      )}
-
-
-
-      {/* Media Upload Options Modal (Wait for Media vs Send Anyway) */}
-
-      {showMediaWaitModal && pendingTextMessage && createPortal(
-
-        <div
-
-          onClick={() => setShowMediaWaitModal(false)}
-
-          style={{
-
-            position: 'fixed', inset: 0, zIndex: 999999,
-
-            backgroundColor: 'rgba(0, 0, 0, 0.65)', backdropFilter: 'blur(4px)',
-
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-
-            padding: '16px'
-
-          }}
-
-        >
-
-          <div
-
-            onClick={e => e.stopPropagation()}
-
-            style={{
-
-              backgroundColor: 'var(--bg-card)',
-
-              border: '1px solid var(--border-color)',
-
-              borderRadius: '20px',
-
-              padding: isMobile ? '18px 16px' : '24px',
-
-              maxWidth: '420px',
-
-              width: '100%',
-
-              maxHeight: '90vh',
-
-              overflowY: 'auto',
-
-              boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
-
-              display: 'flex',
-
-              flexDirection: 'column',
-
-              gap: '16px',
-
-              animation: 'muFadeIn 0.2s ease-out'
-
-            }}
-
-          >
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-
-              <div style={{
-
-                width: '42px', height: '42px', borderRadius: '50%',
-
-                backgroundColor: 'rgba(245, 158, 11, 0.15)',
-
-                color: 'var(--warning-color)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-
-                flexShrink: 0
-
-              }}>
-
-                <Clock size={22} />
-
-              </div>
-
-              <div>
-
-                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: 'var(--text-primary)' }}>
-
-                  Media Uploading in Progress
-
-                </h3>
-
-                <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
-
-                  A media file is currently uploading. How would you like to send this message?
-
-                </p>
-
-              </div>
-
-            </div>
-
-
-
-            {/* Message Preview Box */}
-
-            <div style={{
-
-              padding: '12px 14px',
-
-              borderRadius: '12px',
-
-              backgroundColor: 'var(--bg-secondary)',
-
-              border: '1px solid var(--border-color)',
-
-              fontSize: '14px',
-
-              color: 'var(--text-primary)',
-
-              wordBreak: 'break-word',
-
-              maxHeight: '100px',
-
-              overflowY: 'auto'
-
-            }}>
-
-              "{pendingTextMessage.text}"
-
-            </div>
-
-
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
-
-              {/* Option A: Wait for Media */}
-
-              <button
-
-                type="button"
-
-                onClick={() => {
-
-                  const isStillUploading = activeUploads.current.size > 0;
-
-                  if (!isStillUploading) {
-
-                    // Edge case: Upload completed while the modal was open! Send immediately!
-
-                    const msgToSend = pendingTextMessage;
-
-                    setShowMediaWaitModal(false);
-
-                    setPendingTextMessage(null);
-
-                    setInput("");
-
-                    setActiveMentions([]);
-
-                    sendMessage(msgToSend.text, msgToSend.mentions, msgToSend.repliedto);
-
-                  } else {
-
-                    const tempmsgid = uuidv4().toString();
-
-                    const queuedMsg = {
-
-                      tempmsgid,
-
-                      chatid,
-
-                      userid: localStorage.getItem('userid'),
-
-                      sendername: myDisplayName,
-
-                      type: "text",
-
-                      content: pendingTextMessage.text,
-
-                      timestamp: getCurrentLocalDateTimeString(),
-
-                      repliedto: pendingTextMessage.repliedto ? (pendingTextMessage.repliedto.msgid || pendingTextMessage.repliedto) : null,
-
-                      forwardedfrom: null,
-
-                      spaceid: activeSpace,
-
-                      isQueuedForMedia: true,
-
-                      status: 'waiting_for_upload',
-
-                      rawMentions: pendingTextMessage.mentions,
-
-                      text: pendingTextMessage.text,
-
-                      mentions: pendingTextMessage.mentions
-
-                    };
-
-
-
-                    messageStore.addMessage(queuedMsg);
-
-                    queuedTextMessagesRef.current.push(queuedMsg);
-
-                    setQueuedCount(queuedTextMessagesRef.current.length);
-
-                    setInput("");
-
-                    setActiveMentions([]);
-
-                    setrepliedto(null);
-
-                    setshowreplytomsg(false);
-
-                    setShowMediaWaitModal(false);
-
-                    setPendingTextMessage(null);
-
-                  }
-
-                }}
-
-                style={{
-
-                  display: 'flex', alignItems: 'center', gap: '12px',
-
-                  padding: '14px 16px', borderRadius: '14px',
-
-                  backgroundColor: 'var(--bg-secondary)',
-
-                  border: '1.5px solid var(--border-color)',
-
-                  color: 'var(--text-primary)', cursor: 'pointer',
-
-                  textAlign: 'left', transition: 'all 0.2s ease'
-
-                }}
-
-                onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent-color)'}
-
-                onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border-color)'}
-
-              >
-
-                <div style={{
-
-                  width: '36px', height: '36px', borderRadius: '50%',
-
-                  backgroundColor: 'var(--accent-tint)', color: 'var(--accent-text)',
-
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-
-                }}>
-
-                  <Clock size={18} />
-
-                </div>
-
-                <div>
-
-                  <div style={{ fontWeight: '600', fontSize: '14.5px' }}>⏳ Wait for Media</div>
-
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-
-                    Hold message until media upload completes to preserve exact order.
-
-                  </div>
-
-                </div>
-
-              </button>
-
-
-
-              {/* Option B: Send Anyway */}
-
-              <button
-
-                type="button"
-
-                onClick={() => {
-
-                  const msgToSend = pendingTextMessage;
-
-                  setShowMediaWaitModal(false);
-
-                  setPendingTextMessage(null);
-
-                  setInput("");
-
-                  setActiveMentions([]);
-
-                  sendMessage(msgToSend.text, msgToSend.mentions, msgToSend.repliedto);
-
-                }}
-
-                style={{
-
-                  display: 'flex', alignItems: 'center', gap: '12px',
-
-                  padding: '14px 16px', borderRadius: '14px',
-
-                  backgroundColor: 'var(--accent-color)',
-
-                  border: 'none',
-
-                  color: '#ffffff', cursor: 'pointer',
-
-                  textAlign: 'left', transition: 'all 0.2s ease',
-
-                  boxShadow: '0 4px 14px color-mix(in srgb, var(--accent-solid) 45%, transparent)'
-
-                }}
-
-              >
-
-                <div style={{
-
-                  width: '36px', height: '36px', borderRadius: '50%',
-
-                  backgroundColor: 'rgba(255, 255, 255, 0.2)', color: '#ffffff',
-
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-
-                }}>
-
-                  <Send size={18} />
-
-                </div>
-
-                <div>
-
-                  <div style={{ fontWeight: '700', fontSize: '14.5px' }}>🚀 Send Anyway</div>
-
-                  <div style={{ fontSize: '12px', opacity: 0.9, marginTop: '2px' }}>
-
-                    Bypass media upload and send text message right now.
-
-                  </div>
-
-                </div>
-
-              </button>
-
-            </div>
-
-          </div>
-
-        </div>,
-
-        document.body
-
-      )}
-
-
-
-      {/* Selected Queued Message Action Modal (Send Now vs Delete) */}
-
-      {selectedQueuedMsg && createPortal(
-
-        <div
-
-          onClick={() => setSelectedQueuedMsg(null)}
-
-          style={{
-
-            position: 'fixed', inset: 0, zIndex: 999999,
-
-            backgroundColor: 'rgba(0, 0, 0, 0.65)', backdropFilter: 'blur(4px)',
-
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-
-            padding: '16px'
-
-          }}
-
-        >
-
-          <div
-
-            onClick={e => e.stopPropagation()}
-
-            style={{
-
-              backgroundColor: 'var(--bg-card)',
-
-              border: '1px solid var(--border-color)',
-
-              borderRadius: '20px',
-
-              padding: isMobile ? '18px 16px' : '24px',
-
-              maxWidth: '400px',
-
-              width: '100%',
-
-              boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
-
-              display: 'flex',
-
-              flexDirection: 'column',
-
-              gap: '16px',
-
-              animation: 'muFadeIn 0.2s ease-out'
-
-            }}
-
-          >
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-
-              <div style={{
-
-                width: '42px', height: '42px', borderRadius: '50%',
-
-                backgroundColor: 'rgba(245, 158, 11, 0.15)',
-
-                color: 'var(--warning-color)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-
-                flexShrink: 0
-
-              }}>
-
-                <Clock size={22} />
-
-              </div>
-
-              <div>
-
-                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: 'var(--text-primary)' }}>
-
-                  Queued Message Options
-
-                </h3>
-
-                <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
-
-                  This message is currently waiting for media upload to finish.
-
-                </p>
-
-              </div>
-
-            </div>
-
-
-
-            {/* Message Content Preview */}
-
-            <div style={{
-
-              padding: '12px 14px',
-
-              borderRadius: '12px',
-
-              backgroundColor: 'var(--bg-secondary)',
-
-              border: '1px solid var(--border-color)',
-
-              fontSize: '14px',
-
-              color: 'var(--text-primary)',
-
-              wordBreak: 'break-word',
-
-              maxHeight: '100px',
-
-              overflowY: 'auto'
-
-            }}>
-
-              "{selectedQueuedMsg.content || selectedQueuedMsg.text}"
-
-            </div>
-
-
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
-
-              {/* Option A: Send Now */}
-
-              <button
-
-                type="button"
-
-                onClick={() => handleSendQueuedNow(selectedQueuedMsg)}
-
-                style={{
-
-                  display: 'flex', alignItems: 'center', gap: '12px',
-
-                  padding: '14px 16px', borderRadius: '14px',
-
-                  backgroundColor: 'var(--accent-color)',
-
-                  border: 'none',
-
-                  color: '#ffffff', cursor: 'pointer',
-
-                  textAlign: 'left', transition: 'all 0.2s ease',
-
-                  boxShadow: '0 4px 14px color-mix(in srgb, var(--accent-solid) 45%, transparent)'
-
-                }}
-
-              >
-
-                <div style={{
-
-                  width: '36px', height: '36px', borderRadius: '50%',
-
-                  backgroundColor: 'rgba(255, 255, 255, 0.2)', color: '#ffffff',
-
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-
-                }}>
-
-                  <Send size={18} />
-
-                </div>
-
-                <div>
-
-                  <div style={{ fontWeight: '700', fontSize: '14.5px' }}>🚀 Send Now (Send Anyway)</div>
-
-                  <div style={{ fontSize: '12px', opacity: 0.9, marginTop: '2px' }}>
-
-                    Release from queue and send over WebSocket immediately.
-
-                  </div>
-
-                </div>
-
-              </button>
-
-
-
-              {/* Option B: Delete Message */}
-
-              <button
-
-                type="button"
-
-                onClick={() => handleDeleteQueued(selectedQueuedMsg)}
-
-                style={{
-
-                  display: 'flex', alignItems: 'center', gap: '12px',
-
-                  padding: '14px 16px', borderRadius: '14px',
-
-                  backgroundColor: 'var(--danger-tint)',
-
-                  border: '1px solid var(--danger-tint)',
-
-                  color: 'var(--danger-color)', cursor: 'pointer',
-
-                  textAlign: 'left', transition: 'all 0.2s ease'
-
-                }}
-
-              >
-
-                <div style={{
-
-                  width: '36px', height: '36px', borderRadius: '50%',
-
-                  backgroundColor: 'var(--danger-tint)', color: 'var(--danger-color)',
-
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-
-                }}>
-
-                  <Trash2 size={18} />
-
-                </div>
-
-                <div>
-
-                  <div style={{ fontWeight: '700', fontSize: '14.5px' }}>🗑️ Delete Message</div>
-
-                  <div style={{ fontSize: '12px', opacity: 0.85, marginTop: '2px' }}>
-
-                    Cancel this message and remove it from chat.
-
-                  </div>
-
-                </div>
-
-              </button>
-
-            </div>
-
-          </div>
-
-        </div>,
-
-        document.body
-
-      )}
-
-
-
-      <style>{`
-
-        @keyframes recordBlink {
-
-          0% { opacity: 1; transform: scale(1); }
-
-          50% { opacity: 0.4; transform: scale(0.9); }
-
-          100% { opacity: 1; transform: scale(1); }
-
-        }
-
-      `}</style>
-
-    </div>
-
-  );
-
-
-
   const bottomRef = useRef(null);
 
 
@@ -6040,88 +3537,6 @@ const ChatBox = () => {
 
 
 
-  const formatTime12Hour = (timestamp, showSeconds = false) => {
-
-    if (!timestamp) return '';
-
-    if (typeof timestamp === 'string' && /^(0?[1-9]|1[0-2]):[0-5][0-9]\s*(AM|PM)$/i.test(timestamp.trim())) {
-
-      return timestamp.trim().toUpperCase();
-
-    }
-
-    try {
-
-      let d;
-
-      if (typeof timestamp === 'number') {
-
-        d = new Date(timestamp < 1e11 ? timestamp * 1000 : timestamp);
-
-      } else if (typeof timestamp === 'string') {
-
-        const trimmed = timestamp.trim();
-
-        if (/^\d+(\.\d+)?$/.test(trimmed)) {
-
-          const num = parseFloat(trimmed);
-
-          d = new Date(num < 1e11 ? num * 1000 : num);
-
-        } else if (trimmed.includes('T') || trimmed.includes('-')) {
-
-          let str = trimmed;
-
-          if (!str.endsWith('Z') && !/[+-]\d{2}(:?\d{2})?$/.test(str)) {
-
-            str = str.replace(' ', 'T') + '+05:30';
-
-          }
-
-          d = new Date(str);
-
-        } else if (trimmed.includes(',') && /^\[?\d{4},/.test(trimmed)) {
-          const parts = trimmed.replace(/^\[|\]$/g, '').split(',').map(n => parseInt(n.trim(), 10)).filter(n => !isNaN(n));
-          if (parts.length >= 3) {
-            const utcMs = Date.UTC(parts[0], (parts[1] || 1) - 1, parts[2] || 1, parts[3] || 0, parts[4] || 0, parts[5] || 0);
-            d = new Date(utcMs - 19800000);
-          }
-        } else {
-          d = new Date(timestamp);
-        }
-      } else if (Array.isArray(timestamp) && timestamp.length >= 3) {
-        const utcMs = Date.UTC(timestamp[0], (timestamp[1] || 1) - 1, timestamp[2] || 1, timestamp[3] || 0, timestamp[4] || 0, timestamp[5] || 0);
-        d = new Date(utcMs - 19800000);
-      } else {
-        d = new Date(timestamp);
-      }
-
-
-
-      if (isNaN(d.getTime())) return String(timestamp);
-
-      return new Intl.DateTimeFormat('en-IN', {
-
-        timeZone: 'Asia/Kolkata',
-
-        hour: 'numeric',
-
-        minute: '2-digit',
-
-        second: showSeconds ? '2-digit' : undefined,
-
-        hour12: true
-
-      }).format(d);
-
-    } catch (e) {
-
-      return String(timestamp);
-
-    }
-
-  };
-
 
 
   const [visited, setVisited] = useState(() => {
@@ -6159,80 +3574,6 @@ const ChatBox = () => {
   };
 
 
-
-  const formatDateWithLabel = (timestamp) => {
-
-    const messageDate = new Date(timestamp);
-
-    const today = new Date();
-
-    const yesterday = new Date();
-
-    yesterday.setDate(today.getDate() - 1);
-
-
-
-    const isSameDay = (d1, d2) =>
-
-      d1.getDate() === d2.getDate() &&
-
-      d1.getMonth() === d2.getMonth() &&
-
-      d1.getFullYear() === d2.getFullYear();
-
-
-
-    if (isSameDay(messageDate, today)) {
-
-      return `Today, ${messageDate.toLocaleDateString("en-IN", {
-
-        day: "numeric",
-
-        month: "short",
-
-        year: "numeric",
-
-      })}`;
-
-    } else if (isSameDay(messageDate, yesterday)) {
-
-      return `Yesterday, ${messageDate.toLocaleDateString("en-IN", {
-
-        day: "numeric",
-
-        month: "short",
-
-        year: "numeric",
-
-      })}`;
-
-    } else {
-
-      return messageDate.toLocaleDateString("en-IN", {
-
-        weekday: "long",
-
-        day: "numeric",
-
-        month: "short",
-
-        year: "numeric",
-
-      });
-
-    }
-
-  };
-
-
-
-  const getDateOnly = (timestamp) => {
-
-    return new Date(timestamp).toISOString().split("T")[0];
-
-  };
-
-  let lastdate = "";
 
   const [chatnames, setchatnames] = useState([]);
 
@@ -7150,8 +4491,6 @@ const ChatBox = () => {
 
   const [hasChanges, setHasChanges] = useState(false);
 
-  const [showSaveDialog, setShowSaveDialog] = useState(false)
-
   const [showCancelDialog, setShowCancelDialog] = useState(false);
 
   const handleConfirmCancelEvent = async () => {
@@ -7227,126 +4566,6 @@ const ChatBox = () => {
 
 
   const [draftEvent, setDraftEvent] = useState(null);
-
-
-
-  const saveChanges = async () => {
-
-    if (!draftEvent) return;
-
-    const targetChatId = draftEvent.chatid || draftEvent.chatId || chatid;
-
-    const isNewGroupEvent = !draftEvent.id && !draftEvent.eventId && !draftEvent.groupEventId && targetChatId;
-
-
-
-    if (isNewGroupEvent) {
-
-      try {
-
-        const dateStr = typeof draftEvent.date === 'string' ? draftEvent.date : new Date(draftEvent.date).toISOString().split('T')[0];
-
-        const startIso = draftEvent.startTime && String(draftEvent.startTime).includes('T')
-
-          ? draftEvent.startTime
-
-          : new Date(`${dateStr}T${draftEvent.startTime || '10:00'}:00`).toISOString();
-
-        const endIso = draftEvent.endTime && String(draftEvent.endTime).includes('T')
-
-          ? draftEvent.endTime
-
-          : new Date(`${dateStr}T${draftEvent.endTime || '11:00'}:00`).toISOString();
-
-
-
-        const payload = {
-
-          chatId: targetChatId,
-
-          eventTitle: (draftEvent.title || draftEvent.eventTitle || 'Event').trim(),
-
-          eventDetails: draftEvent.description || draftEvent.eventDetails || '',
-
-          eventColor: draftEvent.color || '#3b82f6',
-
-          startTime: startIso,
-
-          endTime: endIso,
-
-          scope: draftEvent.scope || 'ALL',
-
-          isGroupVisible: draftEvent.isGroupVisible !== false,
-
-          meetingType: draftEvent.meetingType || 'online',
-
-          meetingLink: draftEvent.meetingLink?.trim() || null,
-
-          location: draftEvent.location?.trim() || null,
-
-          reminderOffset: draftEvent.reminderOffset || 60,
-
-          action: 'scheduled'
-
-        };
-
-
-
-        const res = await fetch(`${API}/user/event/create`, {
-
-          method: 'POST',
-
-          headers: {
-
-            'Content-Type': 'application/json',
-
-            'User-Id': currentUserId || localStorage.getItem('userid'),
-
-            'ngrok-skip-browser-warning': 'true'
-
-          },
-
-          body: JSON.stringify(payload)
-
-        });
-
-
-
-        if (res.ok) {
-
-          window.dispatchEvent(new CustomEvent('letschat_refresh_events'));
-
-          window.dispatchEvent(new CustomEvent('letschat_event_sync', { detail: { chatId: targetChatId } }));
-
-        }
-
-      } catch (err) {
-
-        console.error('Failed to create group event on save:', err);
-
-      }
-
-      setDraftEvent(null);
-
-      setShowEventModal(false);
-
-      setShowGroupCalendar(true);
-
-      return;
-
-    }
-
-
-
-    const dateKey = typeof draftEvent.date === 'string' ? draftEvent.date : draftEvent.date.toISOString().split('T')[0];
-
-    updateEvent(dateKey, draftEvent);
-
-    console.log(draftEvent);
-
-    update(draftEvent);
-
-  }
 
 
 
@@ -7568,82 +4787,6 @@ const ChatBox = () => {
 
 
 
-  const isWithin24Hours = useCallback((timestamp) => {
-
-    if (!timestamp) return false;
-
-    const msgTime = new Date(timestamp).getTime();
-
-    if (isNaN(msgTime)) return false;
-
-    const elapsed = Date.now() - msgTime;
-
-    return elapsed >= 0 && elapsed < 24 * 60 * 60 * 1000;
-
-  }, []);
-
-
-
-  const formatTimeRemaining = useCallback((timestamp) => {
-
-    if (!timestamp) return "";
-
-    const msgTime = new Date(timestamp).getTime();
-
-    if (isNaN(msgTime)) return "";
-
-    const remainingMs = (24 * 60 * 60 * 1000) - (Date.now() - msgTime);
-
-    if (remainingMs <= 0) return "Expired";
-
-    const hours = Math.floor(remainingMs / (1000 * 60 * 60));
-
-    const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60));
-
-    if (hours > 0) return `${hours}h left`;
-
-    return `${minutes}m left`;
-
-  }, []);
-
-
-
-  const formatBannerText = useCallback((msg) => {
-
-    if (!msg) return "";
-
-    const myId = localStorage.getItem('userid');
-
-    const isMe = String(msg.userid || msg.senderid) === String(myId);
-
-
-
-    if (typeof msg.content === 'string' && msg.content.includes('/')) {
-
-      const parts = msg.content.split('/');
-
-      const othersText = parts[0]?.trim();
-
-      const myText = parts[1]?.trim();
-
-      return isMe ? (myText || othersText) : othersText;
-
-    }
-
-
-
-    if (isMe && msg.sendername && typeof msg.content === 'string') {
-
-      return msg.content.replace(new RegExp(`^${msg.sendername}`, 'i'), 'You');
-
-    }
-
-
-
-    return msg.content || "";
-
-  }, []);
-
 
 
   const [dismissedBannerPinIds, setDismissedBannerPinIds] = useState(() => {
@@ -7731,93 +4874,10 @@ const ChatBox = () => {
     };
   }, [chatid, currentUserId]);
 
-  const isEventPassed = useCallback((m) => {
-    if (!m) return false;
-    const eventId = m.repliedto || m.repliedTo || m.eventid || m.groupEventId || (typeof m.content === 'string' ? m.content.split('/')[2] : null);
-
-    let eventObj = null;
-    if (eventId && groupEventsList.length > 0) {
-      eventObj = groupEventsList.find(e =>
-        e.groupEventId === eventId ||
-        String(e.eventId) === String(eventId) ||
-        String(e.id) === String(eventId)
-      );
-    }
-
-    if (!eventObj && m.content && groupEventsList.length > 0) {
-      const cleaned = (m.content.split('/')[0] || m.content).toLowerCase();
-      eventObj = groupEventsList.find(e => e.eventTitle && cleaned.includes(e.eventTitle.toLowerCase()));
-    }
-
-    if (!eventObj && events) {
-      const allMediatorEvents = Object.values(events).flat();
-      if (eventId) {
-        eventObj = allMediatorEvents.find(e =>
-          e.groupEventId === eventId ||
-          String(e.id) === String(eventId) ||
-          String(e.eventId) === String(eventId)
-        );
-      }
-      if (!eventObj && m.content) {
-        const cleaned = (m.content.split('/')[0] || m.content).toLowerCase();
-        eventObj = allMediatorEvents.find(e => e.title && cleaned.includes(e.title.toLowerCase()));
-      }
-    }
-
-    if (eventObj) {
-      if (eventObj.action === 'cancelled') {
-        return true;
-      }
-      const rawStart = eventObj.startTime || eventObj.start || eventObj.date;
-      const rawEnd = eventObj.endTime || eventObj.end;
-      const parseDateSafe = (val) => {
-        if (!val) return null;
-        if (typeof val === 'number') return val < 1e11 ? val * 1000 : val;
-        if (typeof val === 'string' && /^\d+(\.\d+)?$/.test(val.trim())) {
-          const num = parseFloat(val.trim());
-          return num < 1e11 ? num * 1000 : num;
-        }
-        const parsed = new Date(val).getTime();
-        return isNaN(parsed) ? null : parsed;
-      };
-      const startMs = parseDateSafe(rawStart);
-      const endMs = parseDateSafe(rawEnd) || (startMs ? startMs + 60 * 60 * 1000 : null);
-      if (endMs && endMs <= currentTime) {
-        return true;
-      }
-    }
-    return false;
-  }, [groupEventsList, events, currentTime]);
-
-  const isEventBannerPin = useCallback((m) => {
-
-    if (!m) return false;
-
-    if (m.type === "event-banner-pin") return true;
-
-    if (m.type === "banner-pin" || m.type === "banner") {
-
-      if (m.eventid || m.groupEventId) return true;
-
-      if (typeof m.content === 'string') {
-
-        const lower = m.content.toLowerCase();
-
-        if (lower.includes("scheduled") || lower.includes("postponed") || lower.includes("cancelled")) {
-
-          return true;
-
-        }
-
-      }
-
-    }
-
-    return false;
-
-  }, []);
-
-
+  const isEventPassed = useCallback(
+    (m) => checkIsEventPassed(m, { groupEventsList, events, currentTime }),
+    [groupEventsList, events, currentTime]
+  );
 
   const activeBannerPins = useMemo(() => {
 
@@ -7855,7 +4915,7 @@ const ChatBox = () => {
 
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-  }, [messages, isWithin24Hours, dismissedBannerPinIds, isEventBannerPin, isEventPassed]);
+  }, [messages, dismissedBannerPinIds, isEventPassed]);
 
 
 
@@ -7869,7 +4929,7 @@ const ChatBox = () => {
     } else {
       scrollToMessage(pin.msgid);
     }
-  }, [isEventBannerPin]);
+  }, []);
 
 
 
@@ -8660,6 +5720,134 @@ const ChatBox = () => {
 
 
 
+  const handleMessagesScroll = useCallback((e) => {
+    const el = e.target;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const isScrollingDown = el.scrollTop > lastScrollTopRef.current;
+
+    if (distanceFromBottom > 200) {
+      if (isScrollingDown) {
+        setShowScrollDownBtn(true);
+        isScrolledUpRef.current = true;
+      } else if (el.scrollTop < lastScrollTopRef.current) {
+        setShowScrollDownBtn(false);
+      }
+    } else {
+      setShowScrollDownBtn(false);
+      isScrolledUpRef.current = false;
+      setUnreadSinceScrolled(0);
+    }
+    lastScrollTopRef.current = el.scrollTop;
+
+    const threshold = 300;
+    const oldScrollHeight = el.scrollHeight;
+
+    if (el.scrollTop < threshold && !isLoadingMoreRef.current) {
+      const spaceMessages = (messageStore.getMessages(chatid) || []).filter((m) => {
+        const msgSpace = m.spaceid !== undefined ? m.spaceid : (m.spaceId !== undefined ? m.spaceId : 0);
+        return Number(msgSpace) === Number(activeSpace || 0);
+      });
+      if (!spaceMessages || spaceMessages.length === 0) return;
+      const oldestTimestamp = messageStore.getBatchFrontier(chatid, activeSpace) || spaceMessages[0].timestamp;
+
+      isLoadingMoreRef.current = true;
+
+      if (hasMoreInServerRef.current) {
+        const now = Date.now();
+        if (oldestTimestamp !== lastLoadMoreTimestampRef.current || (now - lastLoadMoreTimeRef.current) > 5 * 60 * 1000) {
+          lastLoadMoreTimestampRef.current = oldestTimestamp;
+          lastLoadMoreTimeRef.current = now;
+          console.log('[ChatBox] Sync load-more via WebSocket triggered for timestamp:', oldestTimestamp);
+          sendSafe({
+            purpose: 'load-more',
+            userchatId: chatid,
+            usermsgId: activeSpace,
+            timestamp: oldestTimestamp,
+          });
+        }
+      }
+
+      if (hasMoreInDBRef.current) {
+        messageStore.loadMoreMessages(chatid, oldestTimestamp, 50, activeSpace).then((loadedMsgs) => {
+          if (loadedMsgs && loadedMsgs.length > 0) {
+            if (loadedMsgs.length < 50) hasMoreInDBRef.current = false;
+            setMessages([...messageStore.getMessages(chatid)]);
+            requestAnimationFrame(() => {
+              if (el) el.scrollTop = el.scrollHeight - oldScrollHeight;
+            });
+          } else {
+            hasMoreInDBRef.current = false;
+          }
+          isLoadingMoreRef.current = false;
+        }).catch(() => {
+          isLoadingMoreRef.current = false;
+        });
+      } else {
+        setTimeout(() => {
+          if (isMounted.current) isLoadingMoreRef.current = false;
+        }, 1000);
+      }
+    }
+  }, [chatid, activeSpace]);
+
+  const handleToggleDateCollapse = useCallback((dateOnly) => {
+    setCollapsedView((prev) => {
+      if (prev) {
+        setTimeout(() => {
+          const element = messageRefs.current[`date-${dateOnly}`];
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 50);
+        return false;
+      }
+      return true;
+    });
+  }, []);
+
+  const handleJumpToReplied = useCallback((repliedMsg, repliedToId) => {
+    setActiveSpace(repliedMsg.spaceid);
+    const element = messageRefs.current[repliedToId];
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const originalBg = element.style.backgroundColor;
+      element.style.backgroundColor = 'var(--accent-tint)';
+      element.style.transition = 'background-color 2s ease';
+      setTimeout(() => {
+        element.style.backgroundColor = originalBg || '';
+      }, 2000);
+    }
+  }, []);
+
+  const handleOpenAssignmentPanel = useCallback((id) => {
+    setSelectedAssignmentId(id);
+    setShowAssignmentDetail(true);
+  }, []);
+
+  const handleShowReactors = useCallback((msg) => {
+    setReactionInfo({ reactions: msg.reactions, msg });
+  }, []);
+
+  const handleOpenEventFromBadge = useCallback((event, isReceived) => {
+    setHasChanges(false);
+    setDraftEvent(null);
+    setSelectedEvent(event);
+    setShowEventModal(true);
+    setEventRecived(isReceived);
+  }, []);
+
+  const handleSuggestHello = useCallback(() => composerRef.current?.setDraft?.('Hello 👋'), []);
+  const handleSuggestNote = useCallback(() => composerRef.current?.setDraft?.('Hey! Sharing a quick note: '), []);
+  const handleSuggestSchedule = useCallback(() => setShowScheduleModal(true), []);
+  const handleOpenStatusInfoFromBar = useCallback((msg) => {
+    setStatusInfoMsg(msg);
+    clearSelection();
+  }, []);
+  const handleOpenScheduleFromBar = useCallback(() => {
+    setScheduleEditData(null);
+    setShowScheduleModal(true);
+  }, []);
+
   const isSidePanelOpen = !isMobile && (showInfo || ShowEventModal || showpost || showadd || showAssignmentDetail || showGroupCalendar);
 
 
@@ -8667,194 +5855,6 @@ const ChatBox = () => {
   return (
 
     <div className="chat-layout-wrapper" style={{ display: 'flex', width: '100%', height: isIOS && isInputFocused ? 'var(--vvh, 100dvh)' : '100%', overflow: 'hidden', backgroundColor: 'var(--bg-primary)' }}>
-
-      {showClearModal && (
-
-        <div
-
-          onClick={() => setShowClearModal(false)}
-
-          style={{
-
-            position: 'fixed',
-
-            inset: 0,
-
-            zIndex: 10000,
-
-            display: 'flex',
-
-            alignItems: 'center',
-
-            justifyContent: 'center',
-
-            backgroundColor: 'rgba(0,0,0,0.6)',
-
-            backdropFilter: 'blur(4px)'
-
-          }}
-
-        >
-
-          <div
-
-            onClick={e => e.stopPropagation()}
-
-            style={{
-
-              background: 'var(--bg-card)',
-
-              padding: '28px',
-
-              borderRadius: '20px',
-
-              maxWidth: '340px',
-
-              width: '90%',
-
-              textAlign: 'center',
-
-              border: '1px solid var(--border-color)',
-
-              boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
-
-              display: 'flex',
-
-              flexDirection: 'column',
-
-              gap: '12px'
-
-            }}
-
-          >
-
-            <div style={{
-
-              width: '56px',
-
-              height: '56px',
-
-              borderRadius: '50%',
-
-              backgroundColor: 'var(--danger-tint)',
-
-              color: 'var(--danger-color)',
-
-              display: 'flex',
-
-              alignItems: 'center',
-
-              justifyContent: 'center',
-
-              margin: '0 auto 8px'
-
-            }}>
-
-              <Trash2 size={28} />
-
-            </div>
-
-            <h3 style={{ color: 'var(--text-primary)', fontSize: '18px', fontWeight: '700', margin: 0 }}>Clear Chat?</h3>
-
-            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: '1.5', margin: 0 }}>
-
-              Messages will be cleared from this device only. They remain visible on other devices.
-
-            </p>
-
-
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
-
-              <button
-
-                onClick={() => handleClearChat(false)}
-
-                style={{
-
-                  padding: '12px',
-
-                  borderRadius: '10px',
-
-                  border: 'none',
-
-                  background: 'var(--accent-color)',
-
-                  color: 'white',
-
-                  fontWeight: '600',
-
-                  cursor: 'pointer'
-
-                }}
-
-              >
-
-                Clear {spaceName}
-
-              </button>
-
-              <button
-
-                onClick={() => handleClearChat(true)}
-
-                style={{
-
-                  padding: '12px',
-
-                  borderRadius: '10px',
-
-                  border: '1px solid var(--danger-color)',
-
-                  background: 'transparent',
-
-                  color: 'var(--danger-color)',
-
-                  fontWeight: '600',
-
-                  cursor: 'pointer'
-
-                }}
-
-              >
-
-                Clear All Spaces
-
-              </button>
-
-              <button
-
-                onClick={() => setShowClearModal(false)}
-
-                style={{
-
-                  padding: '12px',
-
-                  borderRadius: '10px',
-
-                  border: 'none',
-
-                  background: 'transparent',
-
-                  color: 'var(--text-secondary)',
-
-                  cursor: 'pointer'
-
-                }}
-
-              >
-
-                Cancel
-
-              </button>
-
-            </div>
-
-          </div>
-
-        </div>
-
-      )}
 
       {/* Main Chat Column */}
 
@@ -8924,18 +5924,6 @@ const ChatBox = () => {
 
             <div dangerouslySetInnerHTML={{ __html: guideStep.content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
 
-            <style>{`
-
-              @keyframes guideSlideDown {
-
-                from { opacity: 0; transform: translate(-50%, -20px); }
-
-                to { opacity: 1; transform: translate(-50%, 0); }
-
-              }
-
-            `}</style>
-
           </div>
 
         )}
@@ -8944,33 +5932,35 @@ const ChatBox = () => {
 
         {pendingMediaFile && (
 
-          <MediaPreviewModal
+          <Suspense fallback={null}>
+            <MediaPreviewModal
 
-            file={pendingMediaFile}
+              file={pendingMediaFile}
 
-            isUploading={isUploadingInternal}
+              isUploading={isUploadingInternal}
 
-            uploadProgress={uploadProgressInternal}
+              uploadProgress={uploadProgressInternal}
 
-            onCancel={() => {
+              onCancel={() => {
 
-              if (!isUploadingInternal) setPendingMediaFile(null);
+                if (!isUploadingInternal) setPendingMediaFile(null);
 
-            }}
+              }}
 
-            onSend={(thumbBlob, editedFile) => {
+              onSend={(thumbBlob, editedFile) => {
 
-              const file = editedFile || pendingMediaFile;
+                const file = editedFile || pendingMediaFile;
 
-              setPendingMediaFile(null);
+                setPendingMediaFile(null);
 
-              handleCaptureFile(file, 'Gallery Upload', { silent: true, thumbBlob });
+                handleCaptureFile(file, 'Gallery Upload', { silent: true, thumbBlob });
 
-            }}
+              }}
 
-            onFileChange={setPendingMediaFile}
+              onFileChange={setPendingMediaFile}
 
-          />
+            />
+          </Suspense>
 
         )}
 
@@ -9138,1255 +6128,50 @@ const ChatBox = () => {
 
         )}
 
-        <div style={{
-
-          display: "flex",
-
-          flexDirection: "row",
-
-          justifyContent: "space-between",
-
-          alignItems: "center",
-
-          padding: isMobile ? '12px' : '16px 24px',
-
-          backgroundColor: 'var(--bg-card)',
-
-          backdropFilter: 'var(--glass-effect)',
-
-          borderBottom: "1px solid var(--border-color)",
-
-          flexWrap: "nowrap",
-
-          gap: isMobile ? '8px' : '12px',
-
-          minHeight: isMobile ? '56px' : '72px',
-
-          zIndex: 10
-
-        }}>
-
-          {/* Left Section */}
-
-          <div
-
-            onClick={clickInfo}
-
-            style={{
-
-              display: "flex",
-
-              alignItems: "center",
-
-              gap: isMobile ? '8px' : '12px',
-
-              flex: "1 1 auto",
-
-              minWidth: isMobile ? "120px" : "150px",
-
-              cursor: 'pointer',
-
-              padding: '4px 0',
-
-              borderRadius: '8px',
-
-              transition: 'background-color 0.2s',
-
-            }}
-
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
-
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-
-          >
-
-            {isMobile && (
-
-              <button
-
-                onClick={(e) => { e.stopPropagation(); updateV(); messageStore.setCount(chatid); resetToChats(navigate, { chatId: chatid }); }}
-
-                style={{
-
-                  all: 'unset',
-
-                  fontSize: isMobile ? '20px' : '24px',
-
-                  padding: '4px 8px',
-
-                  cursor: 'pointer',
-
-                  display: 'flex',
-
-                  alignItems: 'center',
-
-                  color: 'var(--text-secondary)',
-
-                  borderRadius: '8px',
-
-                  transition: 'all 0.2s ease',
-
-                }}
-
-                onMouseEnter={(e) => {
-
-                  e.currentTarget.style.backgroundColor = 'var(--border-color)';
-
-                  e.currentTarget.style.color = 'var(--text-primary)';
-
-                }}
-
-                onMouseLeave={(e) => {
-
-                  e.currentTarget.style.backgroundColor = 'transparent';
-
-                  e.currentTarget.style.color = 'var(--text-secondary)';
-
-                }}
-
-              >
-
-                ←
-
-              </button>
-
-            )}
-
-
-
-            <Avatar
-
-              chat={chat}
-
-              size={isMobile ? 32 : 36}
-
-              style={{ cursor: 'pointer' }}
-
-              showStatus={chat.type === 'private'}
-
-              isOnline={isOnline}
-
-              onClick={(e) => { e.stopPropagation(); clickInfo(); }}
-
-            />
-
-            <div
-
-              style={{ display: 'flex', flexDirection: 'column', cursor: 'pointer' }}
-
-              onClick={(e) => { e.stopPropagation(); clickInfo(); }}
-
-            >
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-
-                <span
-
-                  style={{ color: 'var(--text-primary)', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}
-
-                  onClick={(e) => { e.stopPropagation(); clickInfo(); }}
-
-                >
-
-                  {chatid === SIMULATION_ID ? "LetsChat" : (chat?.chatName || "Chat")}
-
-                  {(chatid === SIMULATION_ID || chat?.id === SIMULATION_ID || chat?.isSimulation || chat?.isSystem || chat?.verified || /letschat/i.test(chat?.chatName || '')) && (
-
-                    <span title="Official Verified Channel" style={{
-
-                      display: 'inline-flex',
-
-                      alignItems: 'center',
-
-                      justifyContent: 'center',
-
-                      width: '16px',
-
-                      height: '16px',
-
-                      borderRadius: '50%',
-
-                      backgroundColor: 'var(--accent-solid)',
-
-                      color: '#ffffff',
-
-                      flexShrink: 0
-
-                    }}>
-
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-
-                        <polyline points="20 6 9 17 4 12"></polyline>
-
-                      </svg>
-
-                    </span>
-
-                  )}
-
-                </span>
-
-                {chat?.pulseStreak > 0 && (
-
-                  <StreakBadge streak={chat.pulseStreak} size="sm" />
-
-                )}
-
-                {messageStore.isVolatile(chatid) && (
-
-                  <span
-
-                    title="Messages in this room are temporarily cached for 30 minutes and then automatically deleted."
-
-                    style={{
-
-                      fontSize: '10px',
-
-                      backgroundColor: 'var(--warning-color)', // Amber/Yellow for temporary status
-
-                      color: '#000',
-
-                      padding: '2px 6px',
-
-                      borderRadius: '4px',
-
-                      textTransform: 'uppercase',
-
-                      fontWeight: '800',
-
-                      cursor: 'help'
-
-                    }}
-
-                  >
-
-                    30m Room
-
-                  </span>
-
-                )}
-
-              </div>
-
-              {chat.type === 'private' && (
-
-                <div style={{ fontSize: '11px', color: isOnline ? 'var(--success-color)' : 'var(--text-secondary)', fontWeight: '500' }}>
-
-                  {isOnline ? 'Online' : (() => {
-
-                    const presenceId = chat.userId || chat.id || chatid;
-
-                    const lastSeen = localStorage.getItem(`lastSeen_${presenceId}`);
-
-                    if (!lastSeen) return 'Offline';
-
-                    const date = new Date(lastSeen);
-
-                    const diff = (Date.now() - date.getTime()) / 1000;
-
-                    if (diff < 120) return 'Last seen just now';
-
-                    if (diff < 3600) return `Last seen ${Math.floor(diff / 60)}m ago`;
-
-                    if (diff < 86400) return `Last seen ${Math.floor(diff / 3600)}h ago`;
-
-                    return `Last seen ${date.toLocaleDateString()}`;
-
-                  })()}
-
-                </div>
-
-              )}
-
-              {isMobile && (
-
-                <span
-
-                  onClick={(e) => {
-
-                    if (activeSpace !== 0 && chat?.type !== 'classroom') {
-
-                      e.stopPropagation();
-
-                      handleRenameSpace();
-
-                    }
-
-                  }}
-
-                  style={{
-
-                    fontSize: '10px',
-
-                    color: 'var(--accent-color)',
-
-                    fontWeight: '700',
-
-                    opacity: 0.9,
-
-                    textTransform: 'uppercase',
-
-                    letterSpacing: '0.05em',
-
-                    marginTop: chat.type === 'private' ? '-1px' : '1px',
-
-                    cursor: (activeSpace !== 0 && chat?.type !== 'classroom') ? 'pointer' : 'default',
-
-                    display: 'inline-flex',
-
-                    alignItems: 'center',
-
-                    gap: '3px'
-
-                  }}
-
-                  title={(activeSpace !== 0 && chat?.type !== 'classroom') ? "Click to rename space" : ""}
-
-                >
-
-                  {spaceName}
-
-                  {activeSpace !== 0 && chat?.type !== 'classroom' && <Pencil size={10} />}
-
-                </span>
-
-              )}
-
-              {(() => {
-
-                const headerSubtext = chat?.motto || chat?.description;
-
-                if (!headerSubtext || headerSubtext.toLowerCase() === 'allowed' || headerSubtext.toLowerCase() === 'blocked') return null;
-
-                return (
-
-                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', opacity: 0.85, maxWidth: isMobile ? '130px' : '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={headerSubtext}>
-
-                    {headerSubtext}
-
-                  </span>
-
-                );
-
-              })()}
-
-            </div>
-
-          </div>
-
-
-
-          {/* Center Section - Space Navigation */}
-
-          {chat.type !== "classroom" && !isMobile && (
-
-            <div style={{
-
-              display: 'flex',
-
-              gap: isMobile ? '8px' : '12px',
-
-              alignItems: 'center',
-
-              backgroundColor: 'var(--nav-bg)',
-
-              padding: '6px',
-
-              borderRadius: '12px',
-
-              border: '1px solid var(--border-color)',
-
-              flexBasis: isMobile ? 'auto' : 'auto',
-
-              justifyContent: 'center',
-
-            }}>
-
-              {/* Subtle Space Name Display */}
-
-              <div
-
-                onClick={(e) => {
-
-                  e.stopPropagation();
-
-                  if (activeSpace !== 0 && chat?.type !== 'classroom') handleRenameSpace();
-
-                }}
-
-                style={{
-
-                  padding: '4px 10px',
-
-                  borderRadius: '6px',
-
-                  backgroundColor: 'var(--accent-tint)',
-
-                  color: 'var(--accent-text)',
-
-                  fontSize: isMobile ? '11px' : '12px',
-
-                  fontWeight: '700',
-
-                  textTransform: 'uppercase',
-
-                  letterSpacing: '0.05em',
-
-                  border: '1px solid var(--accent-tint-border)',
-
-                  display: 'flex',
-
-                  alignItems: 'center',
-
-                  gap: '6px',
-
-                  cursor: (activeSpace !== 0 && chat?.type !== 'classroom') ? 'pointer' : 'default'
-
-                }}
-
-                title={(activeSpace !== 0 && chat?.type !== 'classroom') ? "Click to rename space" : ""}
-
-              >
-
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--accent-solid)' }} />
-
-                {spaceName}
-
-                {activeSpace !== 0 && chat?.type !== 'classroom' && <Pencil size={12} />}
-
-              </div>
-
-            </div>
-
-          )}
-
-
-
-          {/* Right Section */}
-
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', position: 'relative' }}>
-
-            {chat.type === "classroom" && (chat.role === "faculty" || chat.role === "admin") && (
-
-              <button
-
-                onClick={() => setShowClassroomMatrixModal(true)}
-
-                title="View Assignment Analytics & Export Matrix Report"
-
-                style={{
-
-                  padding: isMobile ? '6px 10px' : '8px 14px',
-
-                  backgroundColor: 'var(--accent-tint)',
-
-                  color: 'var(--accent-text)',
-
-                  borderRadius: '8px',
-
-                  fontSize: isMobile ? '12px' : '13px',
-
-                  fontWeight: '700',
-
-                  border: '1px solid var(--accent-tint)',
-
-                  cursor: 'pointer',
-
-                  transition: 'all 0.2s ease',
-
-                  display: 'flex',
-
-                  alignItems: 'center',
-
-                  gap: '6px',
-
-                  whiteSpace: 'nowrap',
-
-                }}
-
-              >
-
-                <BarChart3 size={16} />
-
-                <span>{!isMobile && 'Export Matrix Report'}</span>
-
-              </button>
-
-            )}
-
-
-
-            {(chat.type === "classroom" || chat.type === "room") && (
-
-              <div style={{ position: 'relative' }}>
-
-                <button
-
-                  onClick={(e) => {
-
-                    e.stopPropagation();
-
-                    setShowInviteMenu(!showInviteMenu);
-
-                  }}
-
-                  style={{
-
-                    padding: isMobile ? '6px 10px' : '8px 14px',
-
-                    backgroundColor: copiedId ? 'var(--success-color)' : 'var(--border-color)',
-
-                    color: 'var(--text-primary)',
-
-                    borderRadius: '8px',
-
-                  fontSize: isMobile ? '12px' : '14px',
-
-                  fontWeight: '600',
-
-                  border: copiedId ? '1px solid var(--success-color)' : '1px solid #4b5563',
-
-                  cursor: 'pointer',
-
-                  transition: 'all 0.2s ease',
-
-                  display: 'flex',
-
-                  alignItems: 'center',
-
-                  gap: '6px',
-
-                  whiteSpace: 'nowrap',
-
-                }}
-
-                onMouseEnter={(e) => {
-
-                  if (!copiedId) {
-
-                    e.currentTarget.style.backgroundColor = '#4b5563';
-
-                    e.currentTarget.style.borderColor = 'var(--text-muted)';
-
-                  }
-
-                }}
-
-                onMouseLeave={(e) => {
-
-                  if (!copiedId) {
-
-                    e.currentTarget.style.backgroundColor = 'var(--border-color)';
-
-                    e.currentTarget.style.borderColor = '#4b5563';
-
-                  }
-
-                }}
-
-              >
-
-                <span>{copiedId ? '✓' : '📋'}</span>
-
-                <span>{copiedId ? 'Copied!' : chat.id}</span>
-
-              </button>
-
-              {showInviteMenu && (
-
-                <div style={{
-
-                  position: 'absolute',
-
-                  top: '100%',
-
-                  right: 0,
-
-                  marginTop: '8px',
-
-                  backgroundColor: 'var(--bg-secondary)',
-
-                  border: '1px solid var(--border-color)',
-
-                  borderRadius: '8px',
-
-                  padding: '4px',
-
-                  display: 'flex',
-
-                  flexDirection: 'column',
-
-                  gap: '2px',
-
-                  zIndex: 1000,
-
-                  boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-
-                  minWidth: '120px'
-
-                }}>
-
-                  <button
-
-                    onClick={(e) => {
-
-                      e.stopPropagation();
-
-                      setShowInviteMenu(false);
-
-                      copyClassroomId();
-
-                    }}
-
-                    style={{
-
-                      padding: '8px 12px',
-
-                      background: 'none',
-
-                      border: 'none',
-
-                      color: 'var(--text-primary)',
-
-                      textAlign: 'left',
-
-                      cursor: 'pointer',
-
-                      borderRadius: '4px',
-
-                      fontSize: '14px'
-
-                    }}
-
-                    onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--hover-bg)'}
-
-                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-
-                  >
-
-                    Copy ID
-
-                  </button>
-
-                  <button
-
-                    onClick={(e) => {
-
-                      e.stopPropagation();
-
-                      setShowInviteMenu(false);
-
-                      setShowInviteModal(true);
-
-                    }}
-
-                    style={{
-
-                      padding: '8px 12px',
-
-                      background: 'none',
-
-                      border: 'none',
-
-                      color: 'var(--text-primary)',
-
-                      textAlign: 'left',
-
-                      cursor: 'pointer',
-
-                      borderRadius: '4px',
-
-                      fontSize: '14px'
-
-                    }}
-
-                    onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--hover-bg)'}
-
-                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-
-                  >
-
-                    Invite
-
-                  </button>
-
-                </div>
-
-              )}
-
-            </div>
-
-            )}
-
-
-
-            <button
-
-              onClick={() => {
-
-                setShowGroupCalendar(!showGroupCalendar);
-
-                setHasNewGroupEvent(false);
-
-              }}
-
-              title="Group Calendar"
-
-              style={{
-
-                background: showGroupCalendar ? 'var(--accent-tint-border)' : 'none',
-
-                border: showGroupCalendar ? '1px solid var(--accent-tint-border)' : 'none',
-
-                color: showGroupCalendar ? 'var(--accent-text)' : 'var(--text-secondary)',
-
-                cursor: 'pointer',
-
-                padding: '8px',
-
-                borderRadius: '8px',
-
-                display: 'flex',
-
-                alignItems: 'center',
-
-                justifyContent: 'center',
-
-                position: 'relative',
-
-                transition: 'background-color 0.2s'
-
-              }}
-
-              onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--accent-tint)'}
-
-              onMouseLeave={e => e.currentTarget.style.backgroundColor = showGroupCalendar ? 'var(--accent-tint-border)' : 'transparent'}
-
-            >
-
-              <Calendar size={20} />
-
-              {hasNewGroupEvent && (
-
-                <span style={{
-
-                  position: 'absolute',
-
-                  top: '5px',
-
-                  right: '5px',
-
-                  width: '11px',
-
-                  height: '11px',
-
-                  borderRadius: '50%',
-
-                  backgroundColor: '#3b82f6',
-
-                  boxShadow: '0 0 0 2px var(--bg-card), 0 0 8px 2px #3b82f6',
-
-                  zIndex: 2
-
-                }} />
-
-              )}
-
-            </button>
-
-
-
-            <button
-
-              onClick={() => setShowHeaderMenu(!showHeaderMenu)}
-
-              style={{
-
-                background: 'none',
-
-                border: 'none',
-
-                color: 'var(--text-secondary)',
-
-                cursor: 'pointer',
-
-                padding: '8px',
-
-                borderRadius: '8px',
-
-                display: 'flex',
-
-                alignItems: 'center',
-
-                justifyContent: 'center',
-
-                transition: 'background-color 0.2s'
-
-              }}
-
-              onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
-
-              onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-
-            >
-
-              <MoreVertical size={20} />
-
-            </button>
-
-
-
-            {showHeaderMenu && (
-
-              <>
-
-                <div
-
-                  style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100 }}
-
-                  onClick={() => setShowHeaderMenu(false)}
-
-                />
-
-                <div style={{
-
-                  position: 'absolute',
-
-                  top: '100%',
-
-                  right: 0,
-
-                  marginTop: '8px',
-
-                  backgroundColor: 'var(--bg-secondary)',
-
-                  border: '1px solid var(--border-color)',
-
-                  borderRadius: '12px',
-
-                  padding: '6px',
-
-                  minWidth: '180px',
-
-                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.4)',
-
-                  zIndex: 101,
-
-                  animation: 'fadeIn 0.2s ease-out'
-
-                }}>
-
-                  <button
-
-                    onClick={togglePin}
-
-                    style={{
-
-                      width: '100%',
-
-                      padding: '10px 12px',
-
-                      textAlign: 'left',
-
-                      background: 'transparent',
-
-                      border: 'none',
-
-                      color: 'var(--text-primary)',
-
-                      cursor: 'pointer',
-
-                      borderRadius: '8px',
-
-                      fontSize: '14px',
-
-                      display: 'flex',
-
-                      alignItems: 'center',
-
-                      gap: '10px',
-
-                      transition: 'background-color 0.2s'
-
-                    }}
-
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
-
-                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-
-                  >
-
-                    {isCurrentChatPinned ? <PinOff size={16} /> : <Pin size={16} />}
-
-                    {isCurrentChatPinned ? 'Unpin Chat' : 'Pin Chat'}
-
-                  </button>
-
-                  <button
-
-                    onClick={toggleQuickAccessPin}
-
-                    style={{
-
-                      width: '100%',
-
-                      padding: '10px 12px',
-
-                      textAlign: 'left',
-
-                      background: 'transparent',
-
-                      border: 'none',
-
-                      color: 'var(--text-primary)',
-
-                      cursor: 'pointer',
-
-                      borderRadius: '8px',
-
-                      fontSize: '14px',
-
-                      display: 'flex',
-
-                      alignItems: 'center',
-
-                      gap: '10px',
-
-                      transition: 'background-color 0.2s'
-
-                    }}
-
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
-
-                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-
-                  >
-
-                    {isQuickAccessPinned ? <Zap size={16} fill="var(--text-primary)" /> : <Zap size={16} />}
-
-                    {isQuickAccessPinned ? 'Remove from Quick Access' : 'Pin to Quick Access'}
-
-                  </button>
-
-
-
-                  <button
-
-                    onClick={async () => {
-
-                      setShowHeaderMenu(false);
-
-                      const nextMuted = !isMuted;
-
-                      setIsMuted(nextMuted);
-
-                      await toggleMuteChat(chatid, nextMuted);
-
-                    }}
-
-                    style={{
-
-                      width: '100%',
-
-                      padding: '10px 12px',
-
-                      textAlign: 'left',
-
-                      background: 'transparent',
-
-                      border: 'none',
-
-                      color: isMuted ? 'var(--danger-color)' : 'var(--text-primary)',
-
-                      cursor: 'pointer',
-
-                      borderRadius: '8px',
-
-                      fontSize: '14px',
-
-                      display: 'flex',
-
-                      alignItems: 'center',
-
-                      gap: '10px',
-
-                      transition: 'background-color 0.2s'
-
-                    }}
-
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
-
-                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-
-                  >
-
-                    {isMuted ? <BellOff size={16} color="var(--danger-color)" /> : <Bell size={16} />}
-
-                    {isMuted ? 'Unmute Notifications' : 'Mute Notifications'}
-
-                  </button>
-
-
-
-                  <button
-
-                    onClick={() => {
-
-                      setShowHeaderMenu(false);
-
-                      setShowFilterModal(true);
-
-                    }}
-
-                    style={{
-
-                      width: '100%',
-
-                      padding: '10px 12px',
-
-                      textAlign: 'left',
-
-                      background: 'transparent',
-
-                      border: 'none',
-
-                      color: 'var(--text-primary)',
-
-                      cursor: 'pointer',
-
-                      borderRadius: '8px',
-
-                      fontSize: '14px',
-
-                      display: 'flex',
-
-                      alignItems: 'center',
-
-                      gap: '10px',
-
-                      transition: 'background-color 0.2s'
-
-                    }}
-
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
-
-                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-
-                  >
-
-                    <Filter size={16} color="var(--accent-color)" /> Filter by Person
-
-                  </button>
-
-
-
-                  <button
-
-                    onClick={() => {
-
-                      setShowClearModal(true);
-
-                      setShowHeaderMenu(false);
-
-                    }}
-
-                    style={{
-
-                      width: '100%',
-
-                      padding: '10px 12px',
-
-                      textAlign: 'left',
-
-                      background: 'transparent',
-
-                      border: 'none',
-
-                      color: 'var(--danger-color)',
-
-                      cursor: 'pointer',
-
-                      borderRadius: '8px',
-
-                      fontSize: '14px',
-
-                      display: 'flex',
-
-                      alignItems: 'center',
-
-                      gap: '10px',
-
-                      transition: 'background-color 0.2s'
-
-                    }}
-
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--danger-tint)'}
-
-                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-
-                  >
-
-                    <Trash2 size={16} />
-
-                    Clear Chat
-
-                  </button>
-
-                  <button
-
-                    onClick={() => {
-
-                      setShowHeaderMenu(false);
-
-                      navigate(`/starred?chatid=${chatid}`);
-
-                    }}
-
-                    style={{
-
-                      width: '100%',
-
-                      padding: '10px 12px',
-
-                      textAlign: 'left',
-
-                      background: 'transparent',
-
-                      border: 'none',
-
-                      color: 'var(--text-primary)',
-
-                      cursor: 'pointer',
-
-                      borderRadius: '8px',
-
-                      fontSize: '14px',
-
-                      display: 'flex',
-
-                      alignItems: 'center',
-
-                      gap: '10px',
-
-                      transition: 'background-color 0.2s'
-
-                    }}
-
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
-
-                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-
-                  >
-
-                    <Star size={16} /> View Starred
-
-                  </button>
-
-                  <div style={{ height: '1px', backgroundColor: 'var(--border-color)', margin: '4px 0' }} />
-
-                  <button
-
-                    onClick={() => {
-
-                      setShowHeaderMenu(false);
-
-                      setShowGroupCalendar(true);
-
-                    }}
-
-                    style={{
-
-                      width: '100%',
-
-                      padding: '10px 12px',
-
-                      textAlign: 'left',
-
-                      background: 'transparent',
-
-                      border: 'none',
-
-                      color: 'var(--text-primary)',
-
-                      cursor: 'pointer',
-
-                      borderRadius: '8px',
-
-                      fontSize: '14px',
-
-                      display: 'flex',
-
-                      alignItems: 'center',
-
-                      gap: '10px',
-
-                      transition: 'background-color 0.2s'
-
-                    }}
-
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
-
-                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-
-                  >
-
-                    <Calendar size={16} /> Group Calendar
-
-                  </button>
-
-                  <button
-
-                    onClick={() => { setShowHeaderMenu(false); clickInfo(); }}
-
-                    style={{
-
-                      width: '100%',
-
-                      padding: '10px 12px',
-
-                      textAlign: 'left',
-
-                      background: 'transparent',
-
-                      border: 'none',
-
-                      color: 'var(--text-primary)',
-
-                      cursor: 'pointer',
-
-                      borderRadius: '8px',
-
-                      fontSize: '14px',
-
-                      display: 'flex',
-
-                      alignItems: 'center',
-
-                      gap: '10px',
-
-                      transition: 'background-color 0.2s'
-
-                    }}
-
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
-
-                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-
-                  >
-
-                    <Info size={16} /> Contact Info
-
-                  </button>
-
-                </div>
-
-              </>
-
-            )}
-
-          </div>
-
-        </div>
+        <ChatHeader
+          chat={chat}
+          chatid={chatid}
+          isMobile={isMobile}
+          isOnline={isOnline}
+          activeSpace={activeSpace}
+          spaceName={spaceName}
+          clickInfo={clickInfo}
+          onBack={() => {
+            updateV();
+            messageStore.setCount(chatid);
+            resetToChats(navigate, { chatId: chatid });
+          }}
+          handleRenameSpace={handleRenameSpace}
+          onOpenClassroomMatrix={() => setShowClassroomMatrixModal(true)}
+          copiedId={copiedId}
+          copyClassroomId={copyClassroomId}
+          showInviteMenu={showInviteMenu}
+          setShowInviteMenu={setShowInviteMenu}
+          onOpenInviteModal={() => setShowInviteModal(true)}
+          showGroupCalendar={showGroupCalendar}
+          onToggleGroupCalendar={() => {
+            setShowGroupCalendar(!showGroupCalendar);
+            setHasNewGroupEvent(false);
+          }}
+          hasNewGroupEvent={hasNewGroupEvent}
+          showHeaderMenu={showHeaderMenu}
+          setShowHeaderMenu={setShowHeaderMenu}
+          isCurrentChatPinned={isCurrentChatPinned}
+          togglePin={togglePin}
+          isQuickAccessPinned={isQuickAccessPinned}
+          toggleQuickAccessPin={toggleQuickAccessPin}
+          isMuted={isMuted}
+          onToggleMute={async () => {
+            setShowHeaderMenu(false);
+            const nextMuted = !isMuted;
+            setIsMuted(nextMuted);
+            await toggleMuteChat(chatid, nextMuted);
+          }}
+          onOpenFilterModal={() => setShowFilterModal(true)}
+          onOpenClearModal={() => setShowClearModal(true)}
+          onOpenStarred={() => navigate(`/starred?chatid=${chatid}`)}
+          onOpenGroupCalendarFromMenu={() => setShowGroupCalendar(true)}
+        />
 
 
 
@@ -10818,1848 +6603,58 @@ const ChatBox = () => {
 
 
 
-        {isSyncingMessages && (
-
-          <div style={{
-
-            position: 'absolute',
-
-            top: '74px',
-
-            left: '50%',
-
-            transform: 'translateX(-50%)',
-
-            zIndex: 90,
-
-            display: 'flex',
-
-            alignItems: 'center',
-
-            gap: '8px',
-
-            padding: '6px 14px',
-
-            borderRadius: '20px',
-
-            backgroundColor: 'rgba(17, 24, 39, 0.92)',
-
-            backdropFilter: 'blur(8px)',
-
-            border: '1px solid var(--border-color)',
-
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.35)',
-
-            color: 'var(--text-primary)',
-
-            fontSize: '12px',
-
-            fontWeight: '500',
-
-            pointerEvents: 'none',
-
-            userSelect: 'none',
-
-            animation: 'fadeIn 0.2s ease-out'
-
-          }}>
-
-            <Loader2 size={13} className="animate-spin" color="var(--accent-color)" />
-
-            <span>Loading messages...</span>
-
-          </div>
-
-        )}
-
-
-
-
-
-
-
-
-
-        <div
-
-          ref={messagesContainerRef}
-
-          className="hide-scrollbar"
-
-          onScroll={async (e) => {
-
-            const el = e.target;
-
-
-
-            // --- NEW: Scroll to bottom detection ---
-
-            const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-
-            const isScrollingDown = el.scrollTop > lastScrollTopRef.current;
-
-
-
-            if (distanceFromBottom > 200) {
-
-              if (isScrollingDown) {
-
-                setShowScrollDownBtn(true);
-
-                isScrolledUpRef.current = true;
-
-              } else if (el.scrollTop < lastScrollTopRef.current) {
-
-                // Only hide if explicitly scrolling UP away from bottom
-
-                setShowScrollDownBtn(false);
-
-              }
-
-            } else {
-
-              // We are at the bottom
-
-              setShowScrollDownBtn(false);
-
-              isScrolledUpRef.current = false;
-
-              setUnreadSinceScrolled(0);
-
-            }
-
-            lastScrollTopRef.current = el.scrollTop;
-
-            // ---------------------------------------
-
-
-
-            const threshold = 300; // Trigger load when within 300px of top
-
-            const oldScrollHeight = el.scrollHeight;
-
-
-
-            if (el.scrollTop < threshold && !isLoadingMoreRef.current) {
-
-              const spaceMessages = (messageStore.getMessages(chatid) || []).filter(m => {
-
-                const msgSpace = m.spaceid !== undefined ? m.spaceid : (m.spaceId !== undefined ? m.spaceId : 0);
-
-                return Number(msgSpace) === Number(activeSpace || 0);
-
-              });
-
-              if (!spaceMessages || spaceMessages.length === 0) return;
-
-              const oldestTimestamp = messageStore.getBatchFrontier(chatid, activeSpace) || spaceMessages[0].timestamp;
-
-
-
-              isLoadingMoreRef.current = true;
-
-
-
-              // 1. Concurrent WebSocket load more for ALL chats
-
-              if (hasMoreInServerRef.current) {
-
-                const now = Date.now();
-
-                if (oldestTimestamp !== lastLoadMoreTimestampRef.current || (now - lastLoadMoreTimeRef.current) > 5 * 60 * 1000) {
-
-                  lastLoadMoreTimestampRef.current = oldestTimestamp;
-
-                  lastLoadMoreTimeRef.current = now;
-
-                  console.log("[ChatBox] Sync load-more via WebSocket triggered for timestamp:", oldestTimestamp);
-
-                  sendSafe({
-
-                    purpose: "load-more",
-
-                    userchatId: chatid,
-
-                    usermsgId: activeSpace,
-
-                    timestamp: oldestTimestamp
-
-                  });
-
-                }
-
-              }
-
-
-
-              // 2. Local DB load (fetch up to 50 msgs)
-
-              if (hasMoreInDBRef.current) {
-
-                messageStore.loadMoreMessages(chatid, oldestTimestamp, 50, activeSpace).then(loadedMsgs => {
-
-                  if (loadedMsgs && loadedMsgs.length > 0) {
-
-                    if (loadedMsgs.length < 50) hasMoreInDBRef.current = false;
-
-                    setMessages([...messageStore.getMessages(chatid)]);
-
-                    requestAnimationFrame(() => {
-
-                      if (el) el.scrollTop = el.scrollHeight - oldScrollHeight;
-
-                    });
-
-                  } else {
-
-                    hasMoreInDBRef.current = false;
-
-                  }
-
-                  isLoadingMoreRef.current = false;
-
-                }).catch(() => {
-
-                  isLoadingMoreRef.current = false;
-
-                });
-
-              } else {
-
-                // Wait briefly for WebSocket batch to arrive if IDB is empty
-
-                setTimeout(() => {
-
-                  if (isMounted.current) isLoadingMoreRef.current = false;
-
-                }, 1000);
-
-              }
-
-            }
-
-          }}
-
-          style={{
-
-            flex: 1,
-
-            overflowY: "auto",
-
-            overflowX: "hidden",
-
-            padding: isMobile ? '12px' : '16px',
-
-            display: "flex",
-
-            flexDirection: "column",
-
-            gap: isMobile ? '10px' : '12px',
-
-            touchAction: 'pan-y',
-
-          }}
-
-        >
-
-
-
-
-
-          {/* End-to-End Encryption Security Pill */}
-
-          <div style={{
-
-            display: 'flex',
-
-            alignItems: 'center',
-
-            justifyContent: 'center',
-
-            margin: '8px auto 14px',
-
-            maxWidth: '92%',
-
-            padding: '8px 14px',
-
-            backgroundColor: 'var(--bg-card)',
-
-            border: '1px solid var(--border-color)',
-
-            borderRadius: '12px',
-
-            color: 'var(--text-secondary)',
-
-            fontSize: '12px',
-
-            lineHeight: '1.4',
-
-            textAlign: 'center',
-
-            gap: '8px',
-
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-
-            userSelect: 'none'
-
-          }}>
-
-            <Lock size={14} color="var(--accent-color)" style={{ flexShrink: 0 }} />
-
-            <span>Messages are encrypted. Not even LetsChat can read or listen to them.</span>
-
-          </div>
-
-
-
-          {/* Empty Space / Chat Suggestion Chips View */}
-
-          {filteredMessages.length === 0 && (
-
-            <div style={{
-
-              display: 'flex',
-
-              flexDirection: 'column',
-
-              alignItems: 'center',
-
-              justifyContent: 'center',
-
-              padding: '40px 20px',
-
-              textAlign: 'center',
-
-              color: 'var(--text-secondary)',
-
-              margin: 'auto 0'
-
-            }}>
-
-              <div style={{
-
-                width: '64px',
-
-                height: '64px',
-
-                borderRadius: '18px',
-
-                backgroundColor: 'var(--accent-tint)',
-
-                display: 'flex',
-
-                alignItems: 'center',
-
-                justifyContent: 'center',
-
-                color: 'var(--accent-color)',
-
-                marginBottom: '16px'
-
-              }}>
-
-                <Zap size={32} />
-
-              </div>
-
-              <h4 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)', margin: '0 0 6px 0' }}>
-
-                No messages here yet
-
-              </h4>
-
-              <p style={{ fontSize: '13px', margin: '0 0 20px 0', maxWidth: '300px', opacity: 0.85 }}>
-
-                Start the conversation or try one of the quick suggestions below
-
-              </p>
-
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center', maxWidth: '380px' }}>
-
-                {[
-
-                  { text: 'Say Hello 👋', action: () => setInput('Hello 👋') },
-
-                  { text: 'Share a note 📝', action: () => setInput('Hey! Sharing a quick note: ') },
-
-                  { text: 'Schedule a meeting 📅', action: () => setShowScheduleModal(true) }
-
-                ].map((chip, idx) => (
-
-                  <button
-
-                    key={idx}
-
-                    onClick={chip.action}
-
-                    style={{
-
-                      padding: '8px 14px',
-
-                      borderRadius: '20px',
-
-                      border: '1px solid var(--border-color)',
-
-                      backgroundColor: 'var(--bg-secondary)',
-
-                      color: 'var(--accent-color)',
-
-                      fontSize: '13px',
-
-                      fontWeight: '600',
-
-                      cursor: 'pointer',
-
-                      transition: 'all 0.2s ease'
-
-                    }}
-
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--accent-tint)'}
-
-                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--bg-secondary)'}
-
-                  >
-
-                    {chip.text}
-
-                  </button>
-
-                ))}
-
-              </div>
-
-            </div>
-
-          )}
-
-
-
-          {filteredMessages.map(msg => {
-
-            const isReceived = msg.userid
-
-              ? (String(msg.userid) !== String(localStorage.getItem("userid")))
-
-              : (msg.sendername && msg.sendername !== myDisplayName);
-
-            const msgSenderId = msg.userid || msg.senderid || msg.senderId;
-
-            const msgStreak = msg.pulseStreak || msg.senderStreak || (msgSenderId ? userStreakMap[msgSenderId] : 0) || (chat?.type === 'private' && isReceived ? (chat?.pulseStreak || 0) : 0) || 0;
-
-            let msgFireClass = "";
-
-            if (msgStreak >= 7) {
-
-              msgFireClass = "moving-blue-fire-msg-bubble";
-
-            } else if (msgStreak >= 3) {
-
-              msgFireClass = "moving-red-fire-msg-bubble";
-
-            }
-
-            const dateOnly = getDateOnly(msg.timestamp);
-
-            const showDate = dateOnly !== lastdate;
-
-            const event = (msg.msgid && eventByMsgId.get(String(msg.msgid))) || (msg.tempmsgid ? eventByMsgId.get(String(msg.tempmsgid)) : null);
-
-
-
-            if (showDate) {
-
-              lastdate = dateOnly;
-
-            }
-
-
-
-            return (
-
-              <React.Fragment key={msg.pendingid || msg.tempmsgid || msg.msgid}>
-
-                {showDate && (
-
-                  <div
-
-                    style={{
-
-                      border: "1px solid var(--border-color)",
-
-                      textAlign: "center",
-
-                      color: "var(--text-secondary)",
-
-                      padding: isMobile ? '6px 12px' : '8px 16px',
-
-                      borderRadius: '20px',
-
-                      fontSize: isMobile ? '11px' : '12px',
-
-                      fontWeight: "600",
-
-                      margin: "12px auto",
-
-                      backgroundColor: "var(--bg-card)",
-
-                      cursor: "pointer",
-
-                      userSelect: "none",
-
-                      maxWidth: "200px",
-
-                      transition: "all 0.2s ease",
-
-                      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15)",
-
-                    }}
-
-                    ref={(el) => (messageRefs.current[`date-${dateOnly}`] = el)}
-
-                    onClick={(e) => {
-
-                      e.stopPropagation();
-
-                      if (collapsedView) {
-
-                        // If in collapsed view, expand ALL messages and scroll to this date
-
-                        setCollapsedView(false);
-
-                        // Scroll to this date's first message after expanding
-
-                        setTimeout(() => {
-
-                          const element = messageRefs.current[`date-${dateOnly}`];
-
-                          if (element) {
-
-                            element.scrollIntoView({ behavior: "smooth", block: "start" });
-
-                          }
-
-                        }, 50);
-
-                      } else {
-
-                        // Collapse all messages, show only dates
-
-                        setCollapsedView(true);
-
-                      }
-
-                    }}
-
-                  >
-
-                    {formatDateWithLabel(msg.timestamp)}
-
-                  </div>
-
-                )}
-
-
-
-                {!collapsedView && (
-
-                  <>
-
-                    {unreadMarker.firstId === (msg.msgid || msg.tempmsgid) && (
-
-                      <div style={{
-
-                        margin: '24px auto',
-
-                        textAlign: 'center',
-
-                        position: 'relative',
-
-                        display: 'flex',
-
-                        alignItems: 'center',
-
-                        justifyContent: 'center',
-
-                        width: '100%',
-
-                        padding: '12px 0'
-
-                      }}>
-
-                        <div style={{
-
-                          position: 'absolute',
-
-                          left: 0, right: 0, top: '50%',
-
-                          height: '1px',
-
-                          backgroundColor: 'var(--border-color)',
-
-                          zIndex: 0
-
-                        }} />
-
-                        <span style={{
-
-                          backgroundColor: 'var(--bg-card)',
-
-                          color: 'var(--accent-color)',
-
-                          padding: '6px 16px',
-
-                          borderRadius: '24px',
-
-                          fontSize: '11px',
-
-                          fontWeight: '800',
-
-                          textTransform: 'uppercase',
-
-                          letterSpacing: '1.2px',
-
-                          zIndex: 1,
-
-                          border: '1px solid var(--border-color)',
-
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-
-                          display: 'flex',
-
-                          alignItems: 'center',
-
-                          gap: '8px'
-
-                        }}>
-
-                          <span style={{ fontSize: '14px' }}>🔔</span>
-
-                          {unreadMarker.count} New Message{unreadMarker.count > 1 ? 's' : ''}
-
-                        </span>
-
-                      </div>
-
-                    )}
-
-                    {msg.isPendingPlaceholder ? (
-                      <PendingMediaBubble
-                        msg={msg}
-                        isMobile={isMobile}
-                        showSenderName={chat?.type !== 'private'}
-                      />
-                    ) : msg.sendername === "server" || msg.type === "banner" || msg.type === "banner-pin" || msg.type === "event-banner-pin" ? (
-
-                      <div
-
-                        ref={(el) => (messageRefs.current[msg.msgid] = el)}
-
-                        className={highlightedPinId === msg.msgid ? "banner-pin-entrance-pulse" : undefined}
-
-                        onClick={() => {
-
-                          if (isEventBannerPin(msg)) {
-
-                            handleBannerPinClick(msg);
-
-                          }
-
-                        }}
-
-                        style={{
-
-                          alignSelf: "center",
-
-                          backgroundColor: (msg.type === "event-banner-pin" || isEventBannerPin(msg) || (msg.type === "banner-pin" && isWithin24Hours(msg.timestamp)))
-
-                            ? "rgba(30, 58, 95, 0.4)"
-
-                            : "var(--bg-card)",
-
-                          color: (msg.type === "event-banner-pin" || isEventBannerPin(msg) || (msg.type === "banner-pin" && isWithin24Hours(msg.timestamp)))
-
-                            ? "var(--text-primary)"
-
-                            : "var(--text-secondary)",
-
-                          padding: isMobile ? '6px 12px' : '8px 16px',
-
-                          borderRadius: '16px',
-
-                          fontSize: isMobile ? '12px' : '13px',
-
-                          border: (msg.type === "event-banner-pin" || isEventBannerPin(msg) || (msg.type === "banner-pin" && isWithin24Hours(msg.timestamp)))
-
-                            ? "1px solid var(--accent-tint-border)"
-
-                            : "1px solid var(--border-color)",
-
-                          display: "flex",
-
-                          alignItems: "center",
-
-                          gap: "8px",
-
-                          boxShadow: (msg.type === "event-banner-pin" || isEventBannerPin(msg) || (msg.type === "banner-pin" && isWithin24Hours(msg.timestamp)))
-
-                            ? "0 4px 12px var(--accent-tint)"
-
-                            : undefined,
-
-                          transition: "all 0.3s ease",
-
-                          cursor: isEventBannerPin(msg) ? 'pointer' : 'default'
-
-                        }}
-
-                        title={isEventBannerPin(msg) ? "Click to view event in Group Calendar" : undefined}
-
-                      >
-
-                        {(msg.type === "event-banner-pin" || isEventBannerPin(msg) || (msg.type === "banner-pin" && isWithin24Hours(msg.timestamp))) && (
-
-                          <span style={{ fontSize: "13px" }}>📌</span>
-
-                        )}
-
-                        <span>{formatBannerText(msg)}</span>
-
-                        {(msg.type === "event-banner-pin" || isEventBannerPin(msg) || (msg.type === "banner-pin" && isWithin24Hours(msg.timestamp))) && (
-
-                          <span style={{
-
-                            fontSize: "10px",
-
-                            fontWeight: "700",
-
-                            color: 'var(--accent-text)',
-
-                            backgroundColor: "var(--accent-tint)",
-
-                            border: "1px solid var(--accent-tint-border)",
-
-                            padding: "1px 6px",
-
-                            borderRadius: "6px",
-
-                            letterSpacing: "0.02em"
-
-                          }}>
-
-                            Pinned
-
-                          </span>
-
-                        )}
-
-                      </div>
-
-                    ) : (
-
-                      <div style={{
-
-                        position: "relative",
-
-                        width: "100%",
-
-                        display: "flex",
-
-                        flexDirection: "column",
-
-                        animation: "fadeIn 0.3s ease-in",
-
-                        marginBottom: (msg.reactions && Object.values(msg.reactions).some(r => Array.isArray(r) && r.length > 0)) ? '24px' : '8px'
-
-                      }}>
-
-                        {msg.isdeleted || msg.isdeletedeone ? (
-
-                          <div
-
-                            ref={(el) => {
-
-                              if (msg.msgid) messageRefs.current[msg.msgid] = el;
-
-                              if (msg.tempmsgid) messageRefs.current[msg.tempmsgid] = el;
-
-                            }}
-
-                            style={{
-
-                              alignSelf: isReceived ? "flex-start" : "flex-end",
-
-                              backgroundColor: isReceived ? "var(--message-bg-incoming)" : "var(--bg-card)",
-
-                              color: "var(--text-secondary)",
-
-                              padding: isMobile ? '8px 12px' : '10px 14px',
-
-                              borderRadius: isReceived ? "16px 16px 16px 4px" : "16px 16px 4px 16px",
-
-                              maxWidth: isMobile ? "80%" : "70%",
-
-                              wordWrap: "break-word",
-
-                              cursor: "pointer",
-
-                              border: "1px solid var(--border-color)",
-
-                              transition: "all 0.2s ease",
-
-                              fontSize: isMobile ? '13px' : '14px',
-
-                            }}
-
-                            onClick={() => { revive(msg) }}
-
-                          >
-
-                            {isReceived && (
-
-                              <div style={{
-
-                                fontSize: isMobile ? '11px' : '12px',
-
-                                fontWeight: "600",
-
-                                color: "var(--accent-color)",
-
-                                marginBottom: "4px",
-
-                              }}>
-
-                                {msg.sendername}
-
-                              </div>
-
-                            )}
-
-
-
-                            <p style={{ margin: "4px 0", fontSize: isMobile ? '13px' : '14px', fontStyle: "italic" }}>
-
-                              {msg.isdeletedeone && isReceived
-
-                                ? `This message was deleted by ${chatlist.find(u => u.id === msg.isdeletedeone)?.chatName || "user"}`
-
-                                : 'This message was deleted by you'}
-
-                            </p>
-
-                          </div>
-
-                        ) : (
-
-                          <div
-
-                            ref={(el) => {
-
-                              if (msg.msgid) messageRefs.current[msg.msgid] = el;
-
-                              if (msg.tempmsgid) messageRefs.current[msg.tempmsgid] = el;
-
-                            }}
-
-                            className={`msg-bubble ${isReceived ? 'msg-bubble-received' : 'msg-bubble-sent'} ${['image', 'video'].includes(msg.type) ? 'msg-bubble-media' : 'msg-bubble-text'} ${selectedMessages.has(msg) ? 'is-selected' : ''} ${msgFireClass || ''}`}
-                            style={{
-                              alignSelf: isReceived ? "flex-start" : "flex-end",
-                              cursor: "pointer",
-                              transition: (swipeOffset[msg.msgid] || 0) === 0 ? "all 0.2s ease" : "none",
-                              position: "relative",
-                              userSelect: "none",
-                              WebkitUserSelect: "none",
-                              touchAction: "pan-y",
-                              transform: `translateX(${swipeOffset[msg.msgid] || 0}px)`,
-                            }}
-                            onMouseEnter={() => !isMobile && setHoveredMsgId(msg.msgid || msg.tempmsgid)}
-
-                            onMouseLeave={() => !isMobile && setHoveredMsgId(null)}
-
-                            //onDoubleClick={(e) => msgSelect(e, msg)}
-
-                            onClick={() => handleClickMessage(msg)}
-
-                            {...(isMobile
-
-                              ? {
-
-                                onTouchStart: (e) => {
-
-                                  handleSwipeStart(e, msg.msgid);
-
-                                  handleTouchStart(msg);
-
-                                },
-
-                                onTouchMove: (e) => {
-
-                                  handleSwipeMove(e, msg.msgid);
-
-                                },
-
-                                onTouchEnd: () => {
-
-                                  handleTouchEnd(msg);
-
-                                  handleSwipeEnd(msg);
-
-                                },
-
-                              }
-
-                              : {}
-
-                            )}
-
-                          >
-
-                            {msg.forwardedfrom && (
-
-                              <div style={{
-
-                                fontSize: '10px',
-
-                                marginBottom: "6px",
-
-                                color: isReceived ? "var(--text-secondary)" : "rgba(255, 255, 255, 0.75)",
-
-                                fontStyle: "italic",
-
-                                display: "flex",
-
-                                alignItems: "center",
-
-                                gap: "4px",
-
-                              }}>
-
-                                <span>↪</span> Forwarded
-
-                              </div>
-
-                            )}
-
-
-
-                            {/* Swipe Reply Indicator */}
-
-                            {isMobile && (swipeOffset[msg.msgid] || 0) > 30 && (
-
-                              <div
-
-                                style={{
-
-                                  position: "absolute",
-
-                                  left: "-35px",
-
-                                  top: "50%",
-
-                                  transform: "translateY(-50%)",
-
-                                  opacity: Math.min((swipeOffset[msg.msgid] || 0) / 70, 1),
-
-                                  color: 'var(--accent-text)',
-
-                                  fontSize: "20px",
-
-                                  transition: "opacity 0.1s ease",
-
-                                }}
-
-                              >
-
-                                ↩
-
-                              </div>
-
-                            )}
-
-
-
-                            {isReceived && (
-
-                              <div style={{
-
-                                fontSize: isMobile ? '11px' : '12px',
-
-                                fontWeight: "600",
-
-                                marginBottom: "6px",
-
-                                color: "var(--accent-color)",
-
-                                display: "flex",
-
-                                alignItems: "center",
-
-                                gap: "6px"
-
-                              }}>
-
-                                <span>{msg.sendername}</span>
-
-                                {msgStreak > 0 && (
-
-                                  <StreakBadge streak={msgStreak} size="sm" />
-
-                                )}
-
-                              </div>
-
-                            )}
-
-
-
-                            {msg.repliedto && (() => {
-
-                              if (typeof msg.repliedto === 'string' && (msg.repliedto.startsWith("PULSE_REPLY:") || msg.repliedto.startsWith("PULSE_TAG:"))) {
-
-                                return <PulseQuoteCard repliedtoStr={msg.repliedto} isReceived={isReceived} />;
-
-                              }
-
-                              const repliedMsg = messages.find(m => m.msgid === msg.repliedto);
-
-                              return repliedMsg ? (
-
-                                <div
-
-                                  style={{
-
-                                    backgroundColor: isReceived ? "rgba(0,0,0,0.12)" : "var(--border-color)",
-
-                                    borderLeft: "3px solid var(--accent-color)",
-
-                                    padding: '6px 10px',
-
-                                    borderRadius: "6px",
-
-                                    marginBottom: "8px",
-
-                                    fontSize: isMobile ? '11px' : '12px',
-
-                                    cursor: "pointer",
-
-                                  }}
-
-                                  onClick={(e) => {
-
-                                    e.stopPropagation();
-
-                                    setActiveSpace(repliedMsg.spaceid);
-
-                                    const element = messageRefs.current[msg.repliedto];
-
-                                    if (element) {
-
-                                      element.scrollIntoView({ behavior: "smooth", block: "center" });
-
-                                      const originalBg = element.style.backgroundColor;
-
-                                      element.style.backgroundColor = "var(--accent-tint)";
-
-                                      element.style.transition = "background-color 2s ease";
-
-                                      setTimeout(() => {
-
-                                        element.style.backgroundColor = originalBg || "";
-
-                                      }, 2000);
-
-                                    }
-
-                                  }}
-
-                                >
-
-                                  <div style={{ fontWeight: "600", color: 'var(--accent-color)', marginBottom: "2px" }}>
-
-                                    {repliedMsg.status === null ? repliedMsg.sendername : "You"}
-
-                                  </div>
-
-                                  <div style={{ opacity: 0.9 }}>
-
-                                    {repliedMsg.type === 'text' && (stripMentionEncoding(repliedMsg.content).length > 50
-
-                                      ? stripMentionEncoding(repliedMsg.content).substring(0, 50) + '...'
-
-                                      : stripMentionEncoding(repliedMsg.content))}
-
-                                    {repliedMsg.type === 'image' && '📷 Photo'}
-
-                                    {repliedMsg.type === 'video' && '🎥 Video'}
-
-                                    {repliedMsg.type === 'audio' && '🎤 Audio'}
-
-                                    {repliedMsg.type === 'file' && '📄 Document'}
-
-                                    {repliedMsg.type === 'assignment' && '📚 Assignment'}
-
-                                    {(repliedMsg.type === 'poll' || Boolean(repliedMsg.poll) || (typeof repliedMsg.content === 'string' && repliedMsg.content.trim().startsWith('{"poll_id"'))) && '📊 Poll'}
-
-                                  </div>
-
-                                </div>
-
-                              ) : null;
-
-                            })()}
-
-
-
-                            <div style={{ fontSize: isMobile ? '13px' : '14px', lineHeight: "1.5" }}>
-
-                              {msg.type === 'text' && renderFormattedText(msg.content)}
-
-                              {msg.type == 'assignment' && (<AssignmentMessage id={msg.content} userRole={chat.role} isMobile={isMobile} onOpenPanel={(id) => { setSelectedAssignmentId(id); setShowAssignmentDetail(true); }} />)}
-
-                               {msg.type === 'poll' && (
-
-                                 <div
-
-                                   onClick={(e) => e.stopPropagation()}
-
-                                   onMouseDown={(e) => e.stopPropagation()}
-
-                                   onTouchStart={(e) => e.stopPropagation()}
-
-                                   onTouchEnd={(e) => e.stopPropagation()}
-
-                                   style={{ width: '100%' }}
-
-                                 >
-
-                                   <PollWidget message={msg} currentUserId={currentUserId} members={chatMembers} />
-
-                                 </div>
-
-                               )}
-
-                              {['image', 'video', 'audio', 'file', 'pdf'].includes(msg.type) && msg.content && (
-
-                                <MediaMessage
-
-                                  msg={msg}
-
-                                  isReceived={isReceived}
-
-                                  isMobile={isMobile}
-
-                                  isSelectionMode={isSelectionMode}
-
-                                  onOpenViewer={setViewingMedia}
-
-                                  onRetry={retryMediaUpload}
-
-                                />
-
-                              )}
-
-                            </div>
-
-
-
-                            {/* Reactions Display (WhatsApp Style Glass Pill) */}
-
-                            {(() => {
-
-                              const validEntries = Object.entries(msg.reactions || {})
-
-                                .filter(([_, reactors]) => Array.isArray(reactors) && reactors.length > 0);
-
-                              if (validEntries.length === 0) return null;
-
-
-
-                              const sortedEntries = [...validEntries].sort((a, b) => b[1].length - a[1].length);
-
-                              const totalCount = sortedEntries.reduce((sum, [_, reactors]) => sum + reactors.length, 0);
-
-                              const topEmojis = sortedEntries.slice(0, 3).map(([emoji]) => emoji);
-
-
-
-                              const tooltipTitle = sortedEntries
-
-                                .map(([emoji, reactors]) => `${emoji} ${reactors.map(r => r.username || 'User').join(', ')}`)
-
-                                .join('\n');
-
-
-
-                              const ariaText = `${totalCount} reaction${totalCount === 1 ? '' : 's'}. Show who reacted`;
-
-
-
-                              return (
-
-                                <button
-
-                                  type="button"
-
-                                  aria-label={ariaText}
-
-                                  title={tooltipTitle}
-
-                                  onClick={(e) => {
-
-                                    e.stopPropagation();
-
-                                    setReactionInfo({ reactions: msg.reactions, msg });
-
-                                  }}
-
-                                  style={{
-
-                                    position: 'absolute',
-
-                                    bottom: '-10px',
-
-                                    ...(isReceived ? { left: '8px' } : { right: '8px' }),
-
-                                    display: 'flex',
-
-                                    alignItems: 'center',
-
-                                    gap: '2px',
-
-                                    padding: '2px 6px',
-
-                                    borderRadius: '999px',
-
-                                    lineHeight: 1.1,
-
-                                    zIndex: 2,
-
-                                    cursor: 'pointer',
-
-                                    fontSize: '12px',
-
-                                    border: '1px solid rgba(255,255,255,0.4)',
-
-                                    color: '#ffffff',
-
-                                    backgroundImage: `${MARBLE_URL}, linear-gradient(180deg, rgba(255,255,255,0.38) 0%, rgba(255,255,255,0) 55%), var(--accent-gradient)`,
-
-                                    backgroundSize: '96px 48px, auto, auto',
-
-                                    boxShadow: '0 0 0 2px var(--bg-primary), inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -1px 0 rgba(0,0,0,0.15), 0 3px 8px rgba(0,0,0,0.3)',
-
-                                    outlineOffset: '2px'
-
-                                  }}
-
-                                >
-
-                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '12px', lineHeight: 1 }}>
-
-                                    {topEmojis.map(emoji => (
-
-                                      <span key={emoji}>{String(emoji).slice(0, 15)}</span>
-
-                                    ))}
-
-                                  </span>
-
-                                  {totalCount > 1 && (
-
-                                    <span style={{ fontSize: '10px', fontWeight: 700, color: '#ffffff', marginLeft: '2px', lineHeight: 1 }}>
-
-                                      {totalCount}
-
-                                    </span>
-
-                                  )}
-
-                                </button>
-
-                              );
-
-                            })()}
-
-
-
-
-
-                            {(!(['image', 'video'].includes(msg.type) && !msg.isQueuedForMedia && msg.status !== 'waiting_for_upload' && !msg.revived && !msg.isStarred && !(!isMobile && hoveredMsgId === (msg.msgid || msg.tempmsgid)))) && (
-                            <div style={{
-
-                              display: "flex",
-
-                              justifyContent: "space-between",
-
-                              alignItems: "center",
-
-                              marginTop: "6px",
-
-                              gap: "6px"
-
-                            }}>
-
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
-
-                                {(msg.isStarred || (!isMobile && hoveredMsgId === (msg.msgid || msg.tempmsgid))) && (
-
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-
-                                    <button
-
-                                      onClick={(e) => toggleStar(e, msg)}
-
-                                      style={{
-
-                                        background: 'none',
-
-                                        border: 'none',
-
-                                        padding: '0',
-
-                                        cursor: 'pointer',
-
-                                        display: 'flex',
-
-                                        alignItems: 'center',
-
-                                        color: msg.isStarred ? 'var(--warning-color)' : (isReceived ? "var(--text-secondary)" : "rgba(255, 255, 255, 0.75)"),
-
-                                        transition: 'transform 0.2s ease',
-
-                                      }}
-
-                                      onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.2)'}
-
-                                      onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-
-                                    >
-
-                                      <Star size={14} fill={msg.isStarred ? "var(--warning-color)" : "none"} />
-
-                                    </button>
-
-                                  </div>
-
-                                )}
-
-
-
-                                <span style={{
-
-                                  color: isReceived ? "var(--text-secondary)" : "rgba(255, 255, 255, 0.75)",
-
-                                  fontWeight: "500",
-
-                                  fontSize: "11px"
-
-                                }}>
-
-                                  {msg.isQueuedForMedia || msg.status === 'waiting_for_upload' ? (
-
-                                    <span
-
-                                      onClick={(e) => {
-
-                                        e.stopPropagation();
-
-                                        setSelectedQueuedMsg(msg);
-
-                                      }}
-
-                                      style={{ color: 'var(--warning-color)', fontWeight: '600', cursor: 'pointer' }}
-
-                                      title="Click to Send Now or Delete"
-
-                                    >
-
-                                      Waiting for upload ⏳
-
-                                    </span>
-
-                                  ) : formatTime12Hour(msg.timestamp, selectedMessages.has(msg))}
-
-                                </span>
-
-                              {msg.revived && (
-
-                                  <span style={{
-
-                                    fontSize: '10px',
-
-                                    color: "var(--success-color)",
-
-                                    fontWeight: "500",
-
-                                    backgroundColor: "#065f46",
-
-                                    padding: "2px 6px",
-
-                                    borderRadius: "4px",
-
-                                  }}>
-
-                                    ⟳ Revived
-
-                                  </span>
-
-                                )}
-
-                                {!isReceived && chat.type !== 'classroom' && (
-
-                                  <EyeIcon status={msg.status || "sending"} />
-
-                                )}
-
-                              </div>
-
-                            </div>
-                            )}
-
-                          </div>
-
-                        )}
-
-
-
-                            {event && msg.type === 'text' && (
-
-                              <div
-
-                                style={{
-
-                                  position: "absolute",
-
-                                  top: "-8px",
-
-                                  right: isReceived ? "auto" : "8px",
-
-                                  left: isReceived ? "8px" : "auto",
-
-                                  width: isMobile ? '18px' : '20px',
-
-                                  height: isMobile ? '18px' : '20px',
-
-                                  backgroundColor: event.isAdded ? "var(--success-color)" : "var(--danger-color)",
-
-                                  borderRadius: "50%",
-
-                                  display: "flex",
-
-                                  alignItems: "center",
-
-                                  justifyContent: "center",
-
-                                  color: "white",
-
-                                  fontSize: isMobile ? '10px' : '11px',
-
-                                  fontWeight: "bold",
-
-                                  cursor: "pointer",
-
-                                  boxShadow: "0 2px 4px rgba(0,0,0,0.3)",
-
-                                  zIndex: 10,
-
-                                  border: "1.5px solid var(--bg-primary)",
-
-                                  animation: "popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)"
-
-                                }}
-
-                                onClick={(e) => {
-
-                                  e.stopPropagation();
-
-                                  setSelectedEvent(event);
-
-                                  setShowEventModal(true);
-
-                                  setEventRecived(isReceived);
-
-                                }}
-
-                              >
-
-                                {event.isAdded ? "i" : "+"}
-
-                              </div>
-
-                            )}
-
-                          </div>
-
-                        )}
-
-                      </>
-
-                    )}
-
-                  </React.Fragment>
-
-                );
-
-          })}
-
-                <div style={{
-
-                  display: 'flex',
-
-                  flexDirection: 'column',
-
-                  gap: '8px',
-
-                  padding: '12px 0'
-
-                }}>
-
-                  {import.meta.env.DEV && transientIndicators.length > 0 && console.log("[ChatBox] Rendering indicators:", transientIndicators)}
-
-                  {transientIndicators.map(ind => (
-
-                    <div
-
-                      key={ind.userid}
-
-                      style={{
-
-                        alignSelf: "flex-start",
-
-                        backgroundColor: "rgba(31, 41, 55, 0.4)",
-
-                        color: "var(--text-secondary)",
-
-                        padding: isMobile ? '6px 12px' : '8px 16px',
-
-                        borderRadius: '16px 16px 16px 4px',
-
-                        fontSize: isMobile ? '12px' : '13px',
-
-                        border: "1px solid rgba(55, 65, 81, 0.3)",
-
-                        display: 'flex',
-
-                        alignItems: 'center',
-
-                        gap: '8px',
-
-                        marginLeft: '8px',
-
-                        fontStyle: 'italic',
-
-                        animation: 'fadeIn 0.3s ease-out'
-
-                      }}
-
-                    >
-
-                      <div style={{ fontWeight: '600', color: 'var(--accent-text)' }}>
-
-                        {chat.type === 'private' ? (chat.chatName || "Other") : ind.sendername}
-
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-
-                        {ind.content === 'typing' && (
-
-                          <span style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
-
-                            is typing
-
-                            <span className="dot-blink-1">.</span>
-
-                            <span className="dot-blink-2">.</span>
-
-                            <span className="dot-blink-3">.</span>
-
-                          </span>
-
-                        )}
-
-                        {ind.content === 'recording' && (
-
-                          <span style={{ display: 'flex', gap: '6px', alignItems: 'center', color: 'var(--danger-color)' }}>
-
-                            recording audio
-
-                            <div className="rec-pulse" style={{ width: '8px', height: '8px', background: 'var(--danger-color)', borderRadius: '50%' }} />
-
-                          </span>
-
-                        )}
-
-                        {ind.content === 'in-chat' && (
-
-                          <span>is in chat</span>
-
-                        )}
-
-                      </div>
-
-                    </div>
-
-                  ))}
-
-                </div>
-
-                <style>{`
-
-            @keyframes blink { 0% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 0; } }
-
-            .dot-blink-1 { animation: blink 1.4s infinite 0s; }
-
-            .dot-blink-2 { animation: blink 1.4s infinite 0.2s; }
-
-            .dot-blink-3 { animation: blink 1.4s infinite 0.4s; }
-
-            @keyframes pulse-red { 0% { transform: scale(0.8); opacity: 0.5; } 50% { transform: scale(1.2); opacity: 1; } 100% { transform: scale(0.8); opacity: 0.5; } }
-
-            .rec-pulse { animation: pulse-red 1s infinite; }
-
-            @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-
-          `}</style>
-
-                <div ref={bottomRef} />
-
-
-
-                {/* Add CSS for scrollbar styling */}
-
-                <style>{`
-
-        @keyframes fadeIn {
-
-          from {
-
-            opacity: 0;
-
-            transform: translateY(10px);
-
-          }
-
-          to {
-
-            opacity: 1;
-
-            transform: translateY(0);
-
-          }
-
-        }
-
-        
-
-        .hide-scrollbar::-webkit-scrollbar {
-
-          width: 6px;
-
-        }
-
-        
-
-        .hide-scrollbar::-webkit-scrollbar-track {
-
-          background: var(--bg-secondary);
-
-          border-radius: 10px;
-
-        }
-
-        
-
-        .hide-scrollbar::-webkit-scrollbar-thumb {
-
-          background: var(--border-color);
-
-          border-radius: 10px;
-
-        }
-
-        
-
-        .hide-scrollbar::-webkit-scrollbar-thumb:hover {
-
-          background: #4b5563;
-
-        }
-
-      `}</style>
-
-              </div>
-
-
-
-        {/* --- Mentions: Jump to Mention FAB --- */}
-
-        {firstUnreadMentionId && !isSelectionMode && (
-
-          <button
-
-            onClick={() => scrollToMessage(firstUnreadMentionId)}
-
-            title="Jump to Mention"
-
-            style={{
-
-              position: 'absolute',
-
-              bottom: showScrollDownBtn ? '145px' : '90px', // sit above the scroll bottom button if it exists
-
-              right: '20px',
-
-              width: '42px',
-
-              height: '42px',
-
-              borderRadius: '50%',
-
-              background: 'var(--warning-color)',
-
-              backdropFilter: 'blur(8px)',
-
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-
-              color: '#fff',
-
-              display: 'flex',
-
-              alignItems: 'center',
-
-              justifyContent: 'center',
-
-              cursor: 'pointer',
-
-              zIndex: 50,
-
-              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-
-              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-
-              fontWeight: 'bold',
-
-              fontSize: '18px'
-
-            }}
-
-            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-
-            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-
-          >
-
-            @
-
-          </button>
-
-        )}
-
-
-
-        {/* --- NEW: Scroll to Bottom FAB --- */ }
-
-            {
-
-              showScrollDownBtn && !isSelectionMode && (
-
-                <button
-
-                  onClick={scrollToBottom}
-
-                  style={{
-
-                    position: 'absolute',
-
-                    bottom: '90px',
-
-                    right: '20px',
-
-                    width: '42px',
-
-                    height: '42px',
-
-                    borderRadius: '50%',
-
-                    background: 'rgba(30, 41, 59, 0.8)',
-
-                    backdropFilter: 'blur(8px)',
-
-                    border: '1px solid var(--border-color)',
-
-                    color: 'var(--accent-text)',
-
-                    display: 'flex',
-
-                    alignItems: 'center',
-
-                    justifyContent: 'center',
-
-                    cursor: 'pointer',
-
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
-
-                    zIndex: 100,
-
-                    transition: 'all 0.2s ease',
-
-                  }}
-
-                  onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
-
-                  onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-
-                >
-
-                  <ChevronDown style={{ width: '24px', height: '24px' }} strokeWidth={3} />
-
-                  {unreadSinceScrolled > 0 && (
-
-                    <div style={{
-
-                      position: 'absolute',
-
-                      top: '-5px',
-
-                      right: '-5px',
-
-                      background: 'var(--danger-color)',
-
-                      color: 'white',
-
-                      fontSize: '10px',
-
-                      fontWeight: '800',
-
-                      borderRadius: '50%',
-
-                      minWidth: '18px',
-
-                      height: '18px',
-
-                      display: 'flex',
-
-                      alignItems: 'center',
-
-                      justifyContent: 'center',
-
-                      padding: '0 4px',
-
-                      border: '2px solid var(--bg-secondary)',
-
-                    }}>
-
-                      {unreadSinceScrolled > 99 ? '99+' : unreadSinceScrolled}
-
-                    </div>
-
-                  )}
-
-                </button>
-
-              )
-
-            }
+        <ChatMessageList
+          isSyncingMessages={isSyncingMessages}
+          messagesContainerRef={messagesContainerRef}
+          onScroll={handleMessagesScroll}
+          isMobile={isMobile}
+          filteredMessages={filteredMessages}
+          messages={messages}
+          myDisplayName={myDisplayName}
+          currentUserId={currentUserId}
+          userStreakMap={userStreakMap}
+          chat={chat}
+          eventByMsgId={eventByMsgId}
+          collapsedView={collapsedView}
+          unreadMarker={unreadMarker}
+          chatlist={chatlist}
+          selectedMessages={selectedMessages}
+          hoveredMsgId={hoveredMsgId}
+          swipeOffset={swipeOffset}
+          highlightedPinId={highlightedPinId}
+          isSelectionMode={isSelectionMode}
+          chatMembers={chatMembers}
+          messageRefs={messageRefs}
+          transientIndicators={transientIndicators}
+          bottomRef={bottomRef}
+          firstUnreadMentionId={firstUnreadMentionId}
+          showScrollDownBtn={showScrollDownBtn}
+          unreadSinceScrolled={unreadSinceScrolled}
+          onSuggestHello={handleSuggestHello}
+          onSuggestNote={handleSuggestNote}
+          onSuggestSchedule={handleSuggestSchedule}
+          onToggleDateCollapse={handleToggleDateCollapse}
+          onBannerPinClick={handleBannerPinClick}
+          onRevive={revive}
+          onHoverChange={setHoveredMsgId}
+          onClickMessage={handleClickMessage}
+          onSwipeStart={handleSwipeStart}
+          onSwipeMove={handleSwipeMove}
+          onSwipeEnd={handleSwipeEnd}
+          onTouchStartMsg={handleTouchStart}
+          onTouchEndMsg={handleTouchEnd}
+          onJumpToReplied={handleJumpToReplied}
+          renderFormattedText={renderFormattedText}
+          onOpenAssignmentPanel={handleOpenAssignmentPanel}
+          onOpenMediaViewer={setViewingMedia}
+          onRetryMediaUpload={retryMediaUpload}
+          onShowReactors={handleShowReactors}
+          onToggleStar={toggleStar}
+          onOpenQueuedMsg={setSelectedQueuedMsg}
+          onOpenEvent={handleOpenEventFromBadge}
+          onScrollToMention={scrollToMessage}
+          onScrollToBottom={scrollToBottom}
+        />
 
             {/* ---------------------------------- */ }
 
@@ -12775,19 +6770,21 @@ const ChatBox = () => {
 
               cameraOpen && (
 
-                <CameraCaptureModal
+                <Suspense fallback={null}>
+                  <CameraCaptureModal
 
-                  onCapture={(file) => {
+                    onCapture={(file) => {
 
-                    setCameraOpen(false);
+                      setCameraOpen(false);
 
-                    setPendingMediaFile(file);
+                      setPendingMediaFile(file);
 
-                  }}
+                    }}
 
-                  onClose={() => setCameraOpen(false)}
+                    onClose={() => setCameraOpen(false)}
 
-                />
+                  />
+                </Suspense>
 
               )
 
@@ -12796,2717 +6793,80 @@ const ChatBox = () => {
 
 
             {/* Bottom Section */ }
-
-            <div style={{ position: "relative" }}>
-
-
-
-              {/* Selection Menu - Shows when messages are selected */}
-
-              {isSelectionMode && (
-
-                <div
-
-                  style={{
-
-                    display: "flex",
-
-                    flexDirection: "column",
-
-                    background: "var(--bg-card)",
-
-                    border: isMobile ? "none" : "1px solid var(--border-color)",
-
-                    borderTop: "2px solid var(--accent-color)",
-
-                    width: isMobile ? "100%" : "calc(100% - 32px)",
-
-                    maxWidth: isMobile ? "100%" : "600px",
-
-                    margin: isMobile ? "0" : "0 auto 12px auto",
-
-                    borderRadius: isMobile ? "0" : "16px",
-
-                    boxShadow: isMobile ? "none" : "0 12px 32px rgba(0, 0, 0, 0.35)",
-
-                    boxSizing: "border-box",
-
-                    backdropFilter: "var(--glass-effect)",
-
-                    zIndex: 20
-
-                  }}
-
-                >
-
-                  {/* Row 1: Count + Cancel */}
-
-                  <div style={{
-
-                    display: "flex",
-
-                    alignItems: "center",
-
-                    justifyContent: "space-between",
-
-                    padding: isMobile ? "8px 16px" : "10px 16px",
-
-                    borderBottom: "1px solid var(--border-color)",
-
-                  }}>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-
-                      <div style={{
-
-                        color: "var(--accent-color)",
-
-                        fontSize: "14px",
-
-                        fontWeight: "700",
-
-                        background: "var(--nav-active-bg)",
-
-                        padding: "4px 12px",
-
-                        borderRadius: "12px",
-
-                        minWidth: "28px",
-
-                        textAlign: "center",
-
-                        border: "1px solid var(--border-color)"
-
-                      }}>
-
-                        {selectedMessages.size}
-
-                      </div>
-
-                      <span style={{ color: "var(--text-secondary)", fontSize: "13px", fontWeight: "500" }}>
-
-                        selected
-
-                      </span>
-
-                    </div>
-
-                    <button
-
-                      onClick={clearSelection}
-
-                      style={{
-
-                        background: "var(--danger-tint)",
-
-                        color: "var(--danger-color)",
-
-                        border: "1px solid var(--danger-tint-border)",
-
-                        borderRadius: "20px",
-
-                        padding: "5px 14px",
-
-                        cursor: "pointer",
-
-                        fontSize: "13px",
-
-                        fontWeight: "600",
-
-                        display: "flex",
-
-                        alignItems: "center",
-
-                        gap: "5px",
-
-                        transition: "all 0.2s ease"
-
-                      }}
-
-                    >
-
-                      <span style={{ fontSize: '14px', fontWeight: '700' }}>✕</span> Cancel
-
-                    </button>
-
-                  </div>
-
-
-
-                  {/* Row 2: Action Buttons */}
-
-                  <div style={{
-
-                    display: "flex",
-
-                    alignItems: "center",
-
-                    justifyContent: isMobile ? "space-around" : "center",
-
-                    flexWrap: "wrap",
-
-                    padding: isMobile ? "6px 4px" : "10px 16px",
-
-                    gap: isMobile ? "4px" : "8px",
-
-                  }}>
-
-                    {(() => {
-
-                      const items = Array.from(selectedMessages);
-
-                      const anyPending = items.some(m => !m.msgid || m.status === 'uploading' || m.status === 'failed' || m.isOptimistic);
-
-
-
-                      if (anyPending) {
-
-                        return (
-
-                          <button
-
-                            onClick={handleCancelUploads}
-
-                            style={{
-
-                              background: "var(--danger-tint)",
-
-                              color: "var(--danger-color)",
-
-                              border: "1px solid var(--danger-tint-border)",
-
-                              padding: "8px 16px",
-
-                              borderRadius: "20px",
-
-                              cursor: "pointer",
-
-                              fontSize: "14px",
-
-                              fontWeight: "600",
-
-                              display: "flex",
-
-                              alignItems: "center",
-
-                              gap: "8px",
-
-                            }}
-
-                          >
-
-                            <span style={{ fontSize: '18px', fontWeight: '700', marginRight: '8px' }}>✕</span>
-
-                            Cancel Upload
-
-                          </button>
-
-                        );
-
-                      }
-
-
-
-                      const actionBtnStyle = (color = "var(--accent-color)") => ({
-
-                        background: "var(--bg-hover)",
-
-                        color: color || "var(--text-primary)",
-
-                        border: "1px solid var(--border-color)",
-
-                        padding: isMobile ? "8px 10px" : "8px 14px",
-
-                        cursor: "pointer",
-
-                        display: "flex",
-
-                        flexDirection: isMobile ? "column" : "row",
-
-                        alignItems: "center",
-
-                        justifyContent: "center",
-
-                        gap: isMobile ? "3px" : "6px",
-
-                        borderRadius: "10px",
-
-                        flex: isMobile ? 1 : "none",
-
-                        minWidth: isMobile ? 0 : "auto",
-
-                        transition: "all 0.15s ease",
-
-                      });
-
-
-
-                      const labelStyle = {
-
-                        fontSize: isMobile ? "10px" : "12px",
-
-                        fontWeight: "500",
-
-                        color: "inherit",
-
-                        whiteSpace: "nowrap",
-
-                      };
-
-
-
-                      return (
-
-                        <>
-
-                          {selectedMessages.size === 1 && (
-
-                            <button onClick={reply} style={actionBtnStyle()}>
-
-                              <Reply size={isMobile ? 19 : 16} />
-
-                              <span style={labelStyle}>Reply</span>
-
-                            </button>
-
-                          )}
-
-
-
-                          <button onClick={delet} style={actionBtnStyle("var(--danger-color)")}>
-
-                            <Trash2 size={isMobile ? 19 : 16} />
-
-                            <span style={labelStyle}>Delete</span>
-
-                          </button>
-
-
-
-                          <button onClick={forward} style={actionBtnStyle()}>
-
-                            <Forward size={isMobile ? 19 : 16} />
-
-                            <span style={labelStyle}>Forward</span>
-
-                          </button>
-
-
-
-                          {selectedMessages.size === 1 && (
-
-                            <button
-
-                              onClick={(e) => {
-
-                                const msg = Array.from(selectedMessages)[0];
-
-                                toggleStar(e, msg);
-
-                                clearSelection();
-
-                              }}
-
-                              style={actionBtnStyle(items[0]?.isStarred ? "var(--warning-color)" : "var(--accent-color)")}
-
-                            >
-
-                              <Star size={isMobile ? 19 : 16} fill={items[0]?.isStarred ? "var(--warning-color)" : "none"} />
-
-                              <span style={labelStyle}>{items[0]?.isStarred ? "Unstar" : "Star"}</span>
-
-                            </button>
-
-                          )}
-
-
-
-                          {selectedMessages.size === 1 && items[0]?.type === 'text' && (
-
-                            <button onClick={handleCopySelected} style={actionBtnStyle()} title="Copy Text">
-
-                              <Copy size={isMobile ? 19 : 16} />
-
-                              <span style={labelStyle}>Copy</span>
-
-                            </button>
-
-                          )}
-
-
-
-                          {selectedMessages.size === 1 && (
-
-                            <button
-
-                              onClick={() => {
-
-                                const msg = items[0] || Array.from(selectedMessages)[0];
-
-                                setStatusInfoMsg(msg);
-
-                                clearSelection();
-
-                              }}
-
-                              style={actionBtnStyle()}
-
-                              title="Message Info"
-
-                            >
-
-                              <Info size={isMobile ? 19 : 16} />
-
-                              <span style={labelStyle}>Info</span>
-
-                            </button>
-
-                          )}
-
-
-
-                          <button
-
-                            onClick={handleShareSelected}
-
-                            disabled={isSharingMedia}
-
-                            style={actionBtnStyle(isSharingMedia ? "var(--text-muted)" : "var(--accent-color)")}
-
-                            title="Share Media"
-
-                          >
-
-                            {isSharingMedia ? <Loader2 size={isMobile ? 19 : 16} className="animate-spin" /> : <Share2 size={isMobile ? 19 : 16} />}
-
-                            <span style={labelStyle}>Share</span>
-
-                          </button>
-
-
-
-                          <button
-
-                            onClick={toggleInputBox}
-
-                            style={{
-
-                              ...actionBtnStyle(),
-
-                              background: showInputBox ? "var(--nav-active-bg)" : "var(--bg-hover)",
-
-                            }}
-
-                          >
-
-                            <ChevronDown
-
-                              size={isMobile ? 19 : 16}
-
-                              style={{ transform: showInputBox ? "rotate(0deg)" : "rotate(180deg)", transition: "transform 0.3s" }}
-
-                            />
-
-                            <span style={labelStyle}>{showInputBox ? "Hide" : "Show"}</span>
-
-                          </button>
-
-                        </>
-
-                      );
-
-                    })()}
-
-                  </div>
-
-
-
-                  {/* Row 3: Reaction Panel */}
-
-                  {selectedMessages.size === 1 && (
-
-                    <div style={{
-
-                      display: "flex",
-
-                      alignItems: "center",
-
-                      justifyContent: "center",
-
-                      flexWrap: "wrap",
-
-                      padding: "10px 14px",
-
-                      background: "var(--bg-secondary)",
-
-                      borderTop: "1px solid var(--border-color)",
-
-                      borderBottomLeftRadius: isMobile ? "0" : "16px",
-
-                      borderBottomRightRadius: isMobile ? "0" : "16px",
-
-                      gap: isMobile ? "8px" : "12px",
-
-                    }}>
-
-                      <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "8px" : "12px" }}>
-
-                        {['👍', '❤️', '😂', '😮', '😢', '🙏'].map(emoji => (
-
-                          <button
-
-                            key={emoji}
-
-                            type="button"
-
-                            onClick={() => {
-
-                              const msg = Array.from(selectedMessages)[0];
-
-                              sendReaction(msg, emoji);
-
-                              clearSelection();
-
-                            }}
-
-                            style={{
-
-                              background: 'none', border: 'none', fontSize: isMobile ? '22px' : '24px',
-
-                              cursor: 'pointer', transition: 'transform 0.15s ease', padding: '4px',
-
-                              flexShrink: 0, lineHeight: 1
-
-                            }}
-
-                            onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.25)'}
-
-                            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-
-                          >
-
-                            {emoji}
-
-                          </button>
-
-                        ))}
-
-                      </div>
-
-                      <div style={{
-
-                        display: 'flex',
-
-                        alignItems: 'center',
-
-                        gap: '6px',
-
-                        background: 'var(--bg-primary)',
-
-                        border: '1px solid var(--accent-color)',
-
-                        borderRadius: '999px',
-
-                        padding: '4px 6px 4px 12px',
-
-                        flexShrink: 0,
-
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
-
-                      }}>
-
-                        <input
-
-                          type="text"
-
-                          maxLength={15}
-
-                          value={customReactionText}
-
-                          onChange={e => setCustomReactionText(e.target.value.slice(0, 15))}
-
-                          placeholder="Text reaction..."
-
-                          style={{
-
-                            width: isMobile ? '115px' : '135px',
-
-                            background: 'transparent',
-
-                            border: 'none',
-
-                            outline: 'none',
-
-                            color: 'var(--text-primary)',
-
-                            fontSize: '13px',
-
-                            lineHeight: 1.2
-
-                          }}
-
-                          onKeyDown={e => {
-
-                            if (e.key === 'Enter' && customReactionText.trim()) {
-
-                              const msg = Array.from(selectedMessages)[0];
-
-                              sendReaction(msg, customReactionText.trim().slice(0, 15));
-
-                              clearSelection();
-
-                            }
-
-                          }}
-
-                        />
-
-                        <span style={{
-
-                          fontSize: '10px',
-
-                          color: 'var(--text-secondary)',
-
-                          userSelect: 'none'
-
-                        }}>
-
-                          {customReactionText.length}/15
-
-                        </span>
-
-                        <button
-
-                          type="button"
-
-                          onClick={() => {
-
-                            if (customReactionText.trim()) {
-
-                              const msg = Array.from(selectedMessages)[0];
-
-                              sendReaction(msg, customReactionText.trim().slice(0, 15));
-
-                              clearSelection();
-
-                            }
-
-                          }}
-
-                          style={{
-
-                            background: customReactionText.trim() ? 'var(--accent-gradient)' : 'var(--bg-card)',
-
-                            color: '#ffffff',
-
-                            border: 'none',
-
-                            borderRadius: '999px',
-
-                            padding: '4px 10px',
-
-                            fontSize: '12px',
-
-                            fontWeight: 600,
-
-                            cursor: customReactionText.trim() ? 'pointer' : 'default',
-
-                            opacity: customReactionText.trim() ? 1 : 0.5
-
-                          }}
-
-                        >
-
-                          +
-
-                        </button>
-
-                      </div>
-
-                    </div>
-
-                  )}
-
-                </div>
-
-              )}
-
-
-
-
-
-              {filterMember && (
-
-                <div style={{
-
-                  display: 'flex',
-
-                  alignItems: 'center',
-
-                  justifyContent: 'space-between',
-
-                  padding: '8px 16px',
-
-                  backgroundColor: 'var(--bg-card)',
-
-                  borderTop: '1px solid var(--border-color)',
-
-                  borderBottom: '1px solid var(--border-color)',
-
-                  color: 'var(--text-primary)',
-
-                  fontSize: '13px',
-
-                  fontWeight: '500',
-
-                  zIndex: 10
-
-                }}>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-
-                    <Filter size={15} color="var(--accent-color)" />
-
-                    <span>Filtering messages by <strong style={{ color: 'var(--accent-color)' }}>{filterMember.userName || filterMember.name}</strong></span>
-
-                  </div>
-
-                  <button
-
-                    onClick={() => setFilterMember(null)}
-
-                    style={{
-
-                      background: 'var(--danger-tint)',
-
-                      color: 'var(--danger-color)',
-
-                      border: '1px solid var(--danger-tint-border)',
-
-                      borderRadius: '16px',
-
-                      padding: '3px 12px',
-
-                      fontSize: '12px',
-
-                      fontWeight: '600',
-
-                      cursor: 'pointer',
-
-                      display: 'flex',
-
-                      alignItems: 'center',
-
-                      gap: '4px'
-
-                    }}
-
-                  >
-
-                    <span>✕</span> Exit Filter
-
-                  </button>
-
-                </div>
-
-              )}
-
-
-
-              {/* Input Box Section - Animated wrapper */}
-
-              <div
-
-                style={{
-
-                  maxHeight: showInputBox ? "500px" : "0",
-
-                  overflow: "hidden",
-
-                  transition: "max-height 0.3s ease",
-
-                }}
-
-              >
-
-                <div style={{ marginTop: "10px", display: "flex", flexDirection: "column" }}>
-
-                  {showreplytomsg && (
-
-                    <div
-
-                      style={{
-
-                        backgroundColor: "var(--bg-card)",
-
-                        borderLeft: "4px solid var(--accent-color)",
-
-                        border: "1px solid var(--border-color)",
-
-                        padding: "6px 10px",
-
-                        borderRadius: "6px",
-
-                        display: "flex",
-
-                        justifyContent: "space-between",
-
-                        alignItems: "center",
-
-                      }}
-
-                    >
-
-                      <div>
-
-                        <div
-
-                          style={{
-
-                            fontWeight: "bold",
-
-                            fontSize: "13px",
-
-                            color: "var(--accent-color)",
-
-                          }}
-
-                        >
-
-                          {repliedto.status === null ? repliedto.sendername : "You"}
-
-                        </div>
-
-                        <div
-
-                          style={{
-
-                            fontSize: "13px",
-
-                            color: "var(--text-primary)",
-
-                            wordWrap: "break-word",
-
-                          }}
-
-                        >
-
-                          {repliedto.type == 'text' && repliedto.content}
-
-                          {repliedto.type == 'image' && "📷 Photo"}
-
-                          {repliedto.type == 'video' && "🎥 Video"}
-
-                          {repliedto.type == 'audio' && "🎤 Audio"}
-
-                          {repliedto.type == 'file' && "📄 Document"}
-
-                          {repliedto.type == 'assignment' && "📚 Assignment"}
-
-                          {(repliedto.type == 'poll' || Boolean(repliedto.poll) || (typeof repliedto.content === 'string' && repliedto.content.trim().startsWith('{"poll_id"'))) && "📊 Poll"}
-
-                        </div>
-
-                      </div>
-
-                      <div style={{ display: 'flex' }}>
-
-                        <div style={{
-
-                          width: '20px',
-
-                          height: '40px',
-
-                          overflow: 'hidden',
-
-                          position: 'relative',
-
-                        }}>
-
-                          {repliedto.type == 'image' &&
-
-                            <CachedMediaImage mediaId={repliedto.content} optimisticUrl={repliedto.optimisticThumbUrl || repliedto.optimisticUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-
-                          }
-
-                        </div>
-
-                        <button
-
-                          onClick={cancelreply}
-
-                          style={{
-
-                            background: "none",
-
-                            border: "none",
-
-                            color: "var(--danger-color)",
-
-                            fontSize: "16px",
-
-                            cursor: "pointer",
-
-                          }}
-
-                        >
-
-                          ✕
-
-                        </button>
-
-                      </div>
-
-                    </div>
-
-                  )}
-
-
-
-                  {attachedPulse && (
-
-                    <div
-
-                      style={{
-
-                        backgroundColor: "var(--bg-card)",
-
-                        borderLeft: "4px solid #ec4899",
-
-                        border: "1px solid var(--border-color)",
-
-                        padding: "8px 12px",
-
-                        borderRadius: "10px",
-
-                        display: "flex",
-
-                        justify: "space-between",
-
-                        alignItems: "center",
-
-                        marginBottom: "6px"
-
-                      }}
-
-                    >
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-
-                        <Zap size={18} color="#ec4899" />
-
-                        <div>
-
-                          <div style={{ fontWeight: "700", fontSize: "13px", color: "#ec4899" }}>
-
-                            Tagging Pulse by {attachedPulse.pulse?.userName || attachedPulse.pulse?.user_name || 'User'}
-
-                          </div>
-
-                          <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-
-                            {attachedPulse.pulse?.type === 'text' ? attachedPulse.pulse?.content : (attachedPulse.pulse?.content || `${attachedPulse.pulse?.type?.toUpperCase() || 'PULSE'} Story`)}
-
-                            {attachedPulse.targetSpaceId !== undefined && (
-
-                              <span style={{ marginLeft: '8px', opacity: 0.85, fontWeight: '600' }}>
-
-                                • 📍 Space: {spaceStore.getSpaceName(chatid, attachedPulse.targetSpaceId)}
-
-                              </span>
-
-                            )}
-
-                          </div>
-
-                        </div>
-
-                      </div>
-
-                      <button
-
-                        onClick={() => setAttachedPulse(null)}
-
-                        style={{
-
-                          background: "none",
-
-                          border: "none",
-
-                          color: "var(--danger-color)",
-
-                          fontSize: "18px",
-
-                          cursor: "pointer",
-
-                          padding: "2px 6px"
-
-                        }}
-
-                        title="Detach pulse"
-
-                      >
-
-                        ✕
-
-                      </button>
-
-                    </div>
-
-                  )}
-
-
-
-                  {!isSimulation && chatid !== SIMULATION_ID && (chatid === "BROADCAST_SYSTEM" || chat?.type === "broadcast") ? (
-
-                    <div style={{
-
-                      display: "flex",
-
-                      alignItems: "center",
-
-                      justifyContent: "center",
-
-                      padding: "14px 20px",
-
-                      backgroundColor: "var(--bg-card)",
-
-                      borderTop: "1px solid var(--border-color)",
-
-                      color: "var(--text-secondary)",
-
-                      fontSize: "14px",
-
-                      fontWeight: "500",
-
-                      gap: "8px"
-
-                    }}>
-
-                      <span style={{ fontSize: "16px" }}>📢</span>
-
-                      <span>This is an official read-only broadcast channel.</span>
-
-                    </div>
-
-                  ) : ((chat.status === 'allowed' || chat.type === 'room' || chat.type === 'direct' || !chat.type) && chat.status !== 'removed' && chat.status !== 'left') ? (
-
-                    chat.type === 'classroom' ? (
-
-                      activeSpace !== 0 && activeSpace !== 1 ? (
-
-                        /* Classroom + activeSpace not 0 or 1 → normal chat for everyone */
-
-                        renderInputBar()
-
-                      ) : chat.role === 'faculty' ? (
-
-                        activeSpace === 1 ? (
-
-                          /* Classroom + activeSpace 1 + faculty → Post Assignment */
-
-                          <div
-
-                            style={{
-
-                              display: "flex",
-
-                              justifyContent: "center",
-
-                              padding: "10px",
-
-                              background: "var(--bg-card)",
-
-                              borderTop: "1px solid #333",
-
-                              position: "sticky",
-
-                              bottom: 0,
-
-                              width: "100%",
-
-                              boxSizing: "border-box",
-
-                            }}
-
-                          >
-
-                            <button
-
-                              style={{
-
-                                background: "var(--success-color)",
-
-                                color: "white",
-
-                                border: "none",
-
-                                borderRadius: "20px",
-
-                                padding: "10px 24px",
-
-                                cursor: "pointer",
-
-                                fontSize: "15px",
-
-                              }}
-
-                              onClick={postAssignment}
-
-                            >
-
-                              Post an Assignment
-
-                            </button>
-
-                          </div>
-
-                        ) : (
-
-                          /* Classroom + activeSpace 0 + faculty → normal chat */
-
-                          renderInputBar()
-
-                        )
-
-                      ) : (
-
-                        /* Classroom + student + activeSpace 0/1 → "You are a student" */
-
-                        <div
-
-                          style={{
-
-                            padding: "10px",
-
-                            background: "var(--bg-card)",
-
-                            color: "#aaa",
-
-                            textAlign: "center",
-
-                            borderTop: "1px solid #333",
-
-                            position: "sticky",
-
-                            bottom: 0,
-
-                            width: "100%",
-
-                            boxSizing: "border-box",
-
-                            fontStyle: "italic",
-
-                          }}
-
-                        >
-
-                          You are a student
-
-                        </div>
-
-                      )
-
-                    ) : (
-
-                      /* Not classroom → normal chat input */
-
-                      renderInputBar()
-
-                    )) : (
-
-                    <div
-
-                      style={{
-
-                        padding: "10px",
-
-                        background: "var(--bg-card)",
-
-                        color: "#aaa",
-
-                        textAlign: "center",
-
-                        borderTop: "1px solid #333",
-
-                        position: "sticky",
-
-                        bottom: 0,
-
-                        width: "100%",
-
-                        boxSizing: "border-box",
-
-                        fontStyle: "italic",
-
-                      }}
-
-                    >
-
-                      You can't Chat in this conversation
-
-                      {chat.status === 'removed' && " - You were removed"}
-
-                      {chat.status === 'left' && " - You left"}
-
-                    </div>
-
-                  )
-
-                  }
-
-                </div>
-
-              </div>
-
-            </div>
-
-
-
-
-
-
-
-
-
-            {
-
-              showforward && (
-
-                <>
-
-                  {/* Backdrop */}
-
-                  <div
-
-                    style={{
-
-                      position: 'fixed',
-
-                      inset: '0',
-
-                      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-
-                      zIndex: '40'
-
-                    }}
-
-                    onClick={() => setshowforward(false)}
-
-                  />
-
-
-
-                  {/* Floating Container */}
-
-                  <div style={{
-
-                    position: 'fixed',
-
-                    top: '50%',
-
-                    left: '50%',
-
-                    transform: 'translate(-50%, -50%)',
-
-                    backgroundColor: 'var(--bg-card)',
-
-                    border: '1px solid var(--border-color)',
-
-                    borderRadius: '12px',
-
-                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
-
-                    zIndex: '50',
-
-                    width: '80%',
-
-                    maxHeight: '384px',
-
-                    display: 'flex',
-
-                    flexDirection: 'column'
-
-                  }}>
-
-                    {/* Header */}
-
-                    <div style={{
-
-                      display: 'flex',
-
-                      alignItems: 'center',
-
-                      justifyContent: 'space-between',
-
-                      padding: '16px',
-
-                      borderBottom: '1px solid var(--border-color)'
-
-                    }}>
-
-                      <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-primary)' }}>Forward to Chat</h2>
-
-                      <button
-
-                        onClick={() => cancelforward()}
-
-                        style={{
-
-                          color: 'var(--text-secondary)',
-
-                          background: 'none',
-
-                          border: 'none',
-
-                          cursor: 'pointer',
-
-                          padding: '4px',
-
-                          display: 'flex',
-
-                          alignItems: 'center',
-
-                          fontSize: '20px',
-
-                          fontWeight: 'bold'
-
-                        }}
-
-                        onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
-
-                        onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
-
-                      >
-
-                        ✕
-
-                      </button>
-
-                    </div>
-
-
-
-                    {/* Chat List */}
-
-                    <div style={{ flex: '1', overflowY: 'auto', padding: '8px' }}>
-
-                      {chatlist.map((chat) => (
-
-                        <button
-
-                          key={chat.chatId}
-
-                          onClick={() => { handleForward(chat.chatId); cancelforward() }}
-
-                          style={{
-
-                            width: '100%',
-
-                            textAlign: 'left',
-
-                            padding: '12px 16px',
-
-                            borderRadius: '8px',
-
-                            border: 'none',
-
-                            background: 'none',
-
-                            cursor: 'pointer'
-
-                          }}
-
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
-
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-
-                        >
-
-                          <span style={{ color: 'var(--text-primary)', fontWeight: '500' }}>
-
-                            {chat.chatName}
-
-                          </span>
-
-                        </button>
-
-                      ))}
-
-                    </div>
-
-                  </div>
-
-
-
-                </>
-
-              )
-
-            }
-
-
-
-            {
-
-              showInviteModal && (
-
-                <>
-
-                  {/* Backdrop */}
-
-                  <div
-
-                    style={{
-
-                      position: 'fixed',
-
-                      inset: '0',
-
-                      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-
-                      zIndex: '40'
-
-                    }}
-
-                    onClick={() => setShowInviteModal(false)}
-
-                  />
-
-
-
-                  {/* Floating Container */}
-
-                  <div style={{
-
-                    position: 'fixed',
-
-                    top: '50%',
-
-                    left: '50%',
-
-                    transform: 'translate(-50%, -50%)',
-
-                    backgroundColor: 'var(--bg-card)',
-
-                    border: '1px solid var(--border-color)',
-
-                    borderRadius: '12px',
-
-                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
-
-                    zIndex: '50',
-
-                    width: '80%',
-
-                    maxHeight: '384px',
-
-                    display: 'flex',
-
-                    flexDirection: 'column'
-
-                  }}>
-
-                    {/* Header */}
-
-                    <div style={{
-
-                      display: 'flex',
-
-                      alignItems: 'center',
-
-                      justifyContent: 'space-between',
-
-                      padding: '16px',
-
-                      borderBottom: '1px solid var(--border-color)'
-
-                    }}>
-
-                      <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-primary)' }}>Invite to {chat.chatName}</h2>
-
-                      <button
-
-                        onClick={() => setShowInviteModal(false)}
-
-                        style={{
-
-                          color: 'var(--text-secondary)',
-
-                          background: 'none',
-
-                          border: 'none',
-
-                          cursor: 'pointer',
-
-                          padding: '4px',
-
-                          display: 'flex',
-
-                          alignItems: 'center',
-
-                          fontSize: '20px',
-
-                          fontWeight: 'bold'
-
-                        }}
-
-                        onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
-
-                        onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
-
-                      >
-
-                        ✕
-
-                      </button>
-
-                    </div>
-
-
-
-                    {/* Chat List */}
-
-                    <div style={{ flex: '1', overflowY: 'auto', padding: '8px' }}>
-
-                      {chatlist.map((c) => (
-
-                        <button
-
-                          key={c.chatId}
-
-                          onClick={() => { handleInvite(c.chatId); setShowInviteModal(false); }}
-
-                          style={{
-
-                            width: '100%',
-
-                            textAlign: 'left',
-
-                            padding: '12px 16px',
-
-                            borderRadius: '8px',
-
-                            border: 'none',
-
-                            background: 'none',
-
-                            cursor: 'pointer'
-
-                          }}
-
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
-
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-
-                        >
-
-                          <span style={{ color: 'var(--text-primary)', fontWeight: '500' }}>
-
-                            {c.chatName}
-
-                          </span>
-
-                        </button>
-
-                      ))}
-
-                    </div>
-
-                  </div>
-
-                </>
-
-              )
-
-            }
-
-
-
-            {
-
-              showFilterModal && (
-
-                <>
-
-                  <div
-
-                    style={{
-
-                      position: 'fixed',
-
-                      inset: '0',
-
-                      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-
-                      zIndex: '50'
-
-                    }}
-
-                    onClick={() => setShowFilterModal(false)}
-
-                  />
-
-                  <div style={{
-
-                    position: 'fixed',
-
-                    top: '50%',
-
-                    left: '50%',
-
-                    transform: 'translate(-50%, -50%)',
-
-                    backgroundColor: 'var(--bg-card)',
-
-                    border: '1px solid var(--border-color)',
-
-                    borderRadius: '16px',
-
-                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
-
-                    zIndex: '60',
-
-                    width: '85%',
-
-                    maxWidth: '380px',
-
-                    maxHeight: '420px',
-
-                    display: 'flex',
-
-                    flexDirection: 'column',
-
-                    overflow: 'hidden'
-
-                  }}>
-
-                    <div style={{
-
-                      display: 'flex',
-
-                      alignItems: 'center',
-
-                      justifyContent: 'space-between',
-
-                      padding: '16px',
-
-                      borderBottom: '1px solid var(--border-color)'
-
-                    }}>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-
-                        <Filter size={18} color="var(--accent-color)" />
-
-                        <h2 style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-primary)', margin: 0 }}>Filter Messages by Person</h2>
-
-                      </div>
-
-                      <button
-
-                        onClick={() => setShowFilterModal(false)}
-
-                        style={{
-
-                          color: 'var(--text-secondary)',
-
-                          background: 'none',
-
-                          border: 'none',
-
-                          cursor: 'pointer',
-
-                          padding: '4px',
-
-                          fontSize: '18px',
-
-                          fontWeight: 'bold'
-
-                        }}
-
-                      >
-
-                        ✕
-
-                      </button>
-
-                    </div>
-
-                    <div style={{ flex: '1', overflowY: 'auto', padding: '8px' }}>
-
-                      {filterCandidates.map((m) => (
-
-                        <button
-
-                          key={m.userId || m.userName}
-
-                          onClick={() => {
-
-                            setFilterMember(m);
-
-                            setShowFilterModal(false);
-
-                          }}
-
-                          style={{
-
-                            width: '100%',
-
-                            textAlign: 'left',
-
-                            padding: '10px 14px',
-
-                            borderRadius: '10px',
-
-                            border: 'none',
-
-                            background: filterMember?.userId === m.userId || filterMember?.userName === m.userName ? 'var(--nav-active-bg)' : 'none',
-
-                            cursor: 'pointer',
-
-                            display: 'flex',
-
-                            alignItems: 'center',
-
-                            gap: '12px',
-
-                            transition: 'background-color 0.2s'
-
-                          }}
-
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-hover)'}
-
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = filterMember?.userId === m.userId || filterMember?.userName === m.userName ? 'var(--nav-active-bg)' : 'transparent'}
-
-                        >
-
-                          <Avatar chat={{ profile: m.profile, userName: m.userName }} size={36} />
-
-                          <div style={{ flex: 1, minWidth: 0 }}>
-
-                            <div style={{ color: 'var(--text-primary)', fontWeight: '600', fontSize: '14px' }}>
-
-                              {m.userId === localStorage.getItem("userid") ? "You" : (m.userName || "User")}
-
-                            </div>
-
-                            <div style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
-
-                              {m.role ? m.role.toUpperCase() : "Participant"}
-
-                            </div>
-
-                          </div>
-
-                        </button>
-
-                      ))}
-
-                    </div>
-
-                  </div>
-
-                </>
-
-              )
-
-            }
-
-
-
-            {/* Network Error Dialog */ }
-
-            {
-
-              networkError && (
-
-                <>
-
-                  <div
-
-                    style={{
-
-                      position: 'fixed',
-
-                      inset: '0',
-
-                      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-
-                      zIndex: '60'
-
-                    }}
-
-                    onClick={() => setNetworkError(false)}
-
-                  />
-
-                  <div style={{
-
-                    position: 'fixed',
-
-                    top: '50%',
-
-                    left: '50%',
-
-                    transform: 'translate(-50%, -50%)',
-
-                    backgroundColor: 'var(--bg-card)',
-
-                    border: '1px solid var(--border-color)',
-
-                    borderRadius: '12px',
-
-                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
-
-                    zIndex: '70',
-
-                    width: '80%',
-
-                    maxWidth: '350px',
-
-                    display: 'flex',
-
-                    flexDirection: 'column',
-
-                    overflow: 'hidden'
-
-                  }}>
-
-                    <div style={{
-
-                      padding: '20px',
-
-                      textAlign: 'center',
-
-                      color: 'var(--text-primary)'
-
-                    }}>
-
-                      <div style={{ marginBottom: '12px' }}>
-
-                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--danger-color)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ margin: '0 auto' }}>
-
-                          <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
-
-                          <line x1="12" y1="20" x2="12.01" y2="20"></line>
-
-                          <path d="M4.93 10.93a10 10 0 0 1 14.14 0"></path>
-
-                          <line x1="2" y1="2" x2="22" y2="22"></line>
-
-                        </svg>
-
-                      </div>
-
-                      <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>No Connection</h3>
-
-                      <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>
-
-                        You seem to be offline or have a slow connection. Please check your internet and try again.
-
-                      </p>
-
-                    </div>
-
-                    <button
-
-                      onClick={() => setNetworkError(false)}
-
-                      style={{
-
-                        padding: '14px',
-
-                        backgroundColor: 'var(--bg-hover)',
-
-                        color: 'var(--text-primary)',
-
-                        border: 'none',
-
-                        borderTop: '1px solid var(--border-color)',
-
-                        fontWeight: '600',
-
-                        fontSize: '15px',
-
-                        cursor: 'pointer',
-
-                        width: '100%'
-
-                      }}
-
-                    >
-
-                      Okay
-
-                    </button>
-
-                  </div>
-
-                </>
-
-              )
-
-            }
-
-            {
-
-              showdelet && (
-
-                <>
-
-                  {/* Backdrop */}
-
-                  <div
-
-                    style={{
-
-                      position: 'fixed',
-
-                      inset: '0',
-
-                      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-
-                      zIndex: '40'
-
-                    }}
-
-                    onClick={() => { setshowdelet(false); setdeleted([]); }}
-
-                  />
-
-
-
-                  {/* Floating Container */}
-
-                  <div style={{
-
-                    position: 'fixed',
-
-                    top: '50%',
-
-                    left: '50%',
-
-                    transform: 'translate(-50%, -50%)',
-
-                    backgroundColor: 'var(--bg-card)',
-
-                    border: '1px solid var(--border-color)',
-
-                    borderRadius: '12px',
-
-                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
-
-                    zIndex: '50',
-
-                    width: '80%',
-
-                    display: 'flex',
-
-                    flexDirection: 'column'
-
-                  }}>
-
-                    {/* Header */}
-
-                    <div style={{
-
-                      display: 'flex',
-
-                      alignItems: 'center',
-
-                      justifyContent: 'space-between',
-
-                      padding: '16px',
-
-                      borderBottom: '1px solid var(--border-color)'
-
-                    }}>
-
-                      <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-primary)' }}>Delete Message</h2>
-
-                      <button
-
-                        onClick={() => { setshowdelet(false); setdeleted([]); }}
-
-                        style={{
-
-                          color: 'var(--danger-color)',
-
-                          background: 'none',
-
-                          border: 'none',
-
-                          cursor: 'pointer',
-
-                          padding: '4px',
-
-                          display: 'flex',
-
-                          alignItems: 'center',
-
-                          fontSize: '20px',
-
-                          fontWeight: 'bold'
-
-                        }}
-
-                        onMouseEnter={(e) => e.currentTarget.style.color = 'var(--danger-color)'}
-
-                        onMouseLeave={(e) => e.currentTarget.style.color = 'var(--danger-color)'}
-
-                      >
-
-                        ✕
-
-                      </button>
-
-                    </div>
-
-
-
-                    {/* Buttons Container */}
-
-                    <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-
-                      {/* Delete for Me - Always Visible */}
-
-                      {chat.type !== 'classroom' && (
-
-                        <button
-
-                          onClick={() => { setshowdelet(false); dforme() }}
-
-                          style={{
-
-                            width: '100%',
-
-                            padding: '12px 16px',
-
-                            backgroundColor: 'var(--bg-hover)',
-
-                            color: 'var(--text-primary)',
-
-                            border: '1px solid var(--border-color)',
-
-                            borderRadius: '8px',
-
-                            cursor: 'pointer',
-
-                            fontWeight: '500',
-
-                            transition: 'all 0.2s ease'
-
-                          }}
-
-                        >
-
-                          Delete for Me
-
-                        </button>
-
-                      )}
-
-                      {/* Delete for Everyone - Conditional */}
-
-                      {showEveryone && (
-
-                        <button
-
-                          onClick={() => { setshowdelet(false); console.log("delete for everyone"); dforeone() }}
-
-                          style={{
-
-                            width: '100%',
-
-                            padding: '12px 16px',
-
-                            backgroundColor: 'var(--danger-color)',
-
-                            color: '#ffffff',
-
-                            border: 'none',
-
-                            borderRadius: '8px',
-
-                            cursor: 'pointer',
-
-                            fontWeight: '500',
-
-                            transition: 'background-color 0.2s'
-
-                          }}
-
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--danger-color)'}
-
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--danger-color)'}
-
-                        >
-
-                          Delete for Everyone
-
-                        </button>
-
-                      )}
-
-
-
-                      {chat.type === 'classroom' && deleted?.userid === localStorage.getItem("userid") && (
-
-                        <button
-
-                          onClick={() => { setshowdelet(false); console.log("delete for everyone"); }}
-
-                          style={{
-
-                            width: '100%',
-
-                            padding: '12px 16px',
-
-                            backgroundColor: 'var(--danger-color)',
-
-                            color: '#ffffff',
-
-                            border: 'none',
-
-                            borderRadius: '8px',
-
-                            cursor: 'pointer',
-
-                            fontWeight: '500',
-
-                            transition: 'background-color 0.2s'
-
-                          }}
-
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--danger-color)'}
-
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--danger-color)'}
-
-                        >
-
-                          Delete
-
-                        </button>
-
-                      )}
-
-                    </div>
-
-                  </div>
-
-                </>
-
-              )
-
-            }
-
-
-
-            {
-
-              revpanel && (revev.isdeletedeone === localStorage.getItem("userid") || (revev.isdeleted == true && !revev.isdeletedeone)) && (
-
-                <>
-
-                  {/* Backdrop */}
-
-                  <div
-
-                    style={{
-
-                      position: 'fixed',
-
-                      inset: '0',
-
-                      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-
-                      zIndex: '40'
-
-                    }}
-
-                    onClick={() => { setrevpanel(false); setrevev(null) }}
-
-                  />
-
-
-
-                  {/* Floating Container */}
-
-                  <div style={{
-
-                    position: 'fixed',
-
-                    top: '50%',
-
-                    left: '50%',
-
-                    transform: 'translate(-50%, -50%)',
-
-                    backgroundColor: 'var(--bg-card)',
-
-                    border: '1px solid var(--border-color)',
-
-                    borderRadius: '12px',
-
-                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
-
-                    zIndex: '50',
-
-                    width: '80%',
-
-                    display: 'flex',
-
-                    flexDirection: 'column'
-
-                  }}>
-
-                    {/* Header */}
-
-                    <div style={{
-
-                      display: 'flex',
-
-                      alignItems: 'center',
-
-                      justifyContent: 'space-between',
-
-                      padding: '16px',
-
-                      borderBottom: '1px solid var(--border-color)'
-
-                    }}>
-
-                      <h2 style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-primary)' }}>Revive Message</h2>
-
-                      <button
-
-                        onClick={() => { setrevpanel(false); setrevev(null) }}
-
-                        style={{
-
-                          color: 'var(--danger-color)',
-
-                          background: 'none',
-
-                          border: 'none',
-
-                          cursor: 'pointer',
-
-                          padding: '4px',
-
-                          display: 'flex',
-
-                          alignItems: 'center',
-
-                          fontSize: '20px',
-
-                          fontWeight: 'bold'
-
-                        }}
-
-                        onMouseEnter={(e) => e.currentTarget.style.color = 'var(--danger-color)'}
-
-                        onMouseLeave={(e) => e.currentTarget.style.color = 'var(--danger-color)'}
-
-                      >
-
-                        ✕
-
-                      </button>
-
-                    </div>
-
-
-
-                    {/* Buttons Container */}
-
-                    <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-
-                      {/* Revive for Me - Always Visible */}
-
-
-
-                      <button
-
-                        onClick={() => { revivforme() }}
-
-                        style={{
-
-                          width: '100%',
-
-                          padding: '12px 16px',
-
-                          backgroundColor: 'var(--bg-hover)',
-
-                          color: 'var(--text-primary)',
-
-                          border: '1px solid var(--border-color)',
-
-                          borderRadius: '8px',
-
-                          cursor: 'pointer',
-
-                          fontWeight: '500',
-
-                          transition: 'all 0.2s ease'
-
-                        }}
-
-                      >
-
-                        Revive for Me
-
-                      </button>
-
-
-
-                      {/* Revive for Everyone - Conditional */}
-
-                      {(revev.status !== null && revev.isdeletedeone === localStorage.getItem("userid")) && (
-
-                        <button
-
-                          onClick={() => { revivforeone() }}
-
-                          style={{
-
-                            width: '100%',
-
-                            padding: '12px 16px',
-
-                            backgroundColor: 'var(--success-color)',
-
-                            color: '#ffffff',
-
-                            border: 'none',
-
-                            borderRadius: '8px',
-
-                            cursor: 'pointer',
-
-                            fontWeight: '500',
-
-                            transition: 'background-color 0.2s'
-
-                          }}
-
-                          onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--success-color)'}
-
-                          onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--success-color)'}
-
-                        >
-
-                          Revive for Everyone
-
-                        </button>
-
-                      )}
-
-
-
-                      {chat.type === 'classroom' && (revev?.userid === localStorage.getItem("userid") || chat.role === 'faculty') && (
-
-                        <button
-
-                          onClick={() => { revivforeone() }}
-
-                          style={{
-
-                            width: '100%',
-
-                            padding: '12px 16px',
-
-                            backgroundColor: 'var(--success-color)',
-
-                            color: '#ffffff',
-
-                            border: 'none',
-
-                            borderRadius: '8px',
-
-                            cursor: 'pointer',
-
-                            fontWeight: '500',
-
-                            transition: 'background-color 0.2s'
-
-                          }}
-
-                          onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--success-color)'}
-
-                          onMouseLeave={(e) => e.target.style.backgroundColor = 'var(--success-color)'}
-
-                        >
-
-                          Revive
-
-                        </button>
-
-                      )}
-
-                    </div>
-
-                  </div>
-
-                </>
-
-              )
-
-            }
-
-            {
-
-              showmedia && (
-
-                <div
-
-                  style={{
-
-                    position: "fixed",
-
-                    top: 0,
-
-                    left: 0,
-
-                    width: "100vw",
-
-                    height: "100vh",
-
-                    background: "rgba(0,0,0,0.9)",
-
-                    display: "flex",
-
-                    justifyContent: "center",
-
-                    alignItems: "center",
-
-                    zIndex: 9999,
-
-                  }}
-
-                >
-
-                  <div
-
-                    style={{
-
-                      position: "relative",
-
-                      width: "100%",
-
-                      height: "100%",
-
-                      background: "#111",
-
-                      borderRadius: "12px",
-
-                      display: "flex",
-
-                      justifyContent: "center",
-
-                      alignItems: "center",
-
-                      overflow: "hidden",
-
-                    }}
-
-                  >
-
-                    {/* Header - Top */}
-
-                    <div
-
-                      style={{
-
-                        position: "absolute",
-
-                        top: 0,
-
-                        left: 0,
-
-                        right: 0,
-
-                        background: "rgba(0, 0, 0, 0.5)",
-
-                        backdropFilter: "blur(4px)",
-
-                        padding: "12px 16px",
-
-                        display: "flex",
-
-                        alignItems: "center",
-
-                        justifyContent: "space-between",
-
-                        zIndex: 10,
-
-                      }}
-
-                    >
-
-                      {/* Left Side - Back Button and Name */}
-
-                      <div
-
-                        style={{
-
-                          display: "flex",
-
-                          alignItems: "center",
-
-                          gap: "12px",
-
-                        }}
-
-                      >
-
-                        {/* Back Button */}
-
-                        <button
-
-                          onClick={() => setshowmedia(null)}
-
-                          style={{
-
-                            background: "transparent",
-
-                            border: "none",
-
-                            color: "#fff",
-
-                            fontSize: "24px",
-
-                            cursor: "pointer",
-
-                            padding: "8px",
-
-                            display: "flex",
-
-                            alignItems: "center",
-
-                            justifyContent: "center",
-
-                          }}
-
-                        >
-
-                          &larr;
-
-                        </button>
-
-
-
-                        {/* Edit Button next to Close */}
-
-                        {showmedia?.type === 'image' &&
-
-                          !showmedia?.fileName?.toLowerCase().endsWith('.gif') &&
-
-                          !showmedia?.content?.toLowerCase().endsWith('.gif') && (
-
-                          <button
-
-                            type="button"
-
-                            onClick={async () => {
-                              let editUrl = showmedia.optimisticUrl || resolveChatMediaUrl(showmedia.fileKey);
-                              if (!editUrl && showmedia.content) {
-                                try {
-                                  const info = await getMediaInfo(showmedia.content);
-                                  editUrl = resolveChatMediaUrl(info?.fileKey);
-                                } catch {}
-                              }
-                              if (editUrl) setEditingViewerSrc(editUrl);
-                              else toast?.error?.('Image URL unavailable for editing');
-                            }}
-
-                            style={{
-
-                              display: "flex",
-
-                              alignItems: "center",
-
-                              gap: "6px",
-
-                              background: "var(--border-color)",
-
-                              border: "none",
-
-                              color: "#fff",
-
-                              padding: "6px 14px",
-
-                              borderRadius: "6px",
-
-                              fontSize: "14px",
-
-                              fontWeight: "500",
-
-                              cursor: "pointer",
-
-                              transition: "background 0.2s",
-
-                            }}
-
-                            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255, 255, 255, 0.25)")}
-
-                            onMouseLeave={(e) => (e.currentTarget.style.background = "var(--border-color)")}
-
-                            title="Edit Image"
-
-                          >
-
-                            <Pencil size={16} />
-
-                            <span>Edit</span>
-
-                          </button>
-
-                        )}
-
-
-
-                        {/* Chat Name */}
-
-                        <span
-
-                          style={{
-
-                            color: "#fff",
-
-                            fontSize: "18px",
-
-                            fontWeight: "500",
-
-                          }}
-
-                        >
-
-                          {showmedia.status == null ? showmedia.sendername : "You"}
-
-                        </span>
-
-                      </div>
-
-
-
-                      {/* Right Side - Download Button */}
-
-                      <a
-
-                        //href={`${API}/files/media/serve/${showmedia.content}`}
-
-                        onClick={async () => {
-                          let downloadUrl = showmedia.optimisticUrl || resolveChatMediaUrl(showmedia.fileKey);
-                          try {
-                            if (!downloadUrl && showmedia.content) {
-                              const info = await getMediaInfo(showmedia.content);
-                              downloadUrl = resolveChatMediaUrl(info?.fileKey);
-                            }
-                            if (!downloadUrl) throw new Error('Missing file URL');
-                            const response = await fetch(downloadUrl);
-                            const blob = await response.blob();
-                            const url = window.URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.style.display = 'none';
-                            a.href = url;
-                            a.download = showmedia.fileName || showmedia.content || 'download';
-                            document.body.appendChild(a);
-                            a.click();
-                            window.URL.revokeObjectURL(url);
-                            document.body.removeChild(a);
-                          } catch (error) {
-                            console.error('Download failed:', error);
-                            if (downloadUrl) window.open(downloadUrl, '_blank');
-                          }
-                        }}
-
-                        download
-
-                        style={{
-
-                          display: "flex",
-
-                          alignItems: "center",
-
-                          gap: "8px",
-
-                          background: "var(--border-color)",
-
-                          color: "#fff",
-
-                          padding: "8px 16px",
-
-                          borderRadius: "6px",
-
-                          textDecoration: "none",
-
-                          fontSize: "14px",
-
-                          fontWeight: "500",
-
-                          cursor: "pointer",
-
-                          transition: "background 0.2s",
-
-                        }}
-
-                        onMouseEnter={(e) => {
-
-                          e.currentTarget.style.background = "rgba(255, 255, 255, 0.2)";
-
-                        }}
-
-                        onMouseLeave={(e) => {
-
-                          e.currentTarget.style.background = "var(--border-color)";
-
-                        }}
-
-                      >
-
-                        <Download size={18} />
-
-
-
-                      </a>
-
-                    </div>
-
-
-
-                    {/* Image - Center */}
-
-                    <CachedMediaImage
-
-                      mediaId={showmedia.content}
-
-                      optimisticUrl={showmedia.optimisticThumbUrl || showmedia.optimisticUrl}
-
-                      alt="preview"
-
-                      style={{
-
-                        maxWidth: "100%",
-
-                        maxHeight: "100%",
-
-                        objectFit: "contain",
-
-                        borderRadius: "8px",
-
-                      }}
-
-                    />
-
-                  </div>
-
-                </div>
-
-              )
-
-            }
+            <ChatInputBar
+              ref={composerRef}
+              isMobile={isMobile}
+              theme={theme}
+              chat={chat}
+              chatid={chatid}
+              isSimulation={isSimulation}
+              SIMULATION_ID={SIMULATION_ID}
+              activeSpace={activeSpace}
+              spaceStore={spaceStore}
+              inputRef={inputRef}
+              onDraftChange={handleDraftChange}
+              notifyActivity={notifyActivity}
+              isSelectionMode={isSelectionMode}
+              selectedMessages={selectedMessages}
+              clearSelection={clearSelection}
+              handleCancelUploads={handleCancelUploads}
+              reply={reply}
+              delet={delet}
+              forward={forward}
+              toggleStar={toggleStar}
+              handleCopySelected={handleCopySelected}
+              onOpenStatusInfo={handleOpenStatusInfoFromBar}
+              handleShareSelected={handleShareSelected}
+              isSharingMedia={isSharingMedia}
+              showInputBox={showInputBox}
+              toggleInputBox={toggleInputBox}
+              sendReaction={sendReaction}
+              filterMember={filterMember}
+              onClearFilter={() => setFilterMember(null)}
+              showreplytomsg={showreplytomsg}
+              repliedto={repliedto}
+              cancelreply={cancelreply}
+              attachedPulse={attachedPulse}
+              onDetachPulse={() => setAttachedPulse(null)}
+              showReplyNotifyBanner={showReplyNotifyBanner}
+              handleEnableReplyNotify={handleEnableReplyNotify}
+              handleDismissReplyNotifyBanner={handleDismissReplyNotifyBanner}
+              isRecording={isRecording}
+              recordingTime={recordingTime}
+              startRecording={startRecording}
+              stopRecording={stopRecording}
+              chatMembers={chatMembers}
+              onSendText={handleSendMessageClick}
+              sendMediaMessage={sendMediaMessage}
+              setPendingMediaFile={setPendingMediaFile}
+              handleCameraClick={handleCameraClick}
+              onOpenPollModal={() => setShowPollModal(true)}
+              onOpenAttachPulseModal={() => setShowAttachPulseModal(true)}
+              onOpenScheduleModal={handleOpenScheduleFromBar}
+              queuedCount={queuedCount}
+              flushQueuedTextMessages={flushQueuedTextMessages}
+              showMediaWaitModal={showMediaWaitModal}
+              pendingTextMessage={pendingTextMessage}
+              onCloseMediaWaitModal={() => setShowMediaWaitModal(false)}
+              onWaitForMedia={handleWaitForMedia}
+              onSendAnywayMedia={handleSendAnywayMedia}
+              selectedQueuedMsg={selectedQueuedMsg}
+              onCloseQueuedMsg={() => setSelectedQueuedMsg(null)}
+              onSendQueuedNow={handleSendQueuedNow}
+              onDeleteQueued={handleDeleteQueued}
+              postAssignment={postAssignment}
+            />
+
+            {showmedia && (
+              <Suspense fallback={null}>
+                <ChatLegacyMediaOverlay
+                  showmedia={showmedia}
+                  onClose={() => setshowmedia(null)}
+                  onEditImage={(url) => setEditingViewerSrc(url)}
+                  toast={toast}
+                />
+              </Suspense>
+            )}
 
             <div ref={bottomRef2} />
 
@@ -15546,7 +6906,362 @@ const ChatBox = () => {
 
           }}>
 
-            {showGroupCalendar && (
+            <Suspense fallback={null}>
+
+              {showGroupCalendar && (
+
+                <GroupCalendarPanel
+
+                  chatId={chatid}
+
+                  groupName={chat?.chatname || 'Group Calendar'}
+
+                  highlightEventId={calendarHighlightEventId}
+                  onClose={() => { setShowGroupCalendar(false); setCalendarHighlightEventId(null); }}
+
+                  onOpenCreateEvent={(params) => {
+
+                    setEventRecived(false);
+
+                    setHasChanges(false);
+
+                    setSelectedEvent({ chatid, isGroup: true, title: '', description: '', ...params });
+
+                    setShowGroupCalendar(false);
+
+                    setShowEventModal(true);
+
+                  }}
+
+                  onOpenEvent={(ev) => {
+                    setEventRecived(false);
+                    setHasChanges(false);
+                    setDraftEvent(null);
+                    setSelectedEvent({ ...ev, chatid, isGroup: true });
+                    setShowGroupCalendar(false);
+                    setShowEventModal(true);
+                  }}
+
+                />
+
+              )}
+
+              {showInfo && (
+
+                <InfoModal
+
+                  chat={chat}
+
+                  onClose={() => setShowInfo(false)}
+
+                  API={API}
+
+                  navigate={navigate}
+
+                  getchat={getchat}
+
+                  isPanel={true}
+
+                />
+
+              )}
+
+              {ShowEventModal && SelectedEvent && (
+
+                <EventModal
+
+                  __onLoadError={() => {
+                    setShowEventModal(false);
+                    setDraftEvent(null);
+                  }}
+
+                  event={SelectedEvent}
+
+                  isReceived={EventRecived}
+
+                  onClose={() => {
+                    setShowEventModal(false);
+                    setHasChanges(false);
+                    setDraftEvent(null);
+                    if (SelectedEvent?.isGroup) {
+                      setShowGroupCalendar(true);
+                    }
+                  }}
+
+                  onEventCreated={() => {
+
+                    setShowEventModal(false);
+
+                    setHasChanges(false);
+
+                    setDraftEvent(null);
+
+                    setShowGroupCalendar(true);
+
+                  }}
+
+                  hasChanges={hasChanges}
+
+                  setHasChanges={setHasChanges}
+
+                  onDraftChange={setDraftEvent}
+
+                  onCancelEvent={() => setShowCancelDialog(true)}
+
+                  updateEventApi={update}
+
+                  isPanel={true}
+
+                />
+
+              )}
+
+              {showpost && (
+
+                <AssignmentPostModal
+
+                  chatid={chatid}
+
+                  onClose={() => setShowpost(false)}
+
+                  sendApi={sendAssignment}
+
+                  isPanel={true}
+
+                />
+
+              )}
+
+              {showadd && (
+
+                <AddMemberModal
+
+                  chat={chat}
+
+                  API={API}
+
+                  myDisplayName={myDisplayName}
+
+                  onClose={closeadd}
+
+                  onSuccess={() => {
+
+                    getchat(chatid);
+
+                    closeadd();
+
+                  }}
+
+                  isPanel={true}
+
+                />
+
+              )}
+
+            </Suspense>
+
+            {showAssignmentDetail && selectedAssignmentId && (
+
+              <AssignmentMessage
+
+                id={selectedAssignmentId}
+
+                userRole={chat?.role}
+
+                isMobile={false}
+
+                isPanel={true}
+
+                isDetailOnly={true}
+
+                onClose={() => { setShowAssignmentDetail(false); setSelectedAssignmentId(null); }}
+
+              />
+
+            )}
+
+          </div>
+
+        )}
+
+
+
+        {(showClearModal || showforward || showInviteModal || showFilterModal || networkError || showdelet || (revpanel && revev) || showCancelDialog) && (
+
+          <Suspense fallback={null}>
+
+            <ChatActionModals
+
+              __onLoadError={() => {
+                setShowClearModal(false);
+                setshowforward(false);
+                setShowInviteModal(false);
+                setShowFilterModal(false);
+                setNetworkError(false);
+                setshowdelet(false);
+                setrevpanel(false);
+                setShowCancelDialog(false);
+              }}
+
+              showClearModal={showClearModal}
+
+              setShowClearModal={setShowClearModal}
+
+              handleClearChat={handleClearChat}
+
+              spaceName={spaceName}
+
+              showforward={showforward}
+
+              setshowforward={setshowforward}
+
+              cancelforward={cancelforward}
+
+              chatlist={chatlist}
+
+              handleForward={handleForward}
+
+              showInviteModal={showInviteModal}
+
+              setShowInviteModal={setShowInviteModal}
+
+              chat={chat}
+
+              handleInvite={handleInvite}
+
+              showFilterModal={showFilterModal}
+
+              setShowFilterModal={setShowFilterModal}
+
+              filterCandidates={filterCandidates}
+
+              filterMember={filterMember}
+
+              setFilterMember={setFilterMember}
+
+              networkError={networkError}
+
+              setNetworkError={setNetworkError}
+
+              showdelet={showdelet}
+
+              setshowdelet={setshowdelet}
+
+              setdeleted={setdeleted}
+
+              dforme={dforme}
+
+              showEveryone={showEveryone}
+
+              dforeone={dforeone}
+
+              deleted={deleted}
+
+              revpanel={revpanel}
+
+              setrevpanel={setrevpanel}
+
+              revev={revev}
+
+              setrevev={setrevev}
+
+              revivforme={revivforme}
+
+              revivforeone={revivforeone}
+
+              showCancelDialog={showCancelDialog}
+
+              setShowCancelDialog={setShowCancelDialog}
+
+              handleConfirmCancelEvent={handleConfirmCancelEvent}
+
+            />
+
+          </Suspense>
+
+        )}
+
+
+
+        {/* Mobile Modals (Floating) */}
+
+        <Suspense fallback={null}>
+
+          {isMobile && showpost && (
+
+            <AssignmentPostModal
+
+              chatid={chatid}
+
+              onClose={() => setShowpost(false)}
+
+              sendApi={sendAssignment}
+
+            />
+
+          )}
+
+          {isMobile && ShowEventModal && SelectedEvent && (
+
+            <EventModal
+
+              __onLoadError={() => {
+                setShowEventModal(false);
+                setDraftEvent(null);
+              }}
+
+              event={SelectedEvent}
+
+              isReceived={EventRecived}
+
+              onClose={() => {
+                setShowEventModal(false);
+                setHasChanges(false);
+                setDraftEvent(null);
+                if (SelectedEvent?.isGroup) {
+                  setShowGroupCalendar(true);
+                }
+              }}
+
+              onEventCreated={() => {
+
+                setShowEventModal(false);
+
+                setHasChanges(false);
+
+                setDraftEvent(null);
+
+                setShowGroupCalendar(true);
+
+              }}
+
+              hasChanges={hasChanges}
+
+              setHasChanges={setHasChanges}
+
+              onDraftChange={setDraftEvent}
+
+              onCancelEvent={() => setShowCancelDialog(true)}
+
+              updateEventApi={update}
+
+            />
+
+          )}
+
+          {isMobile && showGroupCalendar && (
+
+            <div style={{
+
+              position: 'fixed',
+
+              inset: 0,
+
+              zIndex: 10000,
+
+              backgroundColor: 'var(--bg-secondary)'
+
+            }}>
 
               <GroupCalendarPanel
 
@@ -15574,7 +7289,7 @@ const ChatBox = () => {
                 onOpenEvent={(ev) => {
                   setEventRecived(false);
                   setHasChanges(false);
-                  setShowSaveDialog(false);
+                  setDraftEvent(null);
                   setSelectedEvent({ ...ev, chatid, isGroup: true });
                   setShowGroupCalendar(false);
                   setShowEventModal(true);
@@ -15582,361 +7297,71 @@ const ChatBox = () => {
 
               />
 
-            )}
-
-            {showInfo && (
-
-              <InfoModal
-
-                chat={chat}
-
-                onClose={() => setShowInfo(false)}
-
-                API={API}
-
-                navigate={navigate}
-
-                getchat={getchat}
-
-                isPanel={true}
-
-              />
-
-            )}
-
-            {ShowEventModal && SelectedEvent && (
-
-              <EventModal
-
-                event={SelectedEvent}
-
-                isReceived={EventRecived}
-
-                onClose={() => {
-                  setShowEventModal(false);
-                  setHasChanges(false);
-                  setShowSaveDialog(false);
-                  if (SelectedEvent?.isGroup) {
-                    setShowGroupCalendar(true);
-                  }
-                }}
-
-                onEventCreated={() => {
-
-                  setShowEventModal(false);
-
-                  setHasChanges(false);
-
-                  setDraftEvent(null);
-
-                  setShowGroupCalendar(true);
-
-                }}
-
-                hasChanges={hasChanges}
-
-                setHasChanges={setHasChanges}
-
-                onDraftChange={setDraftEvent}
-
-                onCancelEvent={() => setShowCancelDialog(true)}
-
-                updateEventApi={update}
-
-                isPanel={true}
-
-              />
-
-            )}
-
-            {showpost && (
-
-              <AssignmentPostModal
-
-                chatid={chatid}
-
-                onClose={() => setShowpost(false)}
-
-                sendApi={sendAssignment}
-
-                isPanel={true}
-
-              />
-
-            )}
-
-            {showadd && (
-
-              <AddMemberModal
-
-                chat={chat}
-
-                API={API}
-
-                myDisplayName={myDisplayName}
-
-                onClose={closeadd}
-
-                onSuccess={() => {
-
-                  getchat();
-
-                  closeadd();
-
-                }}
-
-                isPanel={true}
-
-              />
-
-            )}
-
-            {showAssignmentDetail && selectedAssignmentId && (
-
-              <AssignmentMessage
-
-                id={selectedAssignmentId}
-
-                userRole={chat?.role}
-
-                isMobile={false}
-
-                isPanel={true}
-
-                isDetailOnly={true}
-
-                onClose={() => { setShowAssignmentDetail(false); setSelectedAssignmentId(null); }}
-
-              />
-
-            )}
-
-            <style>{`
-
-            @keyframes slideInRight {
-
-              from { transform: translateX(100%); }
-
-              to { transform: translateX(0); }
-
-            }
-
-          `}</style>
-
-          </div>
-
-        )}
-
-
-
-        {/* Dialogs for Event Changes */}
-
-
-
-        {showCancelDialog && (
-
-          <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001 }}>
-
-            <div style={{ backgroundColor: 'var(--bg-card)', borderRadius: '12px', padding: '24px', width: '90%', maxWidth: '400px', border: '1px solid var(--border-color)' }}>
-
-              <h3 style={{ margin: '0 0 12px 0', color: 'var(--text-primary)', fontSize: '18px' }}>Cancel Event?</h3>
-
-              <p style={{ margin: '0 0 20px 0', color: 'var(--text-secondary)', fontSize: '14px' }}>Are you sure you want to cancel this event? This action cannot be undone.</p>
-
-              <div style={{ display: 'flex', gap: '12px' }}>
-
-                <button onClick={handleConfirmCancelEvent} style={{ flex: 1, padding: '12px', backgroundColor: 'var(--danger-color)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Yes, Cancel Event</button>
-
-                <button onClick={() => setShowCancelDialog(false)} style={{ flex: 1, padding: '12px', backgroundColor: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', fontWeight: '600', cursor: 'pointer' }}>Go Back</button>
-
-              </div>
-
             </div>
 
-          </div>
+          )}
 
-        )}
+          {isMobile && showInfo && (
 
+            <InfoModal
 
+              chat={chat}
 
-        {/* Mobile Modals (Floating) */}
+              onClose={() => setShowInfo(false)}
 
-        {isMobile && showpost && (
+              API={API}
 
-          <AssignmentPostModal
+              navigate={navigate}
 
-            chatid={chatid}
+              getchat={getchat}
 
-            onClose={() => setShowpost(false)}
+            />
 
-            sendApi={sendAssignment}
+          )}
 
-          />
+          {!!statusInfoMsg && (
 
-        )}
+            <MessageStatusInfoModal
 
+              isOpen={!!statusInfoMsg}
 
+              onClose={() => setStatusInfoMsg(null)}
 
-        {isMobile && ShowEventModal && SelectedEvent && (
+              message={statusInfoMsg}
 
-          <EventModal
+              chat={chat}
 
-            event={SelectedEvent}
+              members={chatMembers}
 
-            isReceived={EventRecived}
+            />
 
-            onClose={() => {
-              setShowEventModal(false);
-              setHasChanges(false);
-              setShowSaveDialog(false);
-              if (SelectedEvent?.isGroup) {
-                setShowGroupCalendar(true);
-              }
-            }}
+          )}
 
-            onEventCreated={() => {
+          {isMobile && showadd && (
 
-              setShowEventModal(false);
+            <AddMemberModal
 
-              setHasChanges(false);
+              chat={chat}
 
-              setDraftEvent(null);
+              API={API}
 
-              setShowGroupCalendar(true);
+              myDisplayName={myDisplayName}
 
-            }}
+              onClose={closeadd}
 
-            hasChanges={hasChanges}
+              onSuccess={() => {
 
-            setHasChanges={setHasChanges}
+                getchat(chatid);
 
-            onDraftChange={setDraftEvent}
+                closeadd();
 
-            onCancelEvent={() => setShowCancelDialog(true)}
-
-            updateEventApi={update}
-
-          />
-
-        )}
-
-
-
-        {isMobile && showGroupCalendar && (
-
-          <div style={{
-
-            position: 'fixed',
-
-            inset: 0,
-
-            zIndex: 10000,
-
-            backgroundColor: 'var(--bg-secondary)'
-
-          }}>
-
-            <GroupCalendarPanel
-
-              chatId={chatid}
-
-              groupName={chat?.chatname || 'Group Calendar'}
-
-              highlightEventId={calendarHighlightEventId}
-                onClose={() => { setShowGroupCalendar(false); setCalendarHighlightEventId(null); }}
-
-              onOpenCreateEvent={(params) => {
-
-                setEventRecived(false);
-
-                setHasChanges(false);
-
-                setSelectedEvent({ chatid, isGroup: true, title: '', description: '', ...params });
-
-                setShowGroupCalendar(false);
-
-                setShowEventModal(true);
-
-              }}
-
-              onOpenEvent={(ev) => {
-                setEventRecived(false);
-                setHasChanges(false);
-                setShowSaveDialog(false);
-                setSelectedEvent({ ...ev, chatid, isGroup: true });
-                setShowGroupCalendar(false);
-                setShowEventModal(true);
               }}
 
             />
 
-          </div>
+          )}
 
-        )}
-
-
-
-        {isMobile && showInfo && (
-
-          <InfoModal
-
-            chat={chat}
-
-            onClose={() => setShowInfo(false)}
-
-            API={API}
-
-            navigate={navigate}
-
-            getchat={getchat}
-
-          />
-
-        )}
-
-
-
-        {/* Message Status Details Modal (Read, Delivered, Pending with Authority Hierarchy) */}
-
-        <MessageStatusInfoModal
-
-          isOpen={!!statusInfoMsg}
-
-          onClose={() => setStatusInfoMsg(null)}
-
-          message={statusInfoMsg}
-
-          chat={chat}
-
-          members={chatMembers}
-
-        />
-
-
-
-        {isMobile && showadd && (
-
-          <AddMemberModal
-
-            chat={chat}
-
-            API={API}
-
-            myDisplayName={myDisplayName}
-
-            onClose={closeadd}
-
-            onSuccess={() => {
-
-              getchat();
-
-              closeadd();
-
-            }}
-
-          />
-
-        )}
+        </Suspense>
 
 
 
@@ -15962,19 +7387,23 @@ const ChatBox = () => {
 
         {viewingMedia && (
 
-          <MediaViewer
+          <Suspense fallback={null}>
 
-            media={viewingMedia}
+            <MediaViewer
 
-            onClose={() => setViewingMedia(null)}
+              media={viewingMedia}
 
-            onEdit={(media) => {
+              onClose={() => setViewingMedia(null)}
 
-              setEditingViewerSrc(media.fileUrl);
+              onEdit={(media) => {
 
-            }}
+                setEditingViewerSrc(media.fileUrl);
 
-          />
+              }}
+
+            />
+
+          </Suspense>
 
         )}
 
@@ -16008,215 +7437,179 @@ const ChatBox = () => {
 
         )}
 
+        <Suspense fallback={null}>
 
+          {showScheduleModal && (
 
+            <ScheduleMessageModal
 
+              isOpen={showScheduleModal}
 
+              initialData={scheduleEditData}
 
+              onClose={() => {
 
+                setShowScheduleModal(false);
 
+                setScheduleEditData(null);
 
-        <ScheduleMessageModal
+              }}
 
-          isOpen={showScheduleModal}
+              onSubmit={handleScheduleSubmit}
 
-          initialData={scheduleEditData}
+            />
 
-          onClose={() => {
+          )}
 
-            setShowScheduleModal(false);
+          {showScheduledList && (
 
-            setScheduleEditData(null);
+            <ScheduledListModal
 
-          }}
+              isOpen={showScheduledList}
 
-          onSubmit={handleScheduleSubmit}
+              scheduledMessages={scheduledMessages}
 
-        />
+              onClose={() => setShowScheduledList(false)}
 
+              onEdit={(msg) => {
 
+                setShowScheduledList(false);
 
-        <ScheduledListModal
+                setScheduleEditData(msg);
 
-          isOpen={showScheduledList}
+                setShowScheduleModal(true);
 
-          scheduledMessages={scheduledMessages}
+              }}
 
-          onClose={() => setShowScheduledList(false)}
+              onDelete={handleDeleteSchedule}
 
-          onEdit={(msg) => {
+            />
 
-            setShowScheduledList(false);
+          )}
 
-            setScheduleEditData(msg);
+          {reactionInfo && (
 
-            setShowScheduleModal(true);
+            <ReactorsModal
 
-          }}
+              reactionInfo={reactionInfo}
 
-          onDelete={handleDeleteSchedule}
+              onClose={() => setReactionInfo(null)}
 
-        />
+              onSendReaction={sendReaction}
 
+              isMobile={isMobile}
 
+            />
 
+          )}
 
+          {showClassroomMatrixModal && (
 
-        {reactionInfo && (
+            <ClassroomMatrixModal
 
-          <ReactorsModal
+              roomId={chat?.id || chat?.roomId || chatid}
 
-            reactionInfo={reactionInfo}
+              classroomName={chat?.chatName || chat?.name || ''}
 
-            onClose={() => setReactionInfo(null)}
+              userRole={chat?.role || 'student'}
 
-            onSendReaction={sendReaction}
+              isOpen={showClassroomMatrixModal}
 
-            isMobile={isMobile}
+              onClose={() => setShowClassroomMatrixModal(false)}
 
-          />
+            />
 
-        )}
+          )}
 
+          {showReportExportModal && (
 
+            <ClassroomReportModal
+
+              roomId={chat?.id || chat?.roomId || chatid}
+
+              classroomName={chat?.chatName || chat?.name || ''}
+
+              isOpen={showReportExportModal}
+
+              onClose={() => setShowReportExportModal(false)}
+
+            />
+
+          )}
+
+          {showAttachPulseModal && (
+
+            <AttachPulseModal
+
+              isOpen={showAttachPulseModal}
+
+              onClose={() => setShowAttachPulseModal(false)}
+
+              onSelectPulse={(pulse, targetSpaceId) => {
+
+                setAttachedPulse({ pulse, targetSpaceId });
+
+              }}
+
+              chatId={chatid}
+
+              chatMembers={chatMembers}
+
+              chatType={chat?.type}
+
+              currentActiveSpace={activeSpace}
+
+            />
+
+          )}
+
+          {showPollModal && (
+
+            <CreatePollModal
+
+              isOpen={showPollModal}
+
+              onClose={() => setShowPollModal(false)}
+
+              chatId={chatid}
+
+              currentUserId={currentUserId}
+
+              onPollCreated={handlePollCreated}
+
+            />
+
+          )}
+
+        </Suspense>
 
         {/* Copied Toast Indicator */}
-
         <div style={{
-
           position: 'fixed',
-
           bottom: '80px',
-
           left: '50%',
-
           transform: `translateX(-50%) translateY(${copiedId ? '0' : '20px'})`,
-
           opacity: copiedId ? 1 : 0,
-
           pointerEvents: 'none',
-
           background: 'rgba(31, 41, 55, 0.95)',
-
           border: '1px solid var(--border-color)',
-
           color: 'var(--accent-text)',
-
           padding: '10px 24px',
-
           borderRadius: '24px',
-
           fontSize: '14px',
-
           fontWeight: '600',
-
           boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
-
           display: 'flex',
-
           alignItems: 'center',
-
           gap: '8px',
-
           transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-
           zIndex: 9999
-
         }}>
-
           <Copy size={16} /> Copied to clipboard!
-
         </div>
 
-
-
         {/* Mobile Quick Access Radial Wheel */}
-
         {isMobile && <QuickAccessWheel currentChatId={chatid} />}
-
-
-
-        {/* Classroom Matrix Analytics Modal */}
-
-        {showClassroomMatrixModal && (
-
-          <ClassroomMatrixModal
-
-            roomId={chatid}
-
-            classroomName={chat?.chatName || chat?.name || ''}
-
-            userRole={chat?.role || 'student'}
-
-            isOpen={showClassroomMatrixModal}
-
-            onClose={() => setShowClassroomMatrixModal(false)}
-
-          />
-
-        )}
-
-
-
-        {/* Classroom Report Export Modal */}
-
-        {showReportExportModal && (
-
-          <ClassroomReportModal
-
-            roomId={chatid}
-
-            classroomName={chat?.chatName || chat?.name || ''}
-
-            isOpen={showReportExportModal}
-
-            onClose={() => setShowReportExportModal(false)}
-
-          />
-
-        )}
-
-        {/* Attach Pulse Modal */}
-
-        <AttachPulseModal
-
-          isOpen={showAttachPulseModal}
-
-          onClose={() => setShowAttachPulseModal(false)}
-
-          onSelectPulse={(pulse, targetSpaceId) => {
-
-            setAttachedPulse({ pulse, targetSpaceId });
-
-          }}
-
-          chatId={chatid}
-
-          chatMembers={chatMembers}
-
-          chatType={chat?.type}
-
-          currentActiveSpace={activeSpace}
-
-        />
-
-
-
-        {/* Create Poll Modal */}
-
-        <CreatePollModal
-
-          isOpen={showPollModal}
-
-          onClose={() => setShowPollModal(false)}
-
-          chatId={chatid}
-
-          currentUserId={currentUserId}
-
-          onPollCreated={handlePollCreated}
-
-        />
 
       </div>
 

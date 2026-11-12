@@ -195,10 +195,10 @@ export const getChatInfoFromDB = async (chatId) => {
 // --- Assignment & Submissions Offline Cache Utilities ---
 
 export const saveAssignmentToDB = async (assignment) => {
-  if (!assignment || !assignment.id) return;
+  const aid = assignment?.id ?? assignment?.assignmentId;
+  if (!assignment || aid == null) return;
   const db = await initDB();
-  assignment.id = String(assignment.id);
-  await db.put('assignmentsCache', assignment);
+  await db.put('assignmentsCache', { ...assignment, id: String(aid) });
 };
 
 export const getAssignmentFromDB = async (assignmentId) => {

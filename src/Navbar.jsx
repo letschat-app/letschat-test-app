@@ -417,7 +417,9 @@ function Navbar() {
         const visited = JSON.parse(localStorage.getItem("visited") || "{}");
         visited[data] = Date.now();
         localStorage.setItem("visited", JSON.stringify(visited));
-        localStorage.setItem(data, JSON.stringify(chatsMap[data]));
+        if (chatsMap[data]) {
+          localStorage.setItem(data, JSON.stringify(chatsMap[data]));
+        }
 
         messageStore.setActivechatbox(data);
         getchat(data);

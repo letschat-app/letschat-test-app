@@ -73,6 +73,10 @@ const AssignmentPostModal = ({ chatid, onClose, sendApi, isPanel = false }) => {
       setError("Please enter a title for the assignment");
       return;
     }
+    if (!formData.deadline) {
+      setError("Please set a deadline for the assignment");
+      return;
+    }
 
     try {
       setIsSubmitting(true);

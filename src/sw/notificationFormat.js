@@ -740,16 +740,18 @@ export function resolveNotificationPath(data) {
 
     if (type === 'ASSIGNMENT_MISSING') {
     if (data.chatId) {
+      const spaceParam = data.spaceId != null && data.spaceId !== '' ? data.spaceId : '1';
       const assignmentParam = data.assignmentId ? `&assignmentId=${data.assignmentId}` : '';
-      return `/chat/${data.chatId}?space=1${assignmentParam}`;
+      return `/chat/${data.chatId}?space=${spaceParam}${assignmentParam}`;
     }
     if (data.assignmentsV2) {
       try {
         const items = typeof data.assignmentsV2 === 'string' ? JSON.parse(data.assignmentsV2) : data.assignmentsV2;
         if (Array.isArray(items) && items.length > 0 && items[0].chatId) {
           const first = items[0];
+          const spaceParam = first.spaceId != null && first.spaceId !== '' ? first.spaceId : '1';
           const assignmentParam = first.id ? `&assignmentId=${first.id}` : '';
-          return `/chat/${first.chatId}?space=1${assignmentParam}`;
+          return `/chat/${first.chatId}?space=${spaceParam}${assignmentParam}`;
         }
       } catch (e) {}
     }

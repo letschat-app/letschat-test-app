@@ -290,9 +290,6 @@ async function focusOrOpenAppClient(baseUrl, urlToOpen, messagePayload) {
           if (messagePayload) {
             activeClient.postMessage(messagePayload);
           }
-          if (!wasVisible && urlToOpen && 'navigate' in activeClient && activeClient.url !== urlToOpen) {
-            try { await activeClient.navigate(urlToOpen); } catch { /* ignore */ }
-          }
           return activeClient;
         }
       } catch (cErr) {

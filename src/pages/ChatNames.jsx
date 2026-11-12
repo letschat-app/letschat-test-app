@@ -801,13 +801,31 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
         const uniqueData = Array.from(new Map(data.map(item => [item.chatId, item])).values());
         setChatNames(uniqueData);
         localStorage.setItem('chatNames', JSON.stringify(uniqueData));
+        const nextMap = {};
+        uniqueData.forEach(item => { nextMap[item.chatId] = item; });
+        localStorage.setItem('chatsMap', JSON.stringify(nextMap));
+        syncChatsMapToDB(nextMap);
       })
       .catch(err => console.warn('Failed to refresh chat names:', err));
   }, []);
 
   useEffect(() => {
+    const handleLocalChatUpdated = (e) => {
+      const detail = e?.detail;
+      if (!detail || !detail.chatId) return;
+      setChatNames((prev) =>
+        prev.map((c) => (String(c.chatId) === String(detail.chatId) ? { ...c, ...detail } : c))
+      );
+      setInfoModalChat((prev) =>
+        prev && String(prev.chatId) === String(detail.chatId) ? { ...prev, ...detail } : prev
+      );
+    };
     window.addEventListener('letschat_refresh_chatnames', handleRefreshChatNames);
-    return () => window.removeEventListener('letschat_refresh_chatnames', handleRefreshChatNames);
+    window.addEventListener('letschat_chat_updated', handleLocalChatUpdated);
+    return () => {
+      window.removeEventListener('letschat_refresh_chatnames', handleRefreshChatNames);
+      window.removeEventListener('letschat_chat_updated', handleLocalChatUpdated);
+    };
   }, [handleRefreshChatNames]);
 
   // ── Guard: redirect if not logged in — runs ONCE on mount ────────────────
@@ -1259,9 +1277,11 @@ function ChatNames({ isDesktop = false, activeChatRoute = "", hideTitle = false 
       try { return JSON.parse(localStorage.getItem("visited") || '{}'); } catch { return {}; }
     })();
     if (isMounted.current) setVisited(visitedFromStorage);
-    const date = new Date(visitedFromStorage[chatid]);
+    const rawVisited = visitedFromStorage[chatid];
+    const parsedDate = rawVisited ? new Date(rawVisited) : new Date(0);
+    const safeDate = isNaN(parsedDate.getTime()) ? new Date(0) : parsedDate;
     const offset = 5.5 * 60; // +5:30 in minutes
-    const localTime = new Date(date.getTime() + offset * 60 * 1000);
+    const localTime = new Date(safeDate.getTime() + offset * 60 * 1000);
     const time = localTime.toISOString().slice(0, 19);
 
     if (!isMounted.current) return;

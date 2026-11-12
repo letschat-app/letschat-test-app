@@ -11,7 +11,7 @@ function getHigherStatus(currentStatus, incomingStatus) {
   if (!incomingStatus) return currentStatus;
   if (!currentStatus) return incomingStatus;
   if (typeof incomingStatus === 'string' && incomingStatus.startsWith('deleted')) return incomingStatus;
-  if (incomingStatus === 'revived') return incomingStatus;
+  if (incomingStatus === 'revived' || incomingStatus === 'error') return incomingStatus;
   const currentLevel = STATUS_ORDER[currentStatus] ?? -1;
   const incomingLevel = STATUS_ORDER[incomingStatus] ?? -1;
   return incomingLevel > currentLevel ? incomingStatus : currentStatus;

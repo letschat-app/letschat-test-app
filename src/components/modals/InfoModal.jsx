@@ -15,6 +15,7 @@ import Avatar from '../chat/Avatar';
 import MediaViewer from '../chat/MediaViewer';
 import { toggleMuteChat, isChatMuted, saveChatInfoToDB, getChatInfoFromDB, saveGroupMembersToDB, saveUsersBatchToDB, getGroupMembersFromDB } from '../../service/db';
 import { DisplayNamePolicyModal } from '../common/DisplayNamePolicyModal';
+import ProfileCropModal from '../common/ProfileCropModal';
 import { validateChatNickname } from '../../service/nameSimilarity';
 
 const extractPartnerUserId = (chatObj, currentUserId) => {
@@ -116,6 +117,7 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
   const [memberCount, setMemberCount] = useState(cachedInfo.memberCount || chat.noOfMembers || chat.memberCount || (chat.type === 'room' ? 1 : 0));
   const fileInputRef = useRef(null);
   const groupFileInputRef = useRef(null);
+  const [cropContext, setCropContext] = useState(null);
   const [muted, setMuted] = useState(false);
   const [commonGroups, setCommonGroups] = useState([]);
   const [showCommonPeople, setShowCommonPeople] = useState(false);
@@ -179,6 +181,14 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
   useEffect(() => {
     let isCurrent = true;
     setShowCommonPeople(false);
+    setGroupEditMode(false);
+    setEditMode(false);
+    setCropContext(null);
+    setTempGroupName(chat.chatName || '');
+    setTempGroupProfile(chat.profile || '');
+    const initialMotto = cachedInfo.motto || chat.motto || chat.description || '';
+    setRoomMotto(initialMotto);
+    setTempGroupMotto(initialMotto);
 
     // 1. Immediate cache hydration from IndexedDB
     getChatInfoFromDB(chat.chatId).then(cached => {
@@ -322,10 +332,10 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
         if (data.memberCount !== undefined) {
            setMemberCount(data.memberCount);
         }
-        if (data.motto !== undefined && data.motto !== null) {
-           setRoomMotto(data.motto);
-           setTempGroupMotto(data.motto);
-           chat.motto = data.motto;
+        if (data.motto !== undefined) {
+           const nextMotto = data.motto ?? '';
+           setRoomMotto(nextMotto);
+           setTempGroupMotto((prev) => (groupEditMode ? prev : nextMotto));
         }
         const infoObj = { chatId: chat.chatId, ...data };
         saveChatInfoToDB(infoObj);
@@ -488,43 +498,70 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
   };
 
   const handleSaveGroupInfo = async () => {
+    const cleanName = (tempGroupName || '').trim();
+    const cleanMotto = (tempGroupMotto || '').trim();
+    if (!cleanName) {
+      toast.error(`${chat.type === 'classroom' ? 'Classroom' : 'Group'} name cannot be empty.`);
+      return;
+    }
+
     const endpoint = chat.type === 'classroom' ? 'classroom' : 'group';
+    const targetId = chat.id || chat.roomId || chat.groupId || chat.chatId;
     try {
       setUploading(true);
-      const res = await fetch(`${API}/${endpoint}/update/${chat.chatId}`, {
+      const res = await fetch(`${API}/${endpoint}/update/${encodeURIComponent(targetId)}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "User-Id": currentUserId,
         },
         body: JSON.stringify({
-          chatName: tempGroupName,
-          profile: tempGroupProfile,
-          motto: tempGroupMotto,
-          description: tempGroupMotto
+          chatName: cleanName,
+          profile: tempGroupProfile || '',
+          motto: cleanMotto,
+          description: cleanMotto
         }),
       });
-      if (res.ok) {
+      const resText = await res.text().catch(() => '');
+      const normalized = resText.trim().toLowerCase();
+      if (res.ok && normalized !== 'error' && normalized !== 'not_found' && normalized !== 'failed') {
         setGroupEditMode(false);
-        chat.motto = tempGroupMotto;
-        chat.description = tempGroupMotto;
+        setRoomMotto(cleanMotto);
+        setTempGroupName(cleanName);
+        setTempGroupMotto(cleanMotto);
         try {
           const chatsMap = JSON.parse(localStorage.getItem('chatsMap') || '{}');
           if (chatsMap[chat.chatId]) {
             chatsMap[chat.chatId] = {
               ...chatsMap[chat.chatId],
-              chatName: tempGroupName,
+              chatName: cleanName,
               profile: tempGroupProfile,
-              motto: tempGroupMotto,
-              description: tempGroupMotto
+              motto: cleanMotto,
+              description: cleanMotto
             };
             localStorage.setItem('chatsMap', JSON.stringify(chatsMap));
           }
+          const existingInfo = JSON.parse(localStorage.getItem(`chatInfo_${chat.chatId}`) || '{}');
+          const mergedInfo = { ...existingInfo, chatId: chat.chatId, motto: cleanMotto };
+          localStorage.setItem(`chatInfo_${chat.chatId}`, JSON.stringify(mergedInfo));
+          saveChatInfoToDB(mergedInfo);
         } catch {}
-        // Trigger a global refresh of this chat
+        window.dispatchEvent(new CustomEvent('letschat_chat_updated', {
+          detail: {
+            chatId: chat.chatId,
+            chatName: cleanName,
+            profile: tempGroupProfile,
+            motto: cleanMotto,
+            description: cleanMotto
+          }
+        }));
+        window.dispatchEvent(new Event('letschat_refresh_chatnames'));
         if (typeof getchat === 'function') {
           getchat(chat.chatId);
         }
+        toast.success(`${chat.type === 'classroom' ? 'Classroom' : 'Group'} updated`);
+      } else {
+        toast.error(resText || `Failed to update ${endpoint}`);
       }
     } catch (ex) {
       console.error(`Failed to update ${endpoint}:`, ex);
@@ -534,24 +571,35 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
     }
   };
 
-  const handleGroupProfileChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const handleCroppedUpload = async (croppedFile, target) => {
     setUploading(true);
     setProgress(0);
-
     try {
-      const result = await uploadMedia(file, ({ progress: p }) => {
+      const result = await uploadMedia(croppedFile, ({ progress: p }) => {
         setProgress(p);
       });
-      setTempGroupProfile(result.mediaId);
+      if (target === 'group') {
+        setTempGroupProfile(result.mediaId);
+      } else {
+        setMyProfile(result.mediaId);
+      }
     } catch (err) {
-      console.error('[InfoModal] Group profile upload fail:', err);
+      console.error('[InfoModal] Profile upload fail:', err);
       toast.error('Upload failed: ' + err.message);
     } finally {
       setUploading(false);
     }
+  };
+
+  const handleGroupProfileChange = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type?.startsWith('image/')) {
+      toast.error('Please select an image file.');
+      return;
+    }
+    setCropContext({ file, target: 'group' });
   };
 
   const handleAvatarClick = async (profileId, title = 'Profile Picture') => {
@@ -578,24 +626,15 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
     }
   };
 
-  const handleFileChange = async (e) => {
+  const handleFileChange = (e) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
-
-    setUploading(true);
-    setProgress(0);
-
-    try {
-      const result = await uploadMedia(file, ({ progress: p }) => {
-        setProgress(p);
-      });
-      setMyProfile(result.mediaId);
-    } catch (err) {
-      console.error('[InfoModal] Upload fail:', err);
-      toast.error('Upload failed: ' + err.message);
-    } finally {
-      setUploading(false);
+    if (!file.type?.startsWith('image/')) {
+      toast.error('Please select an image file.');
+      return;
     }
+    setCropContext({ file, target: 'myProfile' });
   };
 
   const handleLeaveGroup = async () => {
@@ -668,10 +707,11 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
     return null;
   };
 
-  const currentMember = members.find(m => m.userId === currentUserId);
-  const isGroupAdmin = (chat.type === 'group' && currentMember?.role === 'admin') || 
-                       (chat.type === 'classroom' && currentMember?.role === 'faculty');
-  const canAddMembers = isGroupAdmin || (chat.type === 'classroom' && currentMember?.role === 'admin');
+  const currentMember = members.find(m => String(m.userId) === String(currentUserId));
+  const currentRole = currentMember?.role || chat.role;
+  const isGroupAdmin = (chat.type === 'group' && currentRole === 'admin') || 
+                       (chat.type === 'classroom' && currentRole === 'faculty');
+  const canAddMembers = isGroupAdmin || (chat.type === 'classroom' && currentRole === 'admin');
 
   const content = (
     <div
@@ -1473,6 +1513,21 @@ const InfoModal = ({ chat, onClose, API, navigate, getchat, isPanel = false }) =
         isOpen={showPolicyModal}
         onClose={() => setShowPolicyModal(false)}
       />
+
+      {cropContext?.file && (
+        <ProfileCropModal
+          file={cropContext.file}
+          title={cropContext.target === 'group'
+            ? `Crop ${chat.type === 'classroom' ? 'Classroom' : 'Group'} Photo (1:1)`
+            : 'Crop Chat Profile Photo (1:1)'}
+          onCancel={() => setCropContext(null)}
+          onDone={(croppedFile) => {
+            const target = cropContext.target;
+            setCropContext(null);
+            handleCroppedUpload(croppedFile, target);
+          }}
+        />
+      )}
     </div>
   );
 

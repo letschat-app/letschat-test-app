@@ -61,7 +61,14 @@ export function initWebsocket() {
     return;
   }
 
-  socket = new WebSocket(`wss://letschat-5dxg.onrender.com/chat?userid=${userid}`);//test server
+  const apiUrl = import.meta.env.VITE_API_URL || 'https://letschat-5dxg.onrender.com/api';
+  let wsOrigin;
+  try {
+    wsOrigin = new URL(apiUrl).origin.replace(/^http/, 'ws');
+  } catch (e) {
+    wsOrigin = window.location.origin.replace(/^http/, 'ws');
+  }
+  socket = new WebSocket(`${wsOrigin}/chat?userid=${encodeURIComponent(userid)}`);
   localStorage.setItem('socket', socket);
 
   socket.onopen = () => {
@@ -175,6 +182,9 @@ export function initWebsocket() {
     // 4. Single Message ACK Response (onrecieve ACK payload)
     if (('tempmsgid' in msg || 'msgid' in msg) && 'status' in msg && !('sendername' in msg) && !('content' in msg)) {
       console.log("[Websocket] Single ACK received:", msg);
+      if (msg.status === 'error') {
+        console.warn("[Websocket] Message send failed on server:", msg);
+      }
       updateMessageStatusInDB(msg).catch(err => console.error(err));
       messageStore.updateMessageStatus(msg);
       if (msg.tempmsgid) {

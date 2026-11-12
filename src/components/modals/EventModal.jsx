@@ -1,7 +1,7 @@
 import { useToast } from '../common/ToastProvider';
 import { useConfirm } from '../common/ConfirmProvider';
-import useBackClose from '../../hooks/useBackClose';
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X, Calendar, Clock, Check, AlertTriangle, Trash2, ArrowRight, Plus,
   Video, MapPin, Users, Globe, Lock, Bell, ExternalLink, ChevronDown, ChevronUp
@@ -185,6 +185,20 @@ const EventModal = ({
   });
 
   const [hasUserSetDateTime, setHasUserSetDateTime] = useState(!isNewEvent);
+  const [localHasChanges, setLocalHasChanges] = useState(false);
+  const [showUnsavedPrompt, setShowUnsavedPrompt] = useState(false);
+  const [isSavingChanges, setIsSavingChanges] = useState(false);
+  const isDirty = Boolean(localHasChanges || hasChanges);
+
+  const updateDirtyState = (dirty) => {
+    setLocalHasChanges(dirty);
+    if (setHasChanges) setHasChanges(dirty);
+  };
+
+  useEffect(() => {
+    setLocalHasChanges(false);
+    setShowUnsavedPrompt(false);
+  }, [event]);
   const formatIsoToTimeStr = (iso) => {
     if (!iso) return '';
     try {
@@ -266,28 +280,35 @@ const EventModal = ({
       if (onDraftChange) onDraftChange(updated);
       return updated;
     });
-      };
+    updateDirtyState(true);
+  };
 
   const handleScopeChange = (newScope) => {
     handleChange('scope', newScope);
   };
 
   const handleGroupVisibilityToggle = () => {
+    if (!canEdit) return;
     const newVis = !formData.isGroupVisible;
-    setFormData((prev) => ({
-      ...prev,
-      isGroupVisible: newVis,
-      // If turned off, event becomes strictly personal
-      chatid: newVis ? (event?.chatid || event?.chatId) : null
-    }));
+    setFormData((prev) => {
+      const updated = {
+        ...prev,
+        isGroupVisible: newVis,
+        // If turned off, event becomes strictly personal
+        chatid: newVis ? (event?.chatid || event?.chatId) : null
       };
+      if (onDraftChange) onDraftChange(updated);
+      return updated;
+    });
+    updateDirtyState(true);
+  };
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleCreateEvent = async () => {
     if (!formData.title || !formData.title.trim()) {
       toast.error("Please enter an event title");
-      return;
+      return false;
     }
 
     // Double check conflict before creating: ask to confirm without any extra API call
@@ -301,7 +322,7 @@ const EventModal = ({
         danger: false
       });
       if (!confirmed) {
-        return;
+        return false;
       }
     }
 
@@ -340,20 +361,23 @@ const EventModal = ({
       if (res.ok) {
         window.dispatchEvent(new CustomEvent('letschat_refresh_events'));
         window.dispatchEvent(new CustomEvent('letschat_event_sync', { detail: { chatId: targetChatId } }));
-        if (setHasChanges) setHasChanges(false);
+        updateDirtyState(false);
         if (onEventCreated) {
           onEventCreated();
         } else if (onClose) {
           onClose();
         }
+        return true;
       } else {
         const errorText = await res.text();
         console.error("Failed to create event:", res.status, errorText);
         toast?.error?.("Failed to create event. Please try again.");
+        return false;
       }
     } catch (err) {
       console.error("Network error creating group event:", err);
       toast?.error?.("Network error creating group event.");
+      return false;
     } finally {
       setIsSubmitting(false);
     }
@@ -466,7 +490,7 @@ const EventModal = ({
             setFormData(prev => ({ ...prev, id: created.eventId }));
           }
           window.dispatchEvent(new CustomEvent('letschat_refresh_events'));
-          if (setHasChanges) setHasChanges(false);
+          updateDirtyState(false);
           return;
         }
       } catch (err) {
@@ -474,10 +498,207 @@ const EventModal = ({
       }
     } else if (updateEventApi) {
       updateEventApi(payload);
-      if (setHasChanges) setHasChanges(false);
+      updateDirtyState(false);
     }
 
     if (onDraftChange) onDraftChange(payload);
+    updateDirtyState(false);
+  };
+
+  const handleAttemptClose = () => {
+    if (isSavingChanges || isSubmitting) return;
+    if (canEdit && isDirty) {
+      setShowUnsavedPrompt(true);
+      return;
+    }
+    if (onClose) onClose();
+  };
+
+  const handleDiscardAndClose = () => {
+    updateDirtyState(false);
+    setShowUnsavedPrompt(false);
+    if (onDraftChange) onDraftChange(null);
+    if (onClose) onClose();
+  };
+
+  const handleSaveChangesAndClose = async () => {
+    if (!canEdit) {
+      if (onClose) onClose();
+      return;
+    }
+    if (!formData.title || !formData.title.trim()) {
+      setShowUnsavedPrompt(false);
+      toast?.error?.('Please enter an event title');
+      return;
+    }
+    setShowUnsavedPrompt(false);
+
+    if (isNewEvent) {
+      await handleCreateEvent();
+      return;
+    }
+
+    const startIso = toSafeIso(formData.date, formData.startTime, 10);
+    const endIso = toSafeIso(formData.date, formData.endTime, 11);
+    const targetChatId = formData.chatid || event?.chatid || event?.chatId;
+    const groupEventId = formData.groupEventId || event?.groupEventId;
+    const isExistingGroupOwnerEvent = Boolean(groupEventId) && !isReceivingPerson;
+
+    setIsSavingChanges(true);
+    try {
+      if (isExistingGroupOwnerEvent) {
+        const payload = {
+          groupEventId,
+          eventId: formData.id || event?.eventId || event?.id || groupEventId,
+          chatId: targetChatId,
+          eventTitle: formData.title.trim(),
+          eventDetails: formData.description || '',
+          eventColor: formData.color || '#3b82f6',
+          startTime: startIso,
+          endTime: endIso,
+          scope: formData.scope || 'ALL',
+          isGroupVisible: formData.isGroupVisible !== false,
+          meetingType: formData.meetingType || 'online',
+          meetingLink: formData.meetingLink?.trim() || null,
+          location: formData.location?.trim() || null,
+          reminderOffset: formData.reminderOffset || 60,
+          action: formData.action || 'scheduled'
+        };
+
+        const res = await fetch(`${API}/user/event/update`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Id': currentUserId || localStorage.getItem('userid'),
+            'ngrok-skip-browser-warning': 'true'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const errorText = await res.text().catch(() => '');
+          console.error('Failed to update group event:', res.status, errorText);
+          toast?.error?.('Failed to save event changes. Please try again.');
+          return;
+        }
+
+        if (formData.isAdded && !formData.isSimulation && (formData.id || groupEventId)) {
+          try {
+            await saveEventToDB({
+              ...event,
+              id: formData.id || event?.id || event?.eventId || groupEventId,
+              groupEventId,
+              title: payload.eventTitle,
+              date: startIso,
+              startTime: formData.startTime,
+              endTime: formData.endTime,
+              description: payload.eventDetails,
+              color: payload.eventColor,
+              msgref: formData.msgref || '',
+              chatid: targetChatId || '',
+              action: payload.action,
+              isAdded: true,
+              isSync: true,
+              meetingType: payload.meetingType,
+              meetingLink: payload.meetingLink,
+              location: payload.location
+            });
+          } catch (dbErr) {
+            console.warn('[EventModal] IDB update for group event failed:', dbErr);
+          }
+        }
+
+        window.dispatchEvent(new CustomEvent('letschat_refresh_events'));
+        if (targetChatId) {
+          window.dispatchEvent(new CustomEvent('letschat_event_sync', { detail: { chatId: targetChatId } }));
+        }
+        updateDirtyState(false);
+        toast?.success?.('Event changes saved');
+        if (onClose) onClose();
+        return;
+      }
+
+      const normalizeHHMM = (val, fallback) => {
+        if (!val) return fallback;
+        if (typeof val === 'string' && /^\d{1,2}:\d{2}$/.test(val.trim())) {
+          const [h, m] = val.trim().split(':');
+          return `${h.padStart(2, '0')}:${m}`;
+        }
+        const d = new Date(toSafeIso(formData.date, val));
+        if (!isNaN(d.getTime())) {
+          return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        }
+        return fallback;
+      };
+
+      const safeStartTime = normalizeHHMM(formData.startTime, '10:00');
+      const safeEndTime = normalizeHHMM(formData.endTime, '11:00');
+      const resolvedId = formData.id || event?.id || event?.eventId;
+
+      const updatedPayload = {
+        ...event,
+        ...formData,
+        id: resolvedId,
+        title: formData.title.trim(),
+        eventTitle: formData.title.trim(),
+        description: formData.description || '',
+        eventDetails: formData.description || '',
+        date: startIso,
+        startTime: safeStartTime,
+        endTime: safeEndTime,
+        isSync: true,
+        chatid: formData.isGroupVisible ? (formData.chatid || event?.chatid || event?.chatId) : null
+      };
+
+      if (formData.isAdded && !formData.isSimulation && resolvedId) {
+        try {
+          await saveEventToDB({
+            ...updatedPayload,
+            id: resolvedId
+          });
+        } catch (dbErr) {
+          console.warn('[EventModal] IDB update for personal event failed:', dbErr);
+        }
+      }
+
+      if (updateEventApi) {
+        await updateEventApi(updatedPayload);
+      } else if (resolvedId && !String(resolvedId).startsWith('local_') && !updatedPayload.isSimulation) {
+        const res = await fetch(`${API}/user/update`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            eventId: resolvedId,
+            userId: currentUserId || localStorage.getItem('userid'),
+            eventTitle: updatedPayload.title,
+            startTime: startIso,
+            endTime: endIso,
+            eventDetails: updatedPayload.description,
+            eventColor: updatedPayload.color || '',
+            msgId: String(updatedPayload.msgref || ''),
+            chatId: String(updatedPayload.chatid || ''),
+            action: updatedPayload.action,
+            isAdded: updatedPayload.isAdded,
+            isSync: true
+          })
+        });
+        if (!res.ok) {
+          toast?.error?.('Failed to save event changes. Please try again.');
+          return;
+        }
+      }
+
+      if (onDraftChange) onDraftChange(updatedPayload);
+      window.dispatchEvent(new CustomEvent('letschat_refresh_events'));
+      updateDirtyState(false);
+      toast?.success?.('Event changes saved');
+      if (onClose) onClose();
+    } catch (err) {
+      console.error('[EventModal] Error saving event changes:', err);
+      toast?.error?.('Network error while saving changes.');
+    } finally {
+      setIsSavingChanges(false);
+    }
   };
 
   // Convert 12h to 24h helper
@@ -578,7 +799,7 @@ const EventModal = ({
         }}>
           <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: '18px', fontWeight: '700' }}>Event Details</h3>
           <button
-            onClick={onClose}
+            onClick={handleAttemptClose}
             style={{
               background: 'var(--bg-hover)', border: 'none',
               borderRadius: '50%', width: '36px', height: '36px',
@@ -617,7 +838,7 @@ const EventModal = ({
 
         {!isPanel && (
           <button
-            onClick={onClose}
+            onClick={handleAttemptClose}
             style={{
               background: 'var(--bg-hover)', border: 'none',
               borderRadius: '50%', width: '36px', height: '36px',
@@ -1253,6 +1474,114 @@ const EventModal = ({
           </div>
         ))}
       </div>
+      {showUnsavedPrompt && createPortal(
+        <div
+          className="modal-overlay"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!isSavingChanges && !isSubmitting) {
+              setShowUnsavedPrompt(false);
+            }
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10050,
+            padding: '20px'
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: 'var(--bg-card, #111827)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '18px',
+              padding: '22px',
+              width: '100%',
+              maxWidth: '380px',
+              boxShadow: '0 24px 48px rgba(0, 0, 0, 0.55)',
+              color: 'var(--text-primary)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+              <AlertTriangle size={20} style={{ color: 'var(--warning-color, #f59e0b)', flexShrink: 0 }} />
+              <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                Unsaved Changes
+              </h4>
+            </div>
+            <p style={{ margin: '0 0 18px 0', fontSize: '13.5px', lineHeight: 1.5, color: 'var(--text-secondary)' }}>
+              {isNewEvent
+                ? 'You have an unsaved event draft. Would you like to create it or discard your changes?'
+                : 'You have unsaved changes to this event. Do you want to save them before closing?'}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button
+                type="button"
+                disabled={isSavingChanges || isSubmitting}
+                onClick={handleSaveChangesAndClose}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  backgroundColor: 'var(--accent-solid)',
+                  color: 'var(--text-on-accent)',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: (isSavingChanges || isSubmitting) ? 'not-allowed' : 'pointer',
+                  opacity: (isSavingChanges || isSubmitting) ? 0.7 : 1
+                }}
+              >
+                {isSavingChanges || isSubmitting
+                  ? 'Saving...'
+                  : (isNewEvent ? 'Create Event' : 'Save Changes')}
+              </button>
+              <button
+                type="button"
+                disabled={isSavingChanges || isSubmitting}
+                onClick={handleDiscardAndClose}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--danger-tint-border, rgba(239, 68, 68, 0.3))',
+                  backgroundColor: 'var(--danger-tint, rgba(239, 68, 68, 0.12))',
+                  color: 'var(--danger-color, #ef4444)',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: (isSavingChanges || isSubmitting) ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Discard Changes
+              </button>
+              <button
+                type="button"
+                disabled={isSavingChanges || isSubmitting}
+                onClick={() => setShowUnsavedPrompt(false)}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border-color)',
+                  backgroundColor: 'var(--bg-hover)',
+                  color: 'var(--text-secondary)',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: (isSavingChanges || isSubmitting) ? 'not-allowed' : 'pointer'
+                }}
+              >
+                Keep Editing
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 
@@ -1261,7 +1590,7 @@ const EventModal = ({
   return (
     <div
       className="modal-overlay"
-      onClick={onClose}
+      onClick={handleAttemptClose}
       style={{
         position: 'fixed', inset: 0,
         backgroundColor: 'rgba(0, 0, 0, 0.75)',

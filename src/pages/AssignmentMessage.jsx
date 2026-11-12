@@ -19,6 +19,8 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
   const [showSubmissionForm, setShowSubmissionForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [userProfiles, setUserProfiles] = useState({});
+  const [gradeInputs, setGradeInputs] = useState({});
+  const [savingGradeId, setSavingGradeId] = useState(null);
   const fileInputRef = useRef(null);
 
 
@@ -50,7 +52,9 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
 
         if (response.ok) {
           const data = await response.json();
-          data.deadline = new Date(data.deadline * 1000).toISOString();
+          if (data.deadline != null) {
+            data.deadline = getParsedDate(data.deadline).toISOString();
+          }
           
           // Update UI with fresh data
           setAssignment(data);
@@ -305,6 +309,51 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
       return new Date(timeNum * 1000);
     }
     return new Date(dateString);
+  };
+
+  const handleSaveGrade = async (submission) => {
+    const subId = submission.submissionId || submission.id;
+    if (!subId) return;
+    const rawVal = gradeInputs[subId] !== undefined ? gradeInputs[subId] : (submission.marks ?? '');
+    const parsed = Number(rawVal);
+    if (rawVal === '' || isNaN(parsed) || parsed < 0) {
+      toast.error('Please enter valid non-negative marks');
+      return;
+    }
+    if (assignment?.marks != null && parsed > assignment.marks) {
+      toast.error(`Marks cannot exceed ${assignment.marks}`);
+      return;
+    }
+    setSavingGradeId(subId);
+    try {
+      const res = await fetch(`${API}/classroom/submission/${subId}/grade`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Id': localStorage.getItem('userid'),
+        },
+        body: JSON.stringify({ marks: Math.round(parsed) }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setSubmissions(prev => {
+          const next = prev.map(s => {
+            const sid = s.submissionId || s.id;
+            return sid === subId ? { ...s, marks: updated.marks } : s;
+          });
+          saveSubmissionsToDB(id, next);
+          return next;
+        });
+        toast.success('Grade saved');
+      } else {
+        toast.error('Failed to save grade');
+      }
+    } catch (err) {
+      console.error('Error saving grade:', err);
+      toast.error('Error saving grade');
+    } finally {
+      setSavingGradeId(null);
+    }
   };
 
   const formatDate = (dateString) => {
@@ -1105,7 +1154,7 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                                 fontSize: '11px',
                                 fontWeight: '600',
                               }}>
-                                {new Date(submission.timestamp) > new Date(assignment.deadline) ? 'Late' : 'On Time'}
+                                {getParsedDate(submission.timestamp) > getParsedDate(assignment.deadline) ? 'Late' : 'On Time'}
                               </span>
                             )}
                           </div>
@@ -1125,6 +1174,59 @@ const AssignmentMessage = ({ id, userRole = 'student', isMobile = false, isPanel
                                   isMobile={isMobile}
                                 />
                               ))}
+                            </div>
+                          )}
+
+                          {(submission.marks != null || ((userRole === 'faculty' || userRole === 'admin') && (submission.submissionId || submission.id))) && (
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border-color)' }}>
+                              <span style={{ fontSize: '12px', fontWeight: '600', color: submission.marks != null ? 'var(--accent-text)' : 'var(--text-secondary)' }}>
+                                {submission.marks != null
+                                  ? `Grade: ${submission.marks}${assignment?.marks != null ? ` / ${assignment.marks}` : ''} pts`
+                                  : 'Not graded yet'}
+                              </span>
+                              {(userRole === 'faculty' || userRole === 'admin') && (submission.submissionId || submission.id) && (() => {
+                                const subId = submission.submissionId || submission.id;
+                                const inputVal = gradeInputs[subId] !== undefined ? gradeInputs[subId] : (submission.marks ?? '');
+                                return (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={assignment?.marks ?? undefined}
+                                      placeholder={assignment?.marks != null ? `0-${assignment.marks}` : 'Marks'}
+                                      value={inputVal}
+                                      onChange={(e) => setGradeInputs(prev => ({ ...prev, [subId]: e.target.value }))}
+                                      style={{
+                                        width: '76px',
+                                        padding: '4px 8px',
+                                        borderRadius: '6px',
+                                        border: '1px solid var(--border-color)',
+                                        backgroundColor: 'var(--bg-secondary)',
+                                        color: 'var(--text-primary)',
+                                        fontSize: '12px',
+                                      }}
+                                    />
+                                    <button
+                                      type="button"
+                                      disabled={savingGradeId === subId}
+                                      onClick={() => handleSaveGrade(submission)}
+                                      style={{
+                                        padding: '4px 10px',
+                                        borderRadius: '6px',
+                                        border: 'none',
+                                        backgroundColor: 'var(--accent-solid)',
+                                        color: '#ffffff',
+                                        fontSize: '12px',
+                                        fontWeight: '600',
+                                        cursor: savingGradeId === subId ? 'not-allowed' : 'pointer',
+                                        opacity: savingGradeId === subId ? 0.65 : 1,
+                                      }}
+                                    >
+                                      {savingGradeId === subId ? 'Saving...' : 'Save Grade'}
+                                    </button>
+                                  </div>
+                                );
+                              })()}
                             </div>
                           )}
                         </div>

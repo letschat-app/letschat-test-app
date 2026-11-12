@@ -723,3 +723,100 @@ a:focus-visible {
   background-size: 200% 100%;
   animation: mediaShimmerSweep 1.6s infinite linear;
 }
+
+/* ─── 12. ChatBox Shared Animations & Scrollbar Utilities ────────────────── */
+.epr-main {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3) !important;
+}
+
+.epr-category-nav {
+  background: transparent !important;
+  border-bottom: 1px solid var(--border-color) !important;
+}
+
+.epr-search-container input {
+  background: var(--bg-secondary) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 10px !important;
+  color: var(--text-primary) !important;
+}
+
+.epr-emoji-category-label {
+  background: var(--bg-card) !important;
+  color: var(--text-secondary) !important;
+  font-size: 11px !important;
+}
+
+.epr-btn:hover {
+  background: var(--bg-hover) !important;
+}
+
+.epr-skin-tones {
+  display: none !important;
+}
+
+@keyframes recordBlink {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.9); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes guideSlideDown {
+  from { opacity: 0; transform: translate(-50%, -20px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@keyframes blink {
+  0% { opacity: 0; }
+  50% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.dot-blink-1 { animation: blink 1.4s infinite 0s; }
+.dot-blink-2 { animation: blink 1.4s infinite 0.2s; }
+.dot-blink-3 { animation: blink 1.4s infinite 0.4s; }
+
+@keyframes pulse-red {
+  0% { transform: scale(0.8); opacity: 0.5; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(0.8); opacity: 0.5; }
+}
+
+.rec-pulse { animation: pulse-red 1s infinite; }
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.hide-scrollbar::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+  border-radius: 10px;
+}
+
+.hide-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 10px;
+}
+
+.hide-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #4b5563;
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}

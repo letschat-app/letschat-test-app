@@ -27,6 +27,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import Avatar from '../components/chat/Avatar';
+import ProfileCropModal from '../components/common/ProfileCropModal';
 import StreakBadge from '../components/pulse/StreakBadge';
 import { useNotifications } from '../hooks/useNotifications';
 import { getGroupMembersFromDB, syncChatsMapToDB, getUserFromDB, saveUserToDB } from '../service/db';
@@ -169,6 +170,7 @@ const ProfilePage = () => {
   const [showPolicyModal, setShowPolicyModal] = useState(false);
 
   const fileInputRef = useRef(null);
+  const [cropFile, setCropFile] = useState(null);
 
   // Room nickname availability checker
   const roomNicknameCheck = useUsernameCheck({
@@ -731,22 +733,32 @@ const ProfilePage = () => {
     if (!uploading) fileInputRef.current?.click();
   };
 
-  // File picker handler for Avatar upload
-  const handleFileChange = async (e) => {
+  // File picker handler -> open forced 1:1 crop modal first
+  const handleFileChange = (e) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
+
+    if (!file.type?.startsWith('image/')) {
+      showToast('Please select an image file.');
+      return;
+    }
 
     if (file.size > 50 * 1024 * 1024) {
       showToast('This file exceeds the 50MB size limit.');
       return;
     }
 
+    setCropFile(file);
+  };
+
+  const uploadCroppedProfile = async (croppedFile) => {
     setUploading(true);
     setProgress(0);
     setStage('preparing_metadata');
 
     try {
-      const result = await uploadMedia(file, ({ stage: s, progress: p }) => {
+      const result = await uploadMedia(croppedFile, ({ stage: s, progress: p }) => {
         setStage(s);
         setProgress(p);
       });
@@ -759,18 +771,20 @@ const ProfilePage = () => {
         }
       });
 
-      if (res.ok) {
+      const resText = await res.text().catch(() => '');
+      if (res.ok && resText.trim().toLowerCase() !== 'failed') {
         localStorage.setItem('profile', result.mediaId);
         setProfile(result.mediaId);
         setStage('done');
         setProgress(100);
         showToast('Profile picture updated');
+        window.dispatchEvent(new Event('letschat_refresh_chatnames'));
         setTimeout(() => {
           setUploading(false);
           setStage('');
         }, 1000);
       } else {
-        throw new Error('Failed to update profile picture on server');
+        throw new Error(resText || 'Failed to update profile picture on server');
       }
     } catch (err) {
       console.error('[ProfileUpload]', err);
@@ -1211,6 +1225,18 @@ const ProfilePage = () => {
         style={{ display: 'none' }}
         accept="image/*"
       />
+
+      {cropFile && (
+        <ProfileCropModal
+          file={cropFile}
+          title="Crop Profile Picture (1:1)"
+          onCancel={() => setCropFile(null)}
+          onDone={(cropped) => {
+            setCropFile(null);
+            uploadCroppedProfile(cropped);
+          }}
+        />
+      )}
 
       {/* Sticky Back Row with title */}
       <ProfileBackRow title="Profile" />
