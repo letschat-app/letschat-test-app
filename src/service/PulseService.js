@@ -196,7 +196,8 @@ export const recordPulseView = async (pulseId, pulseOwnerUserId = null) => {
       headers: getHeaders(),
     });
     if (res.ok) {
-      return await res.json();
+      const text = await res.text();
+      try { return JSON.parse(text); } catch { return { status: text }; }
     }
   } catch (err) {
     console.warn(`[PulseService] View record failed for pulse ${pulseId}:`, err);

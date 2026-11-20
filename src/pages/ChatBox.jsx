@@ -57,6 +57,7 @@ import AssignmentMessage from "./AssignmentMessage";
 
 import MediaMessage from '../components/chat/MediaMessage';
 import { createPackedPreview } from '../service/TinyPreview';
+import { useToast } from '../components/common/ToastProvider';
 import '../components/chat/messages.css';
 import { lazyModal } from '../utils/lazyModal';
 
@@ -78,6 +79,7 @@ const AttachPulseModal = lazyModal(() => import('../components/pulse/AttachPulse
 const ReactorsModal = lazyModal(() => import('../components/chat/ReactorsModal'));
 const ChatLegacyMediaOverlay = lazyModal(() => import('../components/chat/ChatLegacyMediaOverlay'));
 const ChatActionModals = lazyModal(() => import('../components/chat/ChatActionModals'));
+const GroupAlbumModal = lazyModal(() => import('../components/chat/GroupAlbumModal'));
 
 import simulationService from "../service/SimulationService";
 
@@ -102,6 +104,7 @@ const lastChatSyncTimes = {};
 
 
 const ChatBox = () => {
+  const toast = useToast();
 
   const { chatid } = useParams();
   const { isInputFocused = false, isIOS = (typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))) } = useVisualViewport?.() || {};
@@ -1241,6 +1244,10 @@ const ChatBox = () => {
 
   const [viewingMedia, setViewingMedia] = useState(null);
 
+  const [viewingGallery, setViewingGallery] = useState(null);
+
+  const [activeAlbumGroup, setActiveAlbumGroup] = useState(null);
+
   const [editingViewerSrc, setEditingViewerSrc] = useState(null);
 
   const [pendingMediaFile, setPendingMediaFile] = useState(null);
@@ -1423,7 +1430,7 @@ const ChatBox = () => {
 
     try {
 
-      const res = await fetch(`${API}/delete/${msgid}`, { method: 'POST' });
+      const res = await fetch(`${API}/schedule/delete/${msgid}`, { method: 'POST' });
 
       if (!res.ok) throw new Error("Failed to delete scheduled message");
 
@@ -5848,6 +5855,63 @@ const ChatBox = () => {
     setShowScheduleModal(true);
   }, []);
 
+  const galleryMediaItems = useMemo(() => {
+    return (filteredMessages || [])
+      .filter((m) => m && ['image', 'video'].includes(m.type) && !m.isdeleted && !m.isdeletedeone && (m.content || m.optimisticUrl))
+      .map((m) => ({
+        id: m.msgid || m.tempmsgid || m.content,
+        msgid: m.msgid,
+        tempmsgid: m.tempmsgid,
+        content: m.content,
+        mediaId: m.content,
+        fileType: m.type,
+        type: m.type,
+        fileName: m.fileName || (m.type === 'video' ? 'Video' : 'Image'),
+        timestamp: m.timestamp,
+        sendername: m.sendername,
+        isReceived: m.userid ? String(m.userid) !== String(currentUserId) : false,
+        optimisticUrl: m.optimisticUrl,
+        optimisticThumbUrl: m.optimisticThumbUrl,
+        thumbKey: m.thumbKey || m.thumbnailKey,
+        mainKey: m.mainKey || m.fileKey,
+        duration: m.duration,
+      }));
+  }, [filteredMessages, currentUserId]);
+
+  const handleOpenMediaViewer = useCallback((target) => {
+    if (!target) return;
+    if (target.mediaList && Array.isArray(target.mediaList)) {
+      setViewingGallery({
+        media: target.media,
+        mediaList: target.mediaList,
+        initialIndex: target.initialIndex || 0,
+        initialId: target.initialId,
+      });
+      return;
+    }
+
+    const targetId = target.msgid || target.tempmsgid || target.mediaId || target.id || target.content;
+    let foundIndex = -1;
+    if (targetId) {
+      foundIndex = galleryMediaItems.findIndex(
+        (m) => m.id === targetId || m.mediaId === targetId || m.msgid === targetId || m.tempmsgid === targetId
+      );
+    }
+
+    if (foundIndex !== -1) {
+      setViewingGallery({
+        mediaList: galleryMediaItems,
+        initialIndex: foundIndex,
+      });
+    } else {
+      setViewingGallery({
+        media: target,
+        mediaList: [target],
+        initialIndex: 0,
+      });
+    }
+  }, [galleryMediaItems]);
+
   const isSidePanelOpen = !isMobile && (showInfo || ShowEventModal || showpost || showadd || showAssignmentDetail || showGroupCalendar);
 
 
@@ -6646,7 +6710,8 @@ const ChatBox = () => {
           onJumpToReplied={handleJumpToReplied}
           renderFormattedText={renderFormattedText}
           onOpenAssignmentPanel={handleOpenAssignmentPanel}
-          onOpenMediaViewer={setViewingMedia}
+          onOpenMediaViewer={handleOpenMediaViewer}
+          onOpenAlbum={setActiveAlbumGroup}
           onRetryMediaUpload={retryMediaUpload}
           onShowReactors={handleShowReactors}
           onToggleStar={toggleStar}
@@ -7385,56 +7450,55 @@ const ChatBox = () => {
 
         )}
 
-        {viewingMedia && (
-
+        {(viewingGallery || viewingMedia) && (
           <Suspense fallback={null}>
-
             <MediaViewer
-
-              media={viewingMedia}
-
-              onClose={() => setViewingMedia(null)}
-
-              onEdit={(media) => {
-
-                setEditingViewerSrc(media.fileUrl);
-
+              media={viewingGallery?.media || viewingMedia}
+              mediaList={viewingGallery?.mediaList || (viewingMedia ? [viewingMedia] : [])}
+              initialIndex={viewingGallery?.initialIndex || 0}
+              initialId={viewingGallery?.initialId}
+              onClose={() => {
+                setViewingGallery(null);
+                setViewingMedia(null);
               }}
-
+              onEdit={(media) => {
+                setEditingViewerSrc(media.fileUrl);
+              }}
             />
-
           </Suspense>
-
         )}
 
-
+        {activeAlbumGroup && (
+          <Suspense fallback={null}>
+            <GroupAlbumModal
+              group={activeAlbumGroup}
+              onClose={() => setActiveAlbumGroup(null)}
+              onOpenViewer={handleOpenMediaViewer}
+              selectedMessages={selectedMessages}
+              onClickMessage={handleClickMessage}
+              onReply={reply}
+              onDelete={delet}
+              onForward={forward}
+              onToggleStar={toggleStar}
+              isMobile={isMobile}
+            />
+          </Suspense>
+        )}
 
         {editingViewerSrc && (
-
           <React.Suspense fallback={null}>
-
             <ImageEditor
-
               src={editingViewerSrc}
-
               onDone={(editedFile) => {
-
                 setEditingViewerSrc(null);
-
                 setViewingMedia(null);
-
+                setViewingGallery(null);
                 setshowmedia(null);
-
                 setPendingMediaFile(editedFile);
-
               }}
-
               onCancel={() => setEditingViewerSrc(null)}
-
             />
-
           </React.Suspense>
-
         )}
 
         <Suspense fallback={null}>

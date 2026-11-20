@@ -37,8 +37,8 @@ const MyPulsesView = ({ onBack, onOpenCreate }) => {
     fetchMine();
   }, []);
 
-  const activeList = data.activePulses || [];
-  const expiredList = data.expiredPulses || [];
+  const activeList = data.activePulses || (data.pulses ? data.pulses.filter(p => p.status === 'active') : []);
+  const expiredList = data.expiredPulses || (data.pulses ? data.pulses.filter(p => p.status !== 'active') : []);
 
   return (
     <div style={{

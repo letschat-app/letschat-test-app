@@ -582,7 +582,7 @@ let newDate = parsedDate;
       userId:localStorage.getItem('userid'),
       eventTitle:title,
       startTime:startTime?add(date,startTime):add(date,'10:00'),
-      endTime:endTime?add(date,endTime) :'',
+      endTime:endTime?add(date,endTime) :null,
       eventDetails:description || '',
       eventColor:color || '',
       msgId:msgref || '',

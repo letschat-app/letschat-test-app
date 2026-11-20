@@ -55,8 +55,9 @@ const ScheduledListModal = ({ isOpen, onClose, scheduledMessages, onEdit, onDele
                 ? 'Unknown Time' 
                 : dateObj.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
                 
+              const resolvedMsgId = msg.msgId || msg.messageId || msg.msgid;
               return (
-                <div key={msg.msgId || index} style={{
+                <div key={resolvedMsgId || index} style={{
                   background: '#2c2c2c', border: '1px solid #444', borderRadius: '10px', padding: '12px',
                   display: 'flex', flexDirection: 'column', gap: '8px'
                 }}>
@@ -73,7 +74,7 @@ const ScheduledListModal = ({ isOpen, onClose, scheduledMessages, onEdit, onDele
                         <Edit2 size={16} />
                       </button>
                       <button 
-                        onClick={() => onDelete(msg.msgId)}
+                        onClick={() => onDelete(resolvedMsgId)}
                         style={{ background: 'transparent', border: 'none', color: 'var(--danger-color)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
                         title="Delete Message"
                       >

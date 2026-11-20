@@ -440,8 +440,9 @@ export default function Rooms({ isSidebar = false }) {
 
       if (res.ok) {
         const chatId = await res.text();
-        if (!chatId) {
-          console.error('Server returned empty chatId');
+        if (!chatId || chatId.trim() === 'room not exist' || chatId.trim() === 'failed') {
+          console.error('Server returned invalid or error chatId:', chatId);
+          setFetchError(chatId || 'Room does not exist or failed to join');
           return;
         }
 

@@ -284,7 +284,7 @@ export const EventStorage = ({ children }) => {
     const body={
       eventTitle:title,
       startTime:startTime?add(date,startTime):add(date,'10:00'),
-      endTime:endTime?add(date,endTime) :'',
+      endTime:endTime?add(date,endTime) :null,
       eventDetails:description || '',
       eventColor:color || '',
       msgId:msgref ?? '',
@@ -418,6 +418,19 @@ export const EventStorage = ({ children }) => {
     } catch (e) {
       console.warn("[EventStorage] deleteEventFromDB error:", e);
     }
+    try {
+      if (eventId && !String(eventId).startsWith('sim_')) {
+        await fetch(`${API}/user/event/delete/${eventId}`, {
+          method: 'POST',
+          headers: {
+            'User-Id': localStorage.getItem('userid'),
+            'ngrok-skip-browser-warning': 'true'
+          }
+        });
+      }
+    } catch (e) {
+      console.warn("[EventStorage] delete backend event error:", e);
+    }
   };
   
   const getAllEvents = () => events;
@@ -462,7 +475,7 @@ export const EventStorage = ({ children }) => {
           userId: userId || localStorage.getItem('userid'),
           eventTitle: title,
           startTime: startTime ? add(date, startTime) : (date ? add(date, '10:00') : ''),
-          endTime: endTime ? add(date, endTime) : '',
+          endTime: endTime ? add(date, endTime) : null,
           eventDetails: description || '',
           eventColor: color || '',
           msgId: msgref || '',

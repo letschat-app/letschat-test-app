@@ -32,7 +32,7 @@ const PollWidget = ({ message, currentUserId, members = [] }) => {
   useEffect(() => {
     if (!message?.poll && !fetchedPoll && !loadingPoll && targetMsgId) {
       setLoadingPoll(true);
-      fetch(`${API}/api/polls/by-msg/${encodeURIComponent(targetMsgId)}`, {
+      fetch(`${API}/polls/by-msg/${encodeURIComponent(targetMsgId)}`, {
         headers: {
           'User-Id': currentUserId || localStorage.getItem('userid'),
           'ngrok-skip-browser-warning': 'true'

@@ -241,7 +241,7 @@ const EventModal = ({
         const startIso = new Date(`${cleanDate}T${formData.startTime}:00`).toISOString();
         const endIso = new Date(`${cleanDate}T${formData.endTime}:00`).toISOString();
         const chatId = formData.chatid || formData.chatId || event?.chatid || event?.chatId || '';
-        const groupEventId = event?.groupEventId || '';
+        const groupEventId = event?.groupEventId || event?.eventId || event?.id || '';
 
         const params = new URLSearchParams({
           userId: currentUserId,

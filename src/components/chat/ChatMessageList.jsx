@@ -1,7 +1,9 @@
 import React, { useMemo } from 'react';
 import { Loader2, Lock, Zap, ChevronDown } from 'lucide-react';
 import ChatMessageBubble from './ChatMessageBubble';
-import { getDateOnly } from '../../utils/chatFormatting';
+import MediaGroupBubble from './MediaGroupBubble';
+import { getDateOnly, formatDateWithLabel } from '../../utils/chatFormatting';
+import { groupMessages } from '../../utils/groupMedia';
 
 /** Scrollable message feed with encryption notice, empty suggestions, memoized rows, typing indicator, and FABs. */
 export default function ChatMessageList({
@@ -48,6 +50,7 @@ export default function ChatMessageList({
   renderFormattedText,
   onOpenAssignmentPanel,
   onOpenMediaViewer,
+  onOpenAlbum,
   onRetryMediaUpload,
   onShowReactors,
   onToggleStar,
@@ -73,6 +76,10 @@ export default function ChatMessageList({
     }
     return map;
   }, [chatlist]);
+
+  const groupedMessages = useMemo(() => {
+    return groupMessages(filteredMessages);
+  }, [filteredMessages]);
 
   let lastdate = '';
 
@@ -213,7 +220,123 @@ export default function ChatMessageList({
           </div>
         )}
 
-        {filteredMessages.map((msg) => {
+        {groupedMessages.map((entry) => {
+          if (entry.kind === 'mediaGroup') {
+            const firstMsg = entry.items[0];
+            const isReceived = firstMsg.userid
+              ? String(firstMsg.userid) !== String(currentUserId)
+              : Boolean(firstMsg.sendername && firstMsg.sendername !== myDisplayName);
+
+            const dateOnly = getDateOnly(firstMsg.timestamp);
+            const showDate = dateOnly !== lastdate;
+            if (showDate) {
+              lastdate = dateOnly;
+            }
+
+            const unreadCountBeforeThis = entry.items.some((it) => unreadMarker.firstId === (it.msgid || it.tempmsgid))
+              ? unreadMarker.count
+              : 0;
+
+            return (
+              <React.Fragment key={entry.id}>
+                {showDate && (
+                  <div
+                    style={{
+                      border: '1px solid var(--border-color)',
+                      textAlign: 'center',
+                      color: 'var(--text-secondary)',
+                      padding: isMobile ? '6px 12px' : '8px 16px',
+                      borderRadius: '20px',
+                      fontSize: isMobile ? '11px' : '12px',
+                      fontWeight: '600',
+                      margin: '12px auto',
+                      backgroundColor: 'var(--bg-card)',
+                      cursor: 'pointer',
+                      userSelect: 'none',
+                      maxWidth: '200px',
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleDateCollapse(dateOnly);
+                    }}
+                  >
+                    {formatDateWithLabel(firstMsg.timestamp)}
+                  </div>
+                )}
+
+                {!collapsedView && (
+                  <>
+                    {unreadCountBeforeThis > 0 && (
+                      <div
+                        style={{
+                          margin: '24px auto',
+                          textAlign: 'center',
+                          position: 'relative',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '100%',
+                          padding: '12px 0',
+                        }}
+                      >
+                        <div
+                          style={{
+                            position: 'absolute',
+                            left: 0,
+                            right: 0,
+                            top: '50%',
+                            height: '1px',
+                            backgroundColor: 'var(--border-color)',
+                            zIndex: 0,
+                          }}
+                        />
+                        <span
+                          style={{
+                            backgroundColor: 'var(--bg-card)',
+                            color: 'var(--accent-color)',
+                            padding: '6px 16px',
+                            borderRadius: '24px',
+                            fontSize: '11px',
+                            fontWeight: '800',
+                            textTransform: 'uppercase',
+                            letterSpacing: '1.2px',
+                            zIndex: 1,
+                            border: '1px solid var(--border-color)',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                          }}
+                        >
+                          <span style={{ fontSize: '14px' }}>🔔</span>
+                          {unreadCountBeforeThis} New Message{unreadCountBeforeThis > 1 ? 's' : ''}
+                        </span>
+                      </div>
+                    )}
+
+                    <MediaGroupBubble
+                      group={entry}
+                      isReceived={isReceived}
+                      isMobile={isMobile}
+                      isSelectionMode={isSelectionMode}
+                      selectedMessages={selectedMessages}
+                      onOpenViewer={onOpenMediaViewer}
+                      onOpenAlbum={onOpenAlbum}
+                      onClickMessage={onClickMessage}
+                      onRetry={onRetryMediaUpload}
+                      onShowReactors={onShowReactors}
+                      chatType={chat?.type}
+                      userStreakMap={userStreakMap}
+                    />
+                  </>
+                )}
+              </React.Fragment>
+            );
+          }
+
+          const msg = entry.message;
           const isReceived = msg.userid
             ? String(msg.userid) !== String(currentUserId)
             : Boolean(msg.sendername && msg.sendername !== myDisplayName);

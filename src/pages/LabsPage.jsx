@@ -156,7 +156,7 @@ export default function LabsPage() {
   };
 
   const filteredExperiments = experiments.filter(exp => {
-    if (activeTab === 'opted_in') return exp.isOptedInEarlyAccess;
+    if (activeTab === 'opted_in') return exp.isOptedInEarlyAccess || exp.optedInEarlyAccess;
     if (activeTab === 'in_dev') return exp.status === 'in_development';
     return true;
   });
@@ -350,7 +350,7 @@ export default function LabsPage() {
             {filteredExperiments.map(exp => {
               const badge = getStatusBadge(exp.status);
               const userVoted = exp.userVotedIntent;
-              const isOptedIn = exp.isOptedInEarlyAccess;
+              const isOptedIn = exp.isOptedInEarlyAccess || exp.optedInEarlyAccess;
 
               return (
                 <div

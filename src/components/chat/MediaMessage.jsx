@@ -9,8 +9,6 @@ import messageStore from '../../pages/MessageStore';
 import { PREVIEW_BLUR_PX } from '../../service/TinyPreview';
 import './messages.css';
 
-export { PREVIEW_BLUR_PX };
-
 /**
  * Format bytes to human readable size
  */
@@ -142,7 +140,6 @@ export default function MediaMessage({
     );
   });
   const [resolvedMain, setResolvedMain] = useState(() => msg?.optimisticUrl || null);
-  const blobUrls = useRef(new Set());
 
   // Audio playback state
   const [isPlaying, setIsPlaying] = useState(false);
@@ -520,7 +517,16 @@ export default function MediaMessage({
             e.stopPropagation();
             if (isFailed) return;
             if (!resolvedMain && !fileUrl) return;
-            onOpenViewer?.({ fileUrl: resolvedMain || fileUrl, fileName, fileType: 'image' });
+            onOpenViewer?.({
+              id: msg.msgid || msg.tempmsgid || mediaId,
+              msgid: msg.msgid,
+              tempmsgid: msg.tempmsgid,
+              mediaId,
+              msg,
+              fileUrl: resolvedMain || fileUrl,
+              fileName,
+              fileType: 'image'
+            });
           }}
         >
           {imageSrc ? (
@@ -620,7 +626,16 @@ export default function MediaMessage({
           e.stopPropagation();
           if (isFailed) return;
           if (!resolvedMain && !fileUrl) return;
-          onOpenViewer?.({ fileUrl: resolvedMain || fileUrl, fileName, fileType: 'video' });
+          onOpenViewer?.({
+            id: msg.msgid || msg.tempmsgid || mediaId,
+            msgid: msg.msgid,
+            tempmsgid: msg.tempmsgid,
+            mediaId,
+            msg,
+            fileUrl: resolvedMain || fileUrl,
+            fileName,
+            fileType: 'video'
+          });
         }}
       >
         {videoThumb ? (
